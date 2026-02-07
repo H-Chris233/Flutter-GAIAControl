@@ -29,10 +29,10 @@ class HttpUtil {
       // 请求基地址,可以包含子路径
       // baseUrl: storage.read(key: STORAGE_KEY_APIURL) ?? SERVICE_API_BASEURL,
       //连接服务器超时时间，单位是毫秒.
-      connectTimeout: 3000,
+      connectTimeout: const Duration(milliseconds: 3000),
 
       // 响应流上前后两次接受到数据的间隔，单位为毫秒。
-      receiveTimeout: 3000,
+      receiveTimeout: const Duration(milliseconds: 3000),
 
       // Http请求头.
       headers: {},
@@ -81,7 +81,7 @@ class HttpUtil {
         // 如果你想终止请求并触发一个错误,你可以 reject 一个`DioError`对象,如`handler.reject(error)`，
         // 这样请求将被中止并触发异常，上层catchError会被调用。
       },
-      onError: (DioError e, handler) {
+      onError: (DioException e, handler) {
         // Do something with response error
         ErrorEntity eInfo = createErrorEntity(e);
         onError(eInfo);
@@ -112,19 +112,17 @@ class HttpUtil {
   }
 
   // 错误信息
-  ErrorEntity createErrorEntity(DioError error) {
+  ErrorEntity createErrorEntity(DioException error) {
     switch (error.type) {
-      case DioErrorType.cancel:
+      case DioExceptionType.cancel:
         return ErrorEntity(code: -1, message: "请求取消");
-      case DioErrorType.connectTimeout:
+      case DioExceptionType.connectionTimeout:
         return ErrorEntity(code: -1, message: "连接超时");
-      case DioErrorType.sendTimeout:
+      case DioExceptionType.sendTimeout:
         return ErrorEntity(code: -1, message: "请求超时");
-      case DioErrorType.receiveTimeout:
+      case DioExceptionType.receiveTimeout:
         return ErrorEntity(code: -1, message: "响应超时");
-      case DioErrorType.cancel:
-        return ErrorEntity(code: -1, message: "请求取消");
-      case DioErrorType.response:
+      case DioExceptionType.badResponse:
         {
           try {
             int errCode = error.response != null ? error.response!.statusCode! : -1;
@@ -164,7 +162,7 @@ class HttpUtil {
         }
       default:
         {
-          return ErrorEntity(code: -1, message: error.message);
+          return ErrorEntity(code: -1, message: error.message ?? "未知错误");
         }
     }
   }
@@ -202,9 +200,7 @@ class HttpUtil {
     bool cacheDisk = false,
   }) async {
     Options requestOptions = options ?? Options();
-    if (requestOptions.extra == null) {
-      requestOptions.extra = Map();
-    }
+    requestOptions.extra ??= <String, dynamic>{};
     requestOptions.extra!.addAll({
       "refresh": refresh,
       "noCache": noCache,
@@ -252,7 +248,7 @@ class HttpUtil {
 
   Future download(
     String path, {
-    String? savePath,
+    required String savePath,
     ProgressCallback? onReceiveProgress,
   }) async {
     final response = await dio.download(path, savePath, onReceiveProgress: onReceiveProgress);

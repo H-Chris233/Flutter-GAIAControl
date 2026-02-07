@@ -5,20 +5,20 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import 'package:get/get.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-import '../../../utils/gaia/ConfirmationType.dart';
-import '../../../utils/gaia/GAIA.dart';
-import '../../../utils/gaia/GaiaPacketBLE.dart';
-import '../../../utils/gaia/OpCodes.dart';
-import '../../../utils/gaia/ResumePoints.dart';
-import '../../../utils/gaia/UpgradeStartCFMStatus.dart';
-import '../../../utils/gaia/VMUPacket.dart';
-import '../../../utils/gaia/rwcp/RWCPClient.dart';
-import '../TestOtaView.dart';
-import '../utils/StringUtils.dart';
-import '../utils/gaia/rwcp/RWCPListener.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:gaia/TestOtaView.dart';
+import 'package:gaia/utils/StringUtils.dart';
+import 'package:gaia/utils/gaia/ConfirmationType.dart';
+import 'package:gaia/utils/gaia/GAIA.dart';
+import 'package:gaia/utils/gaia/GaiaPacketBLE.dart';
+import 'package:gaia/utils/gaia/OpCodes.dart';
+import 'package:gaia/utils/gaia/ResumePoints.dart';
+import 'package:gaia/utils/gaia/UpgradeStartCFMStatus.dart';
+import 'package:gaia/utils/gaia/VMUPacket.dart';
+import 'package:gaia/utils/gaia/rwcp/RWCPClient.dart';
+import 'package:gaia/utils/gaia/rwcp/RWCPListener.dart';
 
 class OtaServer extends GetxService implements RWCPListener {
   final flutterReactiveBle = FlutterReactiveBle();
@@ -122,6 +122,12 @@ class OtaServer extends GetxService implements RWCPListener {
           break;
         case BleStatus.poweredOff:
           addLog("蓝牙关闭");
+          break;
+        case BleStatus.unknown:
+          addLog("蓝牙状态未知");
+          break;
+        default:
+          addLog("蓝牙不可用");
           break;
       }
     });

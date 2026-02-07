@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:path_provider/path_provider.dart';
 
-import '../../../../utils/StringUtils.dart';
-import '../../../../utils/http.dart';
-import 'controlller/OtaServer.dart';
+import 'package:gaia/controlller/OtaServer.dart';
+import 'package:gaia/utils/StringUtils.dart';
+import 'package:gaia/utils/http.dart';
 
 class TestOtaView extends StatefulWidget {
   const TestOtaView({Key? key}) : super(key: key);
@@ -57,7 +57,7 @@ class _TestOtaState extends State<TestOtaView> {
                     onPressed: () {
                       OtaServer.to.logText.value = "";
                     },
-                    child: Text('清空LOG')),
+                  child: const Text('清空LOG')),
               ),
             ],
           ),
