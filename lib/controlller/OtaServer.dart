@@ -91,6 +91,7 @@ class OtaServer extends GetxService implements RWCPListener {
   StreamSubscription<List<int>>? _subscribeConnectionRWCP;
 
   String fileMd5 = "";
+  var firmwarePath = "".obs;
 
   var percentage = 0.0.obs;
 
@@ -115,6 +116,7 @@ class OtaServer extends GetxService implements RWCPListener {
   void onInit() {
     super.onInit();
     mRWCPClient = RWCPClient(this);
+    _initDefaultFirmwarePath();
     flutterReactiveBle.statusStream.listen((event) {
       switch (event) {
         case BleStatus.ready:
@@ -131,6 +133,25 @@ class OtaServer extends GetxService implements RWCPListener {
           break;
       }
     });
+  }
+
+  void _initDefaultFirmwarePath() async {
+    try {
+      final filePath = await getApplicationDocumentsDirectory();
+      firmwarePath.value = "${filePath.path}/1.bin";
+    } catch (e) {
+      addLog("初始化默认固件路径失败$e");
+    }
+  }
+
+  void setFirmwarePath(String path) {
+    final trimPath = path.trim();
+    if (trimPath.isEmpty) {
+      addLog("固件路径不能为空");
+      return;
+    }
+    firmwarePath.value = trimPath;
+    addLog("已设置固件路径$trimPath");
   }
 
   void connectDevice(String id) async {
@@ -362,11 +383,21 @@ class OtaServer extends GetxService implements RWCPListener {
   void sendSyncReq() async {
     //A2305C3A9059C15171BD33F3BB08ADE4 MD5
     //000A0642130004BB08ADE4
-    final filePath = await getApplicationDocumentsDirectory();
-    final saveBinPath = filePath.path + "/1.bin";
-    File file = File(saveBinPath);
-    mBytesFile = await file.readAsBytes();
+    String usePath = firmwarePath.value;
+    if (usePath.isEmpty) {
+      final filePath = await getApplicationDocumentsDirectory();
+      usePath = "${filePath.path}/1.bin";
+      firmwarePath.value = usePath;
+    }
+    file = File(usePath);
+    if (!await file!.exists()) {
+      addLog("升级文件不存在：$usePath");
+      stopUpgrade();
+      return;
+    }
+    mBytesFile = await file!.readAsBytes();
     fileMd5 = StringUtils.file2md5(mBytesFile ?? []).toUpperCase();
+    addLog("读取到文件:$usePath");
     addLog("读取到文件MD5$fileMd5");
     final endMd5 = StringUtils.hexStringToBytes(fileMd5.substring(24));
     VMUPacket packet = VMUPacket.get(OpCodes.UPGRADE_SYNC_REQ, data: endMd5);

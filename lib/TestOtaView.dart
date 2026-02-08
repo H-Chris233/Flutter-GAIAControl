@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:get/get.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -17,6 +20,13 @@ class _TestOtaState extends State<TestOtaView> {
   var isDownloading = false;
   var progress = 0;
   var savePath = "";
+  final TextEditingController _firmwarePathController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _firmwarePathController.text = OtaServer.to.firmwarePath.value;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,6 +43,52 @@ class _TestOtaState extends State<TestOtaView> {
             },
             child: Text("下载bin\n${!isDownloading ? "路径：$savePath" : '下载中($progress)\n路径：$savePath'}"),
           ),
+          Obx(() {
+            final currentPath = OtaServer.to.firmwarePath.value;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: MaterialButton(
+                        color: Colors.blue,
+                        onPressed: _chooseFirmwareFile,
+                        child: const Text('选择本地固件(.bin)'),
+                      ),
+                    ),
+                  ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: TextField(
+                    controller: _firmwarePathController,
+                    decoration: const InputDecoration(
+                      hintText: "输入固件绝对路径，例如 /storage/emulated/0/Download/firmware.bin",
+                    ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: MaterialButton(
+                        color: Colors.blue,
+                        onPressed: () async {
+                          await _applyFirmwarePath(_firmwarePathController.text);
+                        },
+                        child: const Text('应用路径'),
+                      ),
+                    ),
+                  ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text("当前固件: ${currentPath.isEmpty ? '未设置' : currentPath}",
+                      maxLines: 2, overflow: TextOverflow.ellipsis),
+                ),
+              ],
+            );
+          }),
           Row(
             children: [
               Text('RWCP'),
@@ -75,6 +131,9 @@ class _TestOtaState extends State<TestOtaView> {
             return MaterialButton(
               color: Colors.blue,
               onPressed: () async {
+                if (!await _ensureFirmwareReady()) {
+                  return;
+                }
                 if (OtaServer.to.mIsRWCPEnabled.value) {
                   await OtaServer.to.restPayloadSize();
                   await Future.delayed(const Duration(seconds: 1));
@@ -108,6 +167,7 @@ class _TestOtaState extends State<TestOtaView> {
 
   @override
   void dispose() {
+    _firmwarePathController.dispose();
     super.dispose();
     OtaServer.to.disconnect();
   }
@@ -130,5 +190,73 @@ class _TestOtaState extends State<TestOtaView> {
     setState(() {
       isDownloading = false;
     });
+    OtaServer.to.setFirmwarePath(saveBinPath);
+    _firmwarePathController.text = saveBinPath;
+  }
+
+  Future<void> _chooseFirmwareFile() async {
+    if (!mounted) return;
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ["bin"],
+      allowMultiple: false,
+      withData: false,
+    );
+    if (result == null || result.files.isEmpty) {
+      return;
+    }
+    final picked = result.files.single.path ?? "";
+    if (picked.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("未获取到文件路径，请重试")));
+      return;
+    }
+    await _applyFirmwarePath(picked);
+  }
+
+  Future<bool> _ensureFirmwareReady() async {
+    String usePath = _firmwarePathController.text.trim();
+    if (usePath.isEmpty) {
+      usePath = OtaServer.to.firmwarePath.value.trim();
+    }
+    final error = await _validateFirmwareFile(usePath);
+    if (error != null) {
+      OtaServer.to.addLog(error);
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+      return false;
+    }
+    await _applyFirmwarePath(usePath);
+    return true;
+  }
+
+  Future<void> _applyFirmwarePath(String rawPath) async {
+    final usePath = rawPath.trim();
+    final error = await _validateFirmwareFile(usePath);
+    if (error != null) {
+      OtaServer.to.addLog(error);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+      return;
+    }
+    OtaServer.to.setFirmwarePath(usePath);
+    _firmwarePathController.text = usePath;
+  }
+
+  Future<String?> _validateFirmwareFile(String path) async {
+    if (path.isEmpty) {
+      return "固件路径不能为空";
+    }
+    if (!path.toLowerCase().endsWith(".bin")) {
+      return "仅支持 .bin 固件文件";
+    }
+    final checkFile = File(path);
+    if (!await checkFile.exists()) {
+      return "固件文件不存在: $path";
+    }
+    final length = await checkFile.length();
+    if (length <= 0) {
+      return "固件文件为空: $path";
+    }
+    return null;
   }
 }
