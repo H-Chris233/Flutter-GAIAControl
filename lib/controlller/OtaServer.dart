@@ -109,6 +109,9 @@ class OtaServer extends GetxService implements RWCPListener {
   int writeRTCPCount = 0;
 
   File? file;
+  final bool useDfuOnly = true;
+  int _dfuPendingChunkSize = 0;
+  bool _dfuWriteInFlight = false;
 
   static OtaServer get to => Get.find();
 
@@ -158,20 +161,25 @@ class OtaServer extends GetxService implements RWCPListener {
     try {
       addLog('开始连接$id');
       _connection = flutterReactiveBle
-          .connectToDevice(id: id, connectionTimeout: const Duration(seconds: 5))
+          .connectToDevice(
+              id: id, connectionTimeout: const Duration(seconds: 5))
           .listen((connectionState) async {
-        if (connectionState.connectionState == DeviceConnectionState.connected) {
+        if (connectionState.connectionState ==
+            DeviceConnectionState.connected) {
           connectDeviceId = id;
           addLog("连接成功" + connectDeviceId);
           //IOS BUG
           await flutterReactiveBle.discoverServices(id);
-          Future.delayed(const Duration(seconds: 1)).then((value) => registerNotice());
+          Future.delayed(const Duration(seconds: 1))
+              .then((value) => registerNotice());
           if (!isUpgrading) {
             Get.to(() => const TestOtaView());
           }
-        } else if (connectionState.connectionState == DeviceConnectionState.disconnected) {
+        } else if (connectionState.connectionState ==
+            DeviceConnectionState.disconnected) {
           addLog('断开连接');
-          Future.delayed(const Duration(seconds: 5)).then((value) => connectDevice(connectDeviceId));
+          Future.delayed(const Duration(seconds: 5))
+              .then((value) => connectDevice(connectDeviceId));
         } else {
           addLog('断开${connectionState.connectionState}');
         }
@@ -192,9 +200,13 @@ class OtaServer extends GetxService implements RWCPListener {
     //IOS BUG
     await flutterReactiveBle.discoverServices(connectDeviceId);
     await Future.delayed(const Duration(seconds: 1));
-    final characteristic =
-        QualifiedCharacteristic(serviceId: otaUUID, characteristicId: writeNoResUUID, deviceId: connectDeviceId);
-    _subscribeConnectionRWCP = flutterReactiveBle.subscribeToCharacteristic(characteristic).listen((data) {
+    final characteristic = QualifiedCharacteristic(
+        serviceId: otaUUID,
+        characteristicId: writeNoResUUID,
+        deviceId: connectDeviceId);
+    _subscribeConnectionRWCP = flutterReactiveBle
+        .subscribeToCharacteristic(characteristic)
+        .listen((data) {
       //addLog("wenDataRec2>${StringUtils.byteToHexString(data)}");
       mRWCPClient.onReceiveRWCPSegment(data);
       // code to handle incoming data
@@ -219,9 +231,13 @@ class OtaServer extends GetxService implements RWCPListener {
     //IOS需要先发现否则订阅失败
     await flutterReactiveBle.discoverServices(connectDeviceId);
     await Future.delayed(const Duration(seconds: 1));
-    final characteristic =
-        QualifiedCharacteristic(serviceId: otaUUID, characteristicId: notifyUUID, deviceId: connectDeviceId);
-    _subscribeConnection = flutterReactiveBle.subscribeToCharacteristic(characteristic).listen((data) {
+    final characteristic = QualifiedCharacteristic(
+        serviceId: otaUUID,
+        characteristicId: notifyUUID,
+        deviceId: connectDeviceId);
+    _subscribeConnection = flutterReactiveBle
+        .subscribeToCharacteristic(characteristic)
+        .listen((data) {
       addLog("收到通知>${StringUtils.byteToHexString(data)}");
       handleRecMsg(data);
       // code to handle incoming data
@@ -229,8 +245,8 @@ class OtaServer extends GetxService implements RWCPListener {
       // code to handle errors
     });
     await Future.delayed(const Duration(seconds: 1));
-    GaiaPacketBLE packet =
-        GaiaPacketBLE.buildGaiaNotificationPacket(GAIA.COMMAND_REGISTER_NOTIFICATION, GAIA.VMU_PACKET, null, GAIA.BLE);
+    GaiaPacketBLE packet = GaiaPacketBLE.buildGaiaNotificationPacket(
+        GAIA.COMMAND_REGISTER_NOTIFICATION, GAIA.VMU_PACKET, null, GAIA.BLE);
     writeMsg(packet.getBytes());
     //如果开启RWCP那么需要在重连之后启用RWCP
     if (isUpgrading && transFerComplete && mIsRWCPEnabled.value) {
@@ -253,12 +269,21 @@ class OtaServer extends GetxService implements RWCPListener {
     });
     sendPkgCount = 0;
     updatePer.value = 0;
-    isUpgrading = false;
+    isUpgrading = true;
+    mIsRWCPEnabled.value = false;
     writeQueue.clear();
     resetUpload();
-    //registerNotice();
+    if (useDfuOnly) {
+      final loaded = await loadFirmwareFile();
+      if (!loaded) {
+        isUpgrading = false;
+        _timer?.cancel();
+        return;
+      }
+      sendDfuRequest();
+      return;
+    }
     sendUpgradeConnect();
-    //startUpgradeProcess();
   }
 
   void handleRecMsg(List<int> data) async {
@@ -293,8 +318,21 @@ class OtaServer extends GetxService implements RWCPListener {
   }
 
   void receiveSuccessfulAcknowledgement(GaiaPacketBLE packet) {
-    addLog("receiveSuccessfulAcknowledgement ${StringUtils.intTo2HexString(packet.getCommand())}");
+    addLog(
+        "receiveSuccessfulAcknowledgement ${StringUtils.intTo2HexString(packet.getCommand())}");
     switch (packet.getCommand()) {
+      case GAIA.COMMAND_DFU_REQUEST:
+        sendDfuBegin();
+        break;
+      case GAIA.COMMAND_DFU_BEGIN:
+        sendNextDfuPacket();
+        break;
+      case GAIA.COMMAND_DFU_WRITE:
+        onDfuWriteAck();
+        break;
+      case GAIA.COMMAND_DFU_COMMIT:
+        onDfuCommitAck();
+        break;
       case GAIA.COMMAND_VM_UPGRADE_CONNECT:
         {
           if (isUpgrading) {
@@ -306,8 +344,10 @@ class OtaServer extends GetxService implements RWCPListener {
               size = mPayloadSizeMax - 1;
               size = (size % 2 == 0) ? size : size - 1;
             }
-            mMaxLengthForDataTransfer = size - VMUPacket.REQUIRED_INFORMATION_LENGTH;
-            addLog("mMaxLengthForDataTransfer $mMaxLengthForDataTransfer mPayloadSizeMax $mPayloadSizeMax");
+            mMaxLengthForDataTransfer =
+                size - VMUPacket.REQUIRED_INFORMATION_LENGTH;
+            addLog(
+                "mMaxLengthForDataTransfer $mMaxLengthForDataTransfer mPayloadSizeMax $mPayloadSizeMax");
             //开始发送升级包
             startUpgradeProcess();
           }
@@ -331,7 +371,22 @@ class OtaServer extends GetxService implements RWCPListener {
   }
 
   void receiveUnsuccessfulAcknowledgement(GaiaPacketBLE packet) {
-    addLog("命令发送失败${StringUtils.intTo2HexString(packet.getCommand())}");
+    final cmd = packet.getCommand();
+    final status = packet.getStatus();
+    addLog(
+        "命令发送失败${StringUtils.intTo2HexString(cmd)} status=0x${status.toRadixString(16)}");
+    if (cmd == GAIA.COMMAND_DFU_REQUEST && useDfuOnly) {
+      addLog("DFU_REQUEST不支持，尝试直接发送DFU_BEGIN");
+      sendDfuBegin();
+      return;
+    }
+    if (cmd == GAIA.COMMAND_DFU_BEGIN ||
+        cmd == GAIA.COMMAND_DFU_WRITE ||
+        cmd == GAIA.COMMAND_DFU_COMMIT) {
+      _dfuWriteInFlight = false;
+      stopUpgrade(sendAbort: false);
+      return;
+    }
     if (packet.getCommand() == GAIA.COMMAND_VM_UPGRADE_CONNECT ||
         packet.getCommand() == GAIA.COMMAND_VM_UPGRADE_CONTROL) {
       sendUpgradeDisconnect();
@@ -368,21 +423,25 @@ class OtaServer extends GetxService implements RWCPListener {
     mStartOffset = 0;
   }
 
-  void stopUpgrade() async {
+  void stopUpgrade({bool sendAbort = true}) async {
     _timer?.cancel();
     timeCount.value = 0;
-    abortUpgrade();
+    if (sendAbort && !useDfuOnly) {
+      abortUpgrade();
+    }
     resetUpload();
     writeRTCPCount = 0;
     updatePer.value = 0;
     isUpgrading = false;
-    await Future.delayed(const Duration(milliseconds: 500));
-    sendUpgradeDisconnect();
+    _dfuWriteInFlight = false;
+    _dfuPendingChunkSize = 0;
+    if (!useDfuOnly) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      sendUpgradeDisconnect();
+    }
   }
 
-  void sendSyncReq() async {
-    //A2305C3A9059C15171BD33F3BB08ADE4 MD5
-    //000A0642130004BB08ADE4
+  Future<bool> loadFirmwareFile() async {
     String usePath = firmwarePath.value;
     if (usePath.isEmpty) {
       final filePath = await getApplicationDocumentsDirectory();
@@ -392,16 +451,107 @@ class OtaServer extends GetxService implements RWCPListener {
     file = File(usePath);
     if (!await file!.exists()) {
       addLog("升级文件不存在：$usePath");
-      stopUpgrade();
-      return;
+      return false;
     }
     mBytesFile = await file!.readAsBytes();
+    if ((mBytesFile ?? []).isEmpty) {
+      addLog("升级文件为空：$usePath");
+      return false;
+    }
     fileMd5 = StringUtils.file2md5(mBytesFile ?? []).toUpperCase();
     addLog("读取到文件:$usePath");
     addLog("读取到文件MD5$fileMd5");
+    return true;
+  }
+
+  void sendSyncReq() async {
+    //A2305C3A9059C15171BD33F3BB08ADE4 MD5
+    //000A0642130004BB08ADE4
+    final loaded = await loadFirmwareFile();
+    if (!loaded) {
+      stopUpgrade();
+      return;
+    }
     final endMd5 = StringUtils.hexStringToBytes(fileMd5.substring(24));
     VMUPacket packet = VMUPacket.get(OpCodes.UPGRADE_SYNC_REQ, data: endMd5);
     sendVMUPacket(packet, false);
+  }
+
+  void sendDfuRequest() {
+    addLog("发送DFU_REQUEST");
+    _dfuWriteInFlight = false;
+    _dfuPendingChunkSize = 0;
+    mStartOffset = 0;
+    mBytesToSend = mBytesFile?.length ?? 0;
+    final packet = GaiaPacketBLE(GAIA.COMMAND_DFU_REQUEST);
+    writeMsg(packet.getBytes());
+  }
+
+  void sendDfuBegin() {
+    if ((mBytesFile ?? []).isEmpty) {
+      addLog("DFU_BEGIN失败：固件数据为空");
+      stopUpgrade(sendAbort: false);
+      return;
+    }
+    final fileLength = mBytesFile?.length ?? 0;
+    final fileLengthBytes = [
+      (fileLength >> 24) & 0xFF,
+      (fileLength >> 16) & 0xFF,
+      (fileLength >> 8) & 0xFF,
+      fileLength & 0xFF
+    ];
+    final digest = StringUtils.hexStringToBytes(fileMd5.substring(24));
+    final payload = [...fileLengthBytes, ...digest];
+    addLog(
+        "发送DFU_BEGIN length=$fileLength digest=${StringUtils.byteToHexString(digest)}");
+    final packet = GaiaPacketBLE(GAIA.COMMAND_DFU_BEGIN, mPayload: payload);
+    writeMsg(packet.getBytes());
+  }
+
+  void sendNextDfuPacket() {
+    if (!isUpgrading || _dfuWriteInFlight) {
+      return;
+    }
+    final bytes = mBytesFile ?? [];
+    if (mStartOffset >= bytes.length) {
+      sendDfuCommit();
+      return;
+    }
+    final chunkSize = (bytes.length - mStartOffset) < mPayloadSizeMax
+        ? (bytes.length - mStartOffset)
+        : mPayloadSizeMax;
+    final payload = bytes.sublist(mStartOffset, mStartOffset + chunkSize);
+    _dfuPendingChunkSize = chunkSize;
+    _dfuWriteInFlight = true;
+    final packet = GaiaPacketBLE(GAIA.COMMAND_DFU_WRITE, mPayload: payload);
+    writeMsg(packet.getBytes());
+  }
+
+  void onDfuWriteAck() {
+    if (!_dfuWriteInFlight) {
+      return;
+    }
+    _dfuWriteInFlight = false;
+    mStartOffset += _dfuPendingChunkSize;
+    _dfuPendingChunkSize = 0;
+    final total = (mBytesFile ?? []).length;
+    if (total > 0) {
+      updatePer.value = mStartOffset * 100.0 / total;
+    }
+    sendNextDfuPacket();
+  }
+
+  void sendDfuCommit() {
+    addLog("发送DFU_COMMIT");
+    final packet = GaiaPacketBLE(GAIA.COMMAND_DFU_COMMIT);
+    writeMsg(packet.getBytes());
+  }
+
+  void onDfuCommitAck() {
+    updatePer.value = 100;
+    isUpgrading = false;
+    _timer?.cancel();
+    addLog("DFU升级完成，等待设备重启");
   }
 
   /// <p>To send a VMUPacket over the defined protocol communication.</p>
@@ -413,7 +563,8 @@ class OtaServer extends GetxService implements RWCPListener {
   void sendVMUPacket(VMUPacket packet, bool isTransferringData) {
     List<int> bytes = packet.getBytes();
     if (isTransferringData && mIsRWCPEnabled.value) {
-      final packet = GaiaPacketBLE(GAIA.COMMAND_VM_UPGRADE_CONTROL, mPayload: bytes);
+      final packet =
+          GaiaPacketBLE(GAIA.COMMAND_VM_UPGRADE_CONTROL, mPayload: bytes);
       try {
         List<int> bytes = packet.getBytes();
         if (mTransferStartTime <= 0) {
@@ -421,13 +572,16 @@ class OtaServer extends GetxService implements RWCPListener {
         }
         bool success = mRWCPClient.sendData(bytes);
         if (!success) {
-          addLog("Fail to send GAIA packet for GAIA command: ${packet.getCommandId()}");
+          addLog(
+              "Fail to send GAIA packet for GAIA command: ${packet.getCommandId()}");
         }
       } catch (e) {
-        addLog("Exception when attempting to create GAIA packet: " + e.toString());
+        addLog(
+            "Exception when attempting to create GAIA packet: " + e.toString());
       }
     } else {
-      final pkg = GaiaPacketBLE(GAIA.COMMAND_VM_UPGRADE_CONTROL, mPayload: bytes);
+      final pkg =
+          GaiaPacketBLE(GAIA.COMMAND_VM_UPGRADE_CONTROL, mPayload: bytes);
       writeMsg(pkg.getBytes());
     }
   }
@@ -438,7 +592,8 @@ class OtaServer extends GetxService implements RWCPListener {
       if (isUpgrading || packet!.mOpCode == OpCodes.UPGRADE_ABORT_CFM) {
         handleVMUPacket(packet);
       } else {
-        addLog("receiveVMUPacket Received VMU packet while application is not upgrading anymore, opcode received");
+        addLog(
+            "receiveVMUPacket Received VMU packet while application is not upgrading anymore, opcode received");
       }
     } catch (e) {
       addLog("receiveVMUPacket $e");
@@ -488,8 +643,8 @@ class OtaServer extends GetxService implements RWCPListener {
   }
 
   void cancelNotification() async {
-    GaiaPacketBLE packet =
-        GaiaPacketBLE.buildGaiaNotificationPacket(GAIA.COMMAND_CANCEL_NOTIFICATION, GAIA.VMU_PACKET, null, GAIA.BLE);
+    GaiaPacketBLE packet = GaiaPacketBLE.buildGaiaNotificationPacket(
+        GAIA.COMMAND_CANCEL_NOTIFICATION, GAIA.VMU_PACKET, null, GAIA.BLE);
     writeMsg(packet.getBytes());
   }
 
@@ -560,7 +715,8 @@ class OtaServer extends GetxService implements RWCPListener {
     sendErrorConfirmation(data); //
     int returnCode = StringUtils.extractIntFromByteArray(data, 0, 2, false);
     //A2305C3A9059C15171BD33F3BB08ADE4
-    addLog("receiveErrorWarnIND 升级失败 错误码0x${returnCode.toRadixString(16)} fileMd5$fileMd5");
+    addLog(
+        "receiveErrorWarnIND 升级失败 错误码0x${returnCode.toRadixString(16)} fileMd5$fileMd5");
     //noinspection IfCanBeSwitch
     if (returnCode == 0x81) {
       addLog("包不通过");
@@ -578,7 +734,8 @@ class OtaServer extends GetxService implements RWCPListener {
     List<int> data = packet?.getBytes() ?? [];
     if (data.length == 2) {
       final time = StringUtils.extractIntFromByteArray(data, 0, 2, false);
-      Future.delayed(Duration(milliseconds: time)).then((value) => sendValidationDoneReq());
+      Future.delayed(Duration(milliseconds: time))
+          .then((value) => sendValidationDoneReq());
     } else {
       sendValidationDoneReq();
     }
@@ -628,18 +785,25 @@ class OtaServer extends GetxService implements RWCPListener {
       //SEND 000A064204000D0000030000FFFF0001FFFF0002
       var lengthByte = [data[0], data[1], data[2], data[3]];
       var fileByte = [data[4], data[5], data[6], data[7]];
-      mBytesToSend = int.parse(StringUtils.byteToHexString(lengthByte), radix: 16);
-      int fileOffset = int.parse(StringUtils.byteToHexString(fileByte), radix: 16);
+      mBytesToSend =
+          int.parse(StringUtils.byteToHexString(lengthByte), radix: 16);
+      int fileOffset =
+          int.parse(StringUtils.byteToHexString(fileByte), radix: 16);
 
-      addLog(StringUtils.byteToHexString(data) + "本次发包: $fileOffset $mBytesToSend");
+      addLog(StringUtils.byteToHexString(data) +
+          "本次发包: $fileOffset $mBytesToSend");
       // we check the value for the offset
-      mStartOffset += (fileOffset > 0 && fileOffset + mStartOffset < (mBytesFile?.length ?? 0)) ? fileOffset : 0;
+      mStartOffset += (fileOffset > 0 &&
+              fileOffset + mStartOffset < (mBytesFile?.length ?? 0))
+          ? fileOffset
+          : 0;
 
       // if the asked length doesn't fit with possibilities we use the maximum length we can use.
       mBytesToSend = (mBytesToSend > 0) ? mBytesToSend : 0;
       // if the requested length will look for bytes out of the array we reduce it to the remaining length.
       int remainingLength = mBytesFile?.length ?? 0 - mStartOffset;
-      mBytesToSend = (mBytesToSend < remainingLength) ? mBytesToSend : remainingLength;
+      mBytesToSend =
+          (mBytesToSend < remainingLength) ? mBytesToSend : remainingLength;
       if (mIsRWCPEnabled.value) {
         while (mBytesToSend > 0) {
           sendNextDataPacket();
@@ -676,11 +840,14 @@ class OtaServer extends GetxService implements RWCPListener {
     }
     // inform listeners about evolution
     onFileUploadProgress();
-    int bytesToSend = mBytesToSend < mMaxLengthForDataTransfer - 1 ? mBytesToSend : mMaxLengthForDataTransfer - 1;
+    int bytesToSend = mBytesToSend < mMaxLengthForDataTransfer - 1
+        ? mBytesToSend
+        : mMaxLengthForDataTransfer - 1;
     // to know if we are sending the last data packet.
     bool lastPacket = (mBytesFile ?? []).length - mStartOffset <= bytesToSend;
     if (lastPacket) {
-      addLog("mMaxLengthForDataTransfer$mMaxLengthForDataTransfer bytesToSend$bytesToSend lastPacket$lastPacket");
+      addLog(
+          "mMaxLengthForDataTransfer$mMaxLengthForDataTransfer bytesToSend$bytesToSend lastPacket$lastPacket");
     }
     List<int> dataToSend = [];
     for (int i = 0; i < bytesToSend; i++) {
@@ -733,7 +900,9 @@ class OtaServer extends GetxService implements RWCPListener {
       hasToAbort = false;
       abortUpgrade();
     } else {
-      if (mBytesToSend > 0 && mResumePoint == ResumePoints.DATA_TRANSFER && !mIsRWCPEnabled.value) {
+      if (mBytesToSend > 0 &&
+          mResumePoint == ResumePoints.DATA_TRANSFER &&
+          !mIsRWCPEnabled.value) {
         sendNextDataPacket();
       }
     }
@@ -778,7 +947,8 @@ class OtaServer extends GetxService implements RWCPListener {
   }
 
   void sendErrorConfirmation(List<int> data) {
-    VMUPacket packet = VMUPacket.get(OpCodes.UPGRADE_ERROR_WARN_RES, data: data);
+    VMUPacket packet =
+        VMUPacket.get(OpCodes.UPGRADE_ERROR_WARN_RES, data: data);
     sendVMUPacket(packet, false);
   }
 
@@ -821,20 +991,28 @@ class OtaServer extends GetxService implements RWCPListener {
 
   //一般命令写入通道
   Future<void> writeData(List<int> data) async {
-    addLog("${DateTime.now()} wenDataWrite start>${StringUtils.byteToHexString(data)}");
+    addLog(
+        "${DateTime.now()} wenDataWrite start>${StringUtils.byteToHexString(data)}");
     await Future.delayed(const Duration(milliseconds: 100));
-    final characteristic =
-        QualifiedCharacteristic(serviceId: otaUUID, characteristicId: writeUUID, deviceId: connectDeviceId);
-    await flutterReactiveBle.writeCharacteristicWithResponse(characteristic, value: data);
-    addLog("${DateTime.now()} wenDataWrite end>${StringUtils.byteToHexString(data)}");
+    final characteristic = QualifiedCharacteristic(
+        serviceId: otaUUID,
+        characteristicId: writeUUID,
+        deviceId: connectDeviceId);
+    await flutterReactiveBle.writeCharacteristicWithResponse(characteristic,
+        value: data);
+    addLog(
+        "${DateTime.now()} wenDataWrite end>${StringUtils.byteToHexString(data)}");
   }
 
   //RWCP写入通道
   void writeMsgRWCP(List<int> data) async {
     await Future.delayed(const Duration(milliseconds: 100));
-    final characteristic =
-        QualifiedCharacteristic(serviceId: otaUUID, characteristicId: writeNoResUUID, deviceId: connectDeviceId);
-    await flutterReactiveBle.writeCharacteristicWithoutResponse(characteristic, value: data);
+    final characteristic = QualifiedCharacteristic(
+        serviceId: otaUUID,
+        characteristicId: writeNoResUUID,
+        deviceId: connectDeviceId);
+    await flutterReactiveBle.writeCharacteristicWithoutResponse(characteristic,
+        value: data);
   }
 
   void disconnect() {
@@ -844,7 +1022,8 @@ class OtaServer extends GetxService implements RWCPListener {
   }
 
   Future<void> restPayloadSize() async {
-    int mtu = await flutterReactiveBle.requestMtu(deviceId: connectDeviceId, mtu: 256);
+    int mtu = await flutterReactiveBle.requestMtu(
+        deviceId: connectDeviceId, mtu: 256);
     if (!mIsRWCPEnabled.value) {
       mtu = 23;
     }
@@ -895,7 +1074,9 @@ class OtaServer extends GetxService implements RWCPListener {
     } catch (e) {}
     // Start scannin
     _scanConnection = flutterReactiveBle.scanForDevices(
-        withServices: [], scanMode: ScanMode.lowLatency, requireLocationServicesEnabled: true).listen((device) {
+        withServices: [],
+        scanMode: ScanMode.lowLatency,
+        requireLocationServicesEnabled: true).listen((device) {
       if (device.name.isNotEmpty) {
         final knownDeviceIndex = devices.indexWhere((d) => d.id == device.id);
         if (knownDeviceIndex >= 0) {

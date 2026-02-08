@@ -41,7 +41,8 @@ class _TestOtaState extends State<TestOtaView> {
             onPressed: () {
               _download();
             },
-            child: Text("下载bin\n${!isDownloading ? "路径：$savePath" : '下载中($progress)\n路径：$savePath'}"),
+            child: Text(
+                "下载bin\n${!isDownloading ? "路径：$savePath" : '下载中($progress)\n路径：$savePath'}"),
           ),
           Obx(() {
             final currentPath = OtaServer.to.firmwarePath.value;
@@ -64,7 +65,8 @@ class _TestOtaState extends State<TestOtaView> {
                   child: TextField(
                     controller: _firmwarePathController,
                     decoration: const InputDecoration(
-                      hintText: "输入固件绝对路径，例如 /storage/emulated/0/Download/firmware.bin",
+                      hintText:
+                          "输入固件绝对路径，例如 /storage/emulated/0/Download/firmware.bin",
                     ),
                   ),
                 ),
@@ -74,7 +76,8 @@ class _TestOtaState extends State<TestOtaView> {
                       child: MaterialButton(
                         color: Colors.blue,
                         onPressed: () async {
-                          await _applyFirmwarePath(_firmwarePathController.text);
+                          await _applyFirmwarePath(
+                              _firmwarePathController.text);
                         },
                         child: const Text('应用路径'),
                       ),
@@ -83,8 +86,10 @@ class _TestOtaState extends State<TestOtaView> {
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Text("当前固件: ${currentPath.isEmpty ? '未设置' : currentPath}",
-                      maxLines: 2, overflow: TextOverflow.ellipsis),
+                  child: Text(
+                      "当前固件: ${currentPath.isEmpty ? '未设置' : currentPath}",
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis),
                 ),
               ],
             );
@@ -101,9 +106,11 @@ class _TestOtaState extends State<TestOtaView> {
                       await OtaServer.to.restPayloadSize();
                       await Future.delayed(const Duration(seconds: 1));
                       if (OtaServer.to.mIsRWCPEnabled.value) {
-                        OtaServer.to.writeMsg(StringUtils.hexStringToBytes("000A022E01"));
+                        OtaServer.to.writeMsg(
+                            StringUtils.hexStringToBytes("000A022E01"));
                       } else {
-                        OtaServer.to.writeMsg(StringUtils.hexStringToBytes("000A022E00"));
+                        OtaServer.to.writeMsg(
+                            StringUtils.hexStringToBytes("000A022E00"));
                       }
                     });
               }),
@@ -113,7 +120,7 @@ class _TestOtaState extends State<TestOtaView> {
                     onPressed: () {
                       OtaServer.to.logText.value = "";
                     },
-                  child: const Text('清空LOG')),
+                    child: const Text('清空LOG')),
               ),
             ],
           ),
@@ -121,7 +128,9 @@ class _TestOtaState extends State<TestOtaView> {
             final per = OtaServer.to.updatePer.value;
             return Row(
               children: [
-                Expanded(child: Slider(value: per, onChanged: (data) {}, max: 100, min: 0)),
+                Expanded(
+                    child: Slider(
+                        value: per, onChanged: (data) {}, max: 100, min: 0)),
                 SizedBox(width: 60, child: Text('${per.toStringAsFixed(2)}%'))
               ],
             );
@@ -134,13 +143,7 @@ class _TestOtaState extends State<TestOtaView> {
                 if (!await _ensureFirmwareReady()) {
                   return;
                 }
-                if (OtaServer.to.mIsRWCPEnabled.value) {
-                  await OtaServer.to.restPayloadSize();
-                  await Future.delayed(const Duration(seconds: 1));
-                  OtaServer.to.writeMsg(StringUtils.hexStringToBytes("000A022E01"));
-                } else {
-                  OtaServer.to.startUpdate();
-                }
+                OtaServer.to.startUpdate();
               },
               child: Text('开始升级 $time'),
             );
@@ -181,7 +184,8 @@ class _TestOtaState extends State<TestOtaView> {
     setState(() {
       savePath = saveBinPath;
     });
-    await HttpUtil().download(url, savePath: saveBinPath, onReceiveProgress: (int count, int total) {
+    await HttpUtil().download(url, savePath: saveBinPath,
+        onReceiveProgress: (int count, int total) {
       setState(() {
         isDownloading = true;
         progress = count * 100.0 ~/ total;
@@ -207,7 +211,8 @@ class _TestOtaState extends State<TestOtaView> {
     }
     final picked = result.files.single.path ?? "";
     if (picked.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("未获取到文件路径，请重试")));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text("未获取到文件路径，请重试")));
       return;
     }
     await _applyFirmwarePath(picked);
@@ -222,7 +227,8 @@ class _TestOtaState extends State<TestOtaView> {
     if (error != null) {
       OtaServer.to.addLog(error);
       if (!mounted) return false;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error)));
       return false;
     }
     await _applyFirmwarePath(usePath);
@@ -235,7 +241,8 @@ class _TestOtaState extends State<TestOtaView> {
     if (error != null) {
       OtaServer.to.addLog(error);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error)));
       return;
     }
     OtaServer.to.setFirmwarePath(usePath);
