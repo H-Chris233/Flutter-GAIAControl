@@ -143,9 +143,29 @@ class _TestOtaState extends State<TestOtaView> {
                 if (!await _ensureFirmwareReady()) {
                   return;
                 }
-                OtaServer.to.startUpdate();
+                OtaServer.to.startUpdateWithVersionCheck();
               },
               child: Text('开始升级 $time'),
+            );
+          }),
+          Obx(() {
+            final before = OtaServer.to.versionBeforeUpgrade.value;
+            final after = OtaServer.to.versionAfterUpgrade.value;
+            final compare = (before == "UNKNOWN" || after == "UNKNOWN")
+                ? "信息不足"
+                : (before == after ? "未变化（可能未升级成功）" : "已变化（升级成功）");
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("升级前版本: $before",
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text("升级后版本: $after",
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text("版本对比: $compare"),
+                ],
+              ),
             );
           }),
           MaterialButton(
@@ -209,6 +229,7 @@ class _TestOtaState extends State<TestOtaView> {
     if (result == null || result.files.isEmpty) {
       return;
     }
+    if (!mounted) return;
     final picked = result.files.single.path ?? "";
     if (picked.isEmpty) {
       ScaffoldMessenger.of(context)

@@ -33,6 +33,7 @@ class OtaServer extends GetxService implements RWCPListener {
   Uuid writeUUID = Uuid.parse("00001101-d102-11e1-9b23-00025b00a5a5");
   Uuid writeNoResUUID = Uuid.parse("00001103-d102-11e1-9b23-00025b00a5a5");
   StreamSubscription<ConnectionStateUpdate>? _connection;
+  bool isDeviceConnected = false;
 
   /**
    * To know if the upgrade process is currently running.
@@ -78,6 +79,8 @@ class OtaServer extends GetxService implements RWCPListener {
   int sendPkgCount = 0;
 
   RxDouble updatePer = RxDouble(0);
+  var versionBeforeUpgrade = "UNKNOWN".obs;
+  var versionAfterUpgrade = "UNKNOWN".obs;
 
   /**
    * To know if we have to disconnect after any event which occurs as a fatal error from the board.
@@ -113,6 +116,14 @@ class OtaServer extends GetxService implements RWCPListener {
   int _dfuPendingChunkSize = 0;
   bool _dfuWriteInFlight = false;
   Timer? _dfuResultTimer;
+  bool _isVersionQueryInFlight = false;
+  String _currentVersionQueryTag = "";
+  Timer? _versionQueryTimer;
+  void Function(String version)? _onVersionQuerySuccess;
+  VoidCallback? _onVersionQueryFailed;
+  bool _pendingStartAfterVersionQuery = false;
+  Timer? _postUpgradeVersionRetryTimer;
+  int _postUpgradeVersionRetryCount = 0;
 
   static OtaServer get to => Get.find();
 
@@ -167,6 +178,7 @@ class OtaServer extends GetxService implements RWCPListener {
           .listen((connectionState) async {
         if (connectionState.connectionState ==
             DeviceConnectionState.connected) {
+          isDeviceConnected = true;
           connectDeviceId = id;
           addLog("连接成功" + connectDeviceId);
           //IOS BUG
@@ -178,10 +190,12 @@ class OtaServer extends GetxService implements RWCPListener {
           }
         } else if (connectionState.connectionState ==
             DeviceConnectionState.disconnected) {
+          isDeviceConnected = false;
           addLog('断开连接');
           Future.delayed(const Duration(seconds: 5))
               .then((value) => connectDevice(connectDeviceId));
         } else {
+          isDeviceConnected = false;
           addLog('断开${connectionState.connectionState}');
         }
       });
@@ -272,6 +286,8 @@ class OtaServer extends GetxService implements RWCPListener {
     updatePer.value = 0;
     isUpgrading = true;
     _dfuResultTimer?.cancel();
+    _versionQueryTimer?.cancel();
+    _postUpgradeVersionRetryTimer?.cancel();
     mIsRWCPEnabled.value = false;
     writeQueue.clear();
     resetUpload();
@@ -286,6 +302,33 @@ class OtaServer extends GetxService implements RWCPListener {
       return;
     }
     sendUpgradeConnect();
+  }
+
+  void startUpdateWithVersionCheck() {
+    if (isUpgrading) {
+      addLog("正在升级中，忽略重复开始请求");
+      return;
+    }
+    _pendingStartAfterVersionQuery = true;
+    versionAfterUpgrade.value = "UNKNOWN";
+    queryApplicationVersion(
+      tag: "升级前",
+      onSuccess: (version) {
+        versionBeforeUpgrade.value = version;
+        if (_pendingStartAfterVersionQuery) {
+          _pendingStartAfterVersionQuery = false;
+          startUpdate();
+        }
+      },
+      onFailed: () {
+        versionBeforeUpgrade.value = "UNKNOWN";
+        addLog("升级前版本查询失败，继续执行DFU升级");
+        if (_pendingStartAfterVersionQuery) {
+          _pendingStartAfterVersionQuery = false;
+          startUpdate();
+        }
+      },
+    );
   }
 
   void handleRecMsg(List<int> data) async {
@@ -337,6 +380,9 @@ class OtaServer extends GetxService implements RWCPListener {
         break;
       case GAIA.COMMAND_DFU_GET_RESULT:
         onDfuGetResultAck(packet);
+        break;
+      case GAIA.COMMAND_GET_APPLICATION_VERSION:
+        onApplicationVersionAck(packet);
         break;
       case GAIA.COMMAND_VM_UPGRADE_CONNECT:
         {
@@ -394,7 +440,12 @@ class OtaServer extends GetxService implements RWCPListener {
     }
     if (cmd == GAIA.COMMAND_DFU_GET_RESULT) {
       addLog("DFU_GET_RESULT失败，按提交成功处理（结果码不可得）");
-      _finishDfuUpgrade("DFU提交完成（设备未返回结果码）");
+      _finishDfuUpgrade("DFU提交完成（设备未返回结果码）", queryPostVersion: true);
+      return;
+    }
+    if (cmd == GAIA.COMMAND_GET_APPLICATION_VERSION) {
+      _finishVersionQueryFailed(
+          "$_currentVersionQueryTag版本查询失败 status=0x${status.toRadixString(16)}");
       return;
     }
     if (packet.getCommand() == GAIA.COMMAND_VM_UPGRADE_CONNECT ||
@@ -436,6 +487,9 @@ class OtaServer extends GetxService implements RWCPListener {
   void stopUpgrade({bool sendAbort = true}) async {
     _timer?.cancel();
     _dfuResultTimer?.cancel();
+    _versionQueryTimer?.cancel();
+    _postUpgradeVersionRetryTimer?.cancel();
+    _pendingStartAfterVersionQuery = false;
     timeCount.value = 0;
     if (sendAbort && !useDfuOnly) {
       abortUpgrade();
@@ -573,7 +627,7 @@ class OtaServer extends GetxService implements RWCPListener {
         return;
       }
       addLog("DFU_GET_RESULT超时，按提交成功处理");
-      _finishDfuUpgrade("DFU提交完成（结果查询超时）");
+      _finishDfuUpgrade("DFU提交完成（结果查询超时）", queryPostVersion: true);
     });
   }
 
@@ -581,12 +635,12 @@ class OtaServer extends GetxService implements RWCPListener {
     _dfuResultTimer?.cancel();
     final payload = packet.mPayload ?? [];
     if (payload.length < 2) {
-      _finishDfuUpgrade("DFU提交完成（无结果码）");
+      _finishDfuUpgrade("DFU提交完成（无结果码）", queryPostVersion: true);
       return;
     }
     final resultCode = payload[1];
     if (resultCode == 0x00) {
-      _finishDfuUpgrade("DFU升级完成，设备返回成功");
+      _finishDfuUpgrade("DFU升级完成，设备返回成功", queryPostVersion: true);
       return;
     }
     _dfuWriteInFlight = false;
@@ -595,12 +649,15 @@ class OtaServer extends GetxService implements RWCPListener {
     addLog("DFU升级失败，结果码=0x${resultCode.toRadixString(16).padLeft(2, '0')}");
   }
 
-  void _finishDfuUpgrade(String message) {
+  void _finishDfuUpgrade(String message, {bool queryPostVersion = false}) {
     _dfuWriteInFlight = false;
     isUpgrading = false;
     _timer?.cancel();
     _dfuResultTimer?.cancel();
     addLog(message);
+    if (queryPostVersion) {
+      _schedulePostUpgradeVersionQuery();
+    }
   }
 
   String _gaiaStatusText(int status) {
@@ -624,6 +681,132 @@ class OtaServer extends GetxService implements RWCPListener {
       default:
         return "UNKNOWN_STATUS";
     }
+  }
+
+  void queryApplicationVersion({
+    required String tag,
+    required void Function(String version) onSuccess,
+    required VoidCallback onFailed,
+  }) {
+    if (_isVersionQueryInFlight) {
+      addLog("版本查询进行中，忽略重复请求");
+      return;
+    }
+    if (!isDeviceConnected) {
+      addLog("$tag版本查询失败：设备未连接");
+      onFailed();
+      return;
+    }
+    _currentVersionQueryTag = tag;
+    _onVersionQuerySuccess = onSuccess;
+    _onVersionQueryFailed = onFailed;
+    _isVersionQueryInFlight = true;
+    _versionQueryTimer?.cancel();
+    addLog("发送GET_APPLICATION_VERSION($tag)");
+    final packet = GaiaPacketBLE(GAIA.COMMAND_GET_APPLICATION_VERSION);
+    writeMsg(packet.getBytes());
+    _versionQueryTimer = Timer(const Duration(seconds: 3), () {
+      if (!_isVersionQueryInFlight) {
+        return;
+      }
+      _finishVersionQueryFailed("$tag版本查询超时");
+    });
+  }
+
+  void onApplicationVersionAck(GaiaPacketBLE packet) {
+    if (!_isVersionQueryInFlight) {
+      return;
+    }
+    _versionQueryTimer?.cancel();
+    final version = _parseApplicationVersion(packet.mPayload ?? []);
+    final tag = _currentVersionQueryTag;
+    _isVersionQueryInFlight = false;
+    _currentVersionQueryTag = "";
+    addLog("$tag版本号: $version");
+    final successCallback = _onVersionQuerySuccess;
+    _onVersionQuerySuccess = null;
+    _onVersionQueryFailed = null;
+    successCallback?.call(version);
+  }
+
+  void _finishVersionQueryFailed(String reason) {
+    _versionQueryTimer?.cancel();
+    final failedCallback = _onVersionQueryFailed;
+    _isVersionQueryInFlight = false;
+    _currentVersionQueryTag = "";
+    _onVersionQuerySuccess = null;
+    _onVersionQueryFailed = null;
+    addLog(reason);
+    failedCallback?.call();
+  }
+
+  String _parseApplicationVersion(List<int> payload) {
+    if (payload.length <= 1) {
+      return "UNKNOWN";
+    }
+    final raw = payload.sublist(1);
+    final hex = StringUtils.byteToHexString(raw).toUpperCase();
+    final printable = raw.every((b) => b >= 0x20 && b <= 0x7E);
+    if (printable) {
+      return "${String.fromCharCodes(raw)} (HEX:$hex)";
+    }
+    if (raw.length == 4) {
+      final value = ((raw[0] & 0xFF) << 24) |
+          ((raw[1] & 0xFF) << 16) |
+          ((raw[2] & 0xFF) << 8) |
+          (raw[3] & 0xFF);
+      return "0x${value.toRadixString(16).padLeft(8, '0').toUpperCase()} (HEX:$hex)";
+    }
+    return "HEX:$hex";
+  }
+
+  void _schedulePostUpgradeVersionQuery() {
+    _postUpgradeVersionRetryTimer?.cancel();
+    _postUpgradeVersionRetryCount = 0;
+    _postUpgradeVersionRetryTimer =
+        Timer.periodic(const Duration(seconds: 2), (timer) {
+      if (_postUpgradeVersionRetryCount >= 10) {
+        timer.cancel();
+        addLog("升级后版本查询超时，无法自动对比");
+        return;
+      }
+      _postUpgradeVersionRetryCount++;
+      if (_isVersionQueryInFlight || isUpgrading) {
+        return;
+      }
+      if (!isDeviceConnected) {
+        addLog("等待设备重连后查询升级后版本(${_postUpgradeVersionRetryCount}/10)");
+        return;
+      }
+      queryApplicationVersion(
+        tag: "升级后",
+        onSuccess: (version) {
+          versionAfterUpgrade.value = version;
+          timer.cancel();
+          _logVersionCompare();
+        },
+        onFailed: () {
+          if (_postUpgradeVersionRetryCount >= 10) {
+            timer.cancel();
+            addLog("升级后版本查询失败，无法自动对比");
+          }
+        },
+      );
+    });
+  }
+
+  void _logVersionCompare() {
+    final before = versionBeforeUpgrade.value;
+    final after = versionAfterUpgrade.value;
+    if (before == "UNKNOWN" || after == "UNKNOWN") {
+      addLog("版本对比结果：信息不足（before=$before, after=$after）");
+      return;
+    }
+    if (before == after) {
+      addLog("版本对比结果：未变化（升级可能未生效）");
+      return;
+    }
+    addLog("版本对比结果：已变化（升级生效）");
   }
 
   /// <p>To send a VMUPacket over the defined protocol communication.</p>
