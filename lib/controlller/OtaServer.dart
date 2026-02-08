@@ -112,6 +112,7 @@ class OtaServer extends GetxService implements RWCPListener {
   final bool useDfuOnly = true;
   int _dfuPendingChunkSize = 0;
   bool _dfuWriteInFlight = false;
+  Timer? _dfuResultTimer;
 
   static OtaServer get to => Get.find();
 
@@ -270,6 +271,7 @@ class OtaServer extends GetxService implements RWCPListener {
     sendPkgCount = 0;
     updatePer.value = 0;
     isUpgrading = true;
+    _dfuResultTimer?.cancel();
     mIsRWCPEnabled.value = false;
     writeQueue.clear();
     resetUpload();
@@ -333,6 +335,9 @@ class OtaServer extends GetxService implements RWCPListener {
       case GAIA.COMMAND_DFU_COMMIT:
         onDfuCommitAck();
         break;
+      case GAIA.COMMAND_DFU_GET_RESULT:
+        onDfuGetResultAck(packet);
+        break;
       case GAIA.COMMAND_VM_UPGRADE_CONNECT:
         {
           if (isUpgrading) {
@@ -374,7 +379,7 @@ class OtaServer extends GetxService implements RWCPListener {
     final cmd = packet.getCommand();
     final status = packet.getStatus();
     addLog(
-        "命令发送失败${StringUtils.intTo2HexString(cmd)} status=0x${status.toRadixString(16)}");
+        "命令发送失败${StringUtils.intTo2HexString(cmd)} status=0x${status.toRadixString(16)} ${_gaiaStatusText(status)}");
     if (cmd == GAIA.COMMAND_DFU_REQUEST && useDfuOnly) {
       addLog("DFU_REQUEST不支持，尝试直接发送DFU_BEGIN");
       sendDfuBegin();
@@ -385,6 +390,11 @@ class OtaServer extends GetxService implements RWCPListener {
         cmd == GAIA.COMMAND_DFU_COMMIT) {
       _dfuWriteInFlight = false;
       stopUpgrade(sendAbort: false);
+      return;
+    }
+    if (cmd == GAIA.COMMAND_DFU_GET_RESULT) {
+      addLog("DFU_GET_RESULT失败，按提交成功处理（结果码不可得）");
+      _finishDfuUpgrade("DFU提交完成（设备未返回结果码）");
       return;
     }
     if (packet.getCommand() == GAIA.COMMAND_VM_UPGRADE_CONNECT ||
@@ -425,6 +435,7 @@ class OtaServer extends GetxService implements RWCPListener {
 
   void stopUpgrade({bool sendAbort = true}) async {
     _timer?.cancel();
+    _dfuResultTimer?.cancel();
     timeCount.value = 0;
     if (sendAbort && !useDfuOnly) {
       abortUpgrade();
@@ -549,9 +560,70 @@ class OtaServer extends GetxService implements RWCPListener {
 
   void onDfuCommitAck() {
     updatePer.value = 100;
+    sendDfuGetResult();
+  }
+
+  void sendDfuGetResult() {
+    _dfuResultTimer?.cancel();
+    addLog("发送DFU_GET_RESULT");
+    final packet = GaiaPacketBLE(GAIA.COMMAND_DFU_GET_RESULT);
+    writeMsg(packet.getBytes());
+    _dfuResultTimer = Timer(const Duration(seconds: 3), () {
+      if (!isUpgrading) {
+        return;
+      }
+      addLog("DFU_GET_RESULT超时，按提交成功处理");
+      _finishDfuUpgrade("DFU提交完成（结果查询超时）");
+    });
+  }
+
+  void onDfuGetResultAck(GaiaPacketBLE packet) {
+    _dfuResultTimer?.cancel();
+    final payload = packet.mPayload ?? [];
+    if (payload.length < 2) {
+      _finishDfuUpgrade("DFU提交完成（无结果码）");
+      return;
+    }
+    final resultCode = payload[1];
+    if (resultCode == 0x00) {
+      _finishDfuUpgrade("DFU升级完成，设备返回成功");
+      return;
+    }
+    _dfuWriteInFlight = false;
     isUpgrading = false;
     _timer?.cancel();
-    addLog("DFU升级完成，等待设备重启");
+    addLog("DFU升级失败，结果码=0x${resultCode.toRadixString(16).padLeft(2, '0')}");
+  }
+
+  void _finishDfuUpgrade(String message) {
+    _dfuWriteInFlight = false;
+    isUpgrading = false;
+    _timer?.cancel();
+    _dfuResultTimer?.cancel();
+    addLog(message);
+  }
+
+  String _gaiaStatusText(int status) {
+    switch (status) {
+      case 0:
+        return "SUCCESS";
+      case 1:
+        return "NOT_SUPPORTED";
+      case 2:
+        return "NOT_AUTHENTICATED";
+      case 3:
+        return "INSUFFICIENT_RESOURCES";
+      case 4:
+        return "AUTHENTICATING";
+      case 5:
+        return "INVALID_PARAMETER";
+      case 6:
+        return "INCORRECT_STATE";
+      case 7:
+        return "IN_PROGRESS";
+      default:
+        return "UNKNOWN_STATUS";
+    }
   }
 
   /// <p>To send a VMUPacket over the defined protocol communication.</p>
