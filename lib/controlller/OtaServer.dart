@@ -260,6 +260,10 @@ class OtaServer extends GetxService implements RWCPListener {
           isDeviceConnected = false;
           rwcpStatusText.value = "连接中断";
           addLog('断开${connectionState.connectionState}');
+          if (isUpgrading) {
+            _enterFatalUpgradeState(
+                "升级过程中连接状态异常: ${connectionState.connectionState}");
+          }
         }
       });
     } catch (e) {
@@ -831,6 +835,9 @@ class OtaServer extends GetxService implements RWCPListener {
       _enterFatalUpgradeState(
           "升级命令失败：${_gaiaCommandText(cmd)} status=0x${status.toRadixString(16)}");
     } else if (packet.getCommand() == _upgradeDisconnectCommand()) {
+      if (isUpgrading) {
+        _enterFatalUpgradeState("升级断开命令失败");
+      }
     } else if (packet.getCommand() == _setDataEndpointModeCommand() ||
         packet.getCommand() == GAIA.COMMAND_GET_DATA_ENDPOINT_MODE) {
       _rwcpSetupInProgress = false;
