@@ -464,6 +464,9 @@ class OtaServer extends GetxService implements RWCPListener {
     if (isUpgrading) {
       rwcpStatusText.value = "已启用";
       _rwcpSetupInProgress = false;
+      if (!transFerComplete) {
+        sendUpgradeConnect();
+      }
       return;
     }
     if (!isUpgrading) {
@@ -640,6 +643,8 @@ class OtaServer extends GetxService implements RWCPListener {
           commandId == _v3CmdSetDataEndpointMode) {
         if (mIsRWCPEnabled.value) {
           registerRWCP();
+        } else {
+          _rwcpSetupInProgress = false;
         }
         return;
       }
@@ -656,7 +661,7 @@ class OtaServer extends GetxService implements RWCPListener {
       }
       if (feature == _v3FeatureUpgrade &&
           commandId == _v3CmdUpgradeDisconnect) {
-        stopUpgrade();
+        stopUpgrade(sendAbort: false, sendDisconnect: false);
         return;
       }
       return;
@@ -711,9 +716,8 @@ class OtaServer extends GetxService implements RWCPListener {
       if (feature == _v3FeatureUpgrade &&
           commandId == _v3CmdSetDataEndpointMode) {
         _rwcpSetupInProgress = false;
-        mIsRWCPEnabled.value = false;
-        rwcpStatusText.value = "设备不支持(回退普通)";
-        addLog("RWCP不支持，回退普通升级通道");
+        rwcpStatusText.value = "RWCP错误";
+        _enterFatalUpgradeState("RWCP数据通道启用失败");
         return;
       }
 
@@ -775,7 +779,7 @@ class OtaServer extends GetxService implements RWCPListener {
         }
         break;
       case GAIA.COMMAND_VM_UPGRADE_DISCONNECT:
-        stopUpgrade();
+        stopUpgrade(sendAbort: false, sendDisconnect: false);
         break;
       case GAIA.COMMAND_VM_UPGRADE_CONTROL:
         onSuccessfulTransmission();
@@ -856,9 +860,8 @@ class OtaServer extends GetxService implements RWCPListener {
     } else if (packet.getCommand() == _setDataEndpointModeCommand() ||
         packet.getCommand() == GAIA.COMMAND_GET_DATA_ENDPOINT_MODE) {
       _rwcpSetupInProgress = false;
-      mIsRWCPEnabled.value = false;
-      rwcpStatusText.value = "设备不支持(回退普通)";
-      addLog("RWCP不支持，回退普通升级通道");
+      rwcpStatusText.value = "RWCP错误";
+      _enterFatalUpgradeState("RWCP数据通道启用失败");
     }
   }
 
@@ -872,7 +875,6 @@ class OtaServer extends GetxService implements RWCPListener {
     final packet =
         _buildGaiaPacket(_setDataEndpointModeCommand(), payload: [0x01]);
     writeMsg(packet.getBytes());
-    sendUpgradeConnect();
   }
 
   void startUpgradeProcess() {
@@ -900,7 +902,7 @@ class OtaServer extends GetxService implements RWCPListener {
     mStartOffset = 0;
   }
 
-  void stopUpgrade({bool sendAbort = true}) async {
+  void stopUpgrade({bool sendAbort = true, bool sendDisconnect = true}) async {
     _clearUpgradeWatchdog();
     _vendorProbeTimer?.cancel();
     _isVendorDetecting = false;
@@ -923,7 +925,10 @@ class OtaServer extends GetxService implements RWCPListener {
     isUpgrading = false;
     _dfuWriteInFlight = false;
     _dfuPendingChunkSize = 0;
-    if (!useDfuOnly) {
+    if (!useDfuOnly &&
+        sendDisconnect &&
+        isDeviceConnected &&
+        connectDeviceId.isNotEmpty) {
       await Future.delayed(const Duration(milliseconds: 500));
       sendUpgradeDisconnect();
     }
@@ -1511,7 +1516,7 @@ class OtaServer extends GetxService implements RWCPListener {
       addLog("电量过低");
       askForConfirmation(ConfirmationType.BATTERY_LOW_ON_DEVICE);
     } else {
-      stopUpgrade();
+      _enterFatalUpgradeState("设备返回升级错误码0x${returnCode.toRadixString(16)}");
     }
   }
 
