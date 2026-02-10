@@ -113,6 +113,14 @@ class OtaServer extends GetxService implements RWCPListener {
   var percentage = 0.0.obs;
 
   Timer? _timer;
+  Timer? _logFlushTimer;
+  final ListQueue<String> _pendingLogs = ListQueue();
+  bool _isLogFlushScheduled = false;
+  static const int _maxLogLines = 800;
+  String _lastLogDedupKey = "";
+  int _lastLogRepeat = 0;
+  StreamSubscription<BleStatus>? _bleStatusSubscription;
+  static const bool _enableWriteTraceLog = false;
 
   var timeCount = 0.obs;
 
@@ -170,7 +178,8 @@ class OtaServer extends GetxService implements RWCPListener {
     super.onInit();
     mRWCPClient = RWCPClient(this);
     _initDefaultFirmwarePath();
-    flutterReactiveBle.statusStream.listen((event) {
+    _bleStatusSubscription?.cancel();
+    _bleStatusSubscription = flutterReactiveBle.statusStream.listen((event) {
       switch (event) {
         case BleStatus.ready:
           addLog("蓝牙打开");
@@ -209,6 +218,12 @@ class OtaServer extends GetxService implements RWCPListener {
 
   void connectDevice(String id) async {
     try {
+      await _connection?.cancel();
+      await _subscribeConnection?.cancel();
+      await _subscribeConnectionRWCP?.cancel();
+      _connection = null;
+      _subscribeConnection = null;
+      _subscribeConnectionRWCP = null;
       _autoReconnectEnabled = true;
       _isVendorReady = false;
       _vendorFallbackTried = false;
@@ -1769,8 +1784,9 @@ class OtaServer extends GetxService implements RWCPListener {
   //一般命令写入通道
   Future<void> writeData(List<int> data) async {
     try {
-      addLog(
-          "${DateTime.now()} wenDataWrite start>${StringUtils.byteToHexString(data)}");
+      if (_enableWriteTraceLog) {
+        addLog("wenDataWrite start>${StringUtils.byteToHexString(data)}");
+      }
       await Future.delayed(const Duration(milliseconds: 100));
       final characteristic = QualifiedCharacteristic(
           serviceId: otaUUID,
@@ -1779,8 +1795,9 @@ class OtaServer extends GetxService implements RWCPListener {
       await flutterReactiveBle.writeCharacteristicWithResponse(characteristic,
           value: data);
       _touchUpgradeWatchdog();
-      addLog(
-          "${DateTime.now()} wenDataWrite end>${StringUtils.byteToHexString(data)}");
+      if (_enableWriteTraceLog) {
+        addLog("wenDataWrite end>${StringUtils.byteToHexString(data)}");
+      }
     } catch (e) {
       addLog("写入失败(writeWithResponse): $e");
       _reportDeviceError("写通道异常(writeWithResponse)");
@@ -1831,7 +1848,68 @@ class OtaServer extends GetxService implements RWCPListener {
 
   void addLog(String s) {
     debugPrint("wenTest " + s);
-    logText.value += s + "\n";
+    final dedupKey = _normalizeLogKey(s);
+    if (_lastLogDedupKey.isEmpty) {
+      _lastLogDedupKey = dedupKey;
+      _lastLogRepeat = 1;
+      _pendingLogs.add(s);
+      _scheduleLogFlush();
+      return;
+    }
+
+    if (dedupKey == _lastLogDedupKey) {
+      _lastLogRepeat += 1;
+      _scheduleLogFlush();
+      return;
+    }
+
+    _emitRepeatSummaryIfNeeded();
+    _lastLogDedupKey = dedupKey;
+    _lastLogRepeat = 1;
+    _pendingLogs.add(s);
+    _scheduleLogFlush();
+  }
+
+  String _normalizeLogKey(String message) {
+    final withoutTimestamp = message.replaceFirst(
+        RegExp(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+\s+'), "");
+    return withoutTimestamp.trim();
+  }
+
+  void _emitRepeatSummaryIfNeeded() {
+    if (_lastLogRepeat > 1) {
+      _pendingLogs.add("↳ 上一条重复 ${_lastLogRepeat - 1} 次");
+      _lastLogRepeat = 1;
+    }
+  }
+
+  void _scheduleLogFlush() {
+    if (_isLogFlushScheduled) {
+      return;
+    }
+    _isLogFlushScheduled = true;
+    _logFlushTimer?.cancel();
+    _logFlushTimer = Timer(const Duration(milliseconds: 120), _flushLogs);
+  }
+
+  void _flushLogs() {
+    _isLogFlushScheduled = false;
+    _emitRepeatSummaryIfNeeded();
+    if (_pendingLogs.isEmpty) {
+      return;
+    }
+    final builder = StringBuffer();
+    while (_pendingLogs.isNotEmpty) {
+      builder.writeln(_pendingLogs.removeFirst());
+    }
+    final merged = (logText.value + builder.toString());
+    final lines = merged.split('\n');
+    if (lines.length <= _maxLogLines) {
+      logText.value = merged;
+      return;
+    }
+    final start = lines.length - _maxLogLines;
+    logText.value = lines.sublist(start).join('\n');
   }
 
   void _armUpgradeWatchdog() {
@@ -1941,6 +2019,17 @@ class OtaServer extends GetxService implements RWCPListener {
     } finally {
       _isRecovering = false;
     }
+  }
+
+  @override
+  void onClose() {
+    _bleStatusSubscription?.cancel();
+    _logFlushTimer?.cancel();
+    _upgradeWatchdogTimer?.cancel();
+    _versionQueryTimer?.cancel();
+    _postUpgradeVersionRetryTimer?.cancel();
+    _vendorProbeTimer?.cancel();
+    super.onClose();
   }
 
   void startScan() async {
