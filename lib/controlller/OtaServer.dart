@@ -1490,7 +1490,7 @@ class OtaServer extends GetxService implements RWCPListener {
 
   void receiveAbortCFM() {
     addLog("receiveAbortCFM");
-    stopUpgrade();
+    stopUpgrade(sendAbort: false, sendDisconnect: false);
   }
 
   void receiveErrorWarnIND(VMUPacket? packet) async {
