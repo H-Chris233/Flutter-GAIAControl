@@ -3,11 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:get/get.dart';
-import 'package:path_provider/path_provider.dart';
 
 import 'package:gaia/controlller/OtaServer.dart';
-import 'package:gaia/utils/StringUtils.dart';
-import 'package:gaia/utils/http.dart';
 
 class TestOtaView extends StatefulWidget {
   const TestOtaView({Key? key}) : super(key: key);
@@ -17,17 +14,6 @@ class TestOtaView extends StatefulWidget {
 }
 
 class _TestOtaState extends State<TestOtaView> {
-  var isDownloading = false;
-  var progress = 0;
-  var savePath = "";
-  final TextEditingController _firmwarePathController = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _firmwarePathController.text = OtaServer.to.firmwarePath.value;
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -36,14 +22,6 @@ class _TestOtaState extends State<TestOtaView> {
       ),
       body: Column(
         children: [
-          MaterialButton(
-            color: Colors.blue,
-            onPressed: () {
-              _download();
-            },
-            child: Text(
-                "下载bin\n${!isDownloading ? "路径：$savePath" : '下载中($progress)\n路径：$savePath'}"),
-          ),
           Obx(() {
             final currentPath = OtaServer.to.firmwarePath.value;
             return Column(
@@ -62,30 +40,6 @@ class _TestOtaState extends State<TestOtaView> {
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: TextField(
-                    controller: _firmwarePathController,
-                    decoration: const InputDecoration(
-                      hintText:
-                          "输入固件绝对路径，例如 /storage/emulated/0/Download/firmware.bin",
-                    ),
-                  ),
-                ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: MaterialButton(
-                        color: Colors.blue,
-                        onPressed: () async {
-                          await _applyFirmwarePath(
-                              _firmwarePathController.text);
-                        },
-                        child: const Text('应用路径'),
-                      ),
-                    ),
-                  ],
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
                   child: Text(
                       "当前固件: ${currentPath.isEmpty ? '未设置' : currentPath}",
                       maxLines: 2,
@@ -94,36 +48,6 @@ class _TestOtaState extends State<TestOtaView> {
               ],
             );
           }),
-          Row(
-            children: [
-              Text('RWCP'),
-              Obx(() {
-                bool rwcp = OtaServer.to.mIsRWCPEnabled.value;
-                return Checkbox(
-                    value: rwcp,
-                    onChanged: (on) async {
-                      OtaServer.to.mIsRWCPEnabled.value = on ?? false;
-                      await OtaServer.to.restPayloadSize();
-                      await Future.delayed(const Duration(seconds: 1));
-                      if (OtaServer.to.mIsRWCPEnabled.value) {
-                        OtaServer.to.writeMsg(
-                            StringUtils.hexStringToBytes("000A022E01"));
-                      } else {
-                        OtaServer.to.writeMsg(
-                            StringUtils.hexStringToBytes("000A022E00"));
-                      }
-                    });
-              }),
-              Expanded(
-                child: MaterialButton(
-                    color: Colors.blue,
-                    onPressed: () {
-                      OtaServer.to.logText.value = "";
-                    },
-                    child: const Text('清空LOG')),
-              ),
-            ],
-          ),
           Obx(() {
             final per = OtaServer.to.updatePer.value;
             return Row(
@@ -151,6 +75,8 @@ class _TestOtaState extends State<TestOtaView> {
           Obx(() {
             final before = OtaServer.to.versionBeforeUpgrade.value;
             final after = OtaServer.to.versionAfterUpgrade.value;
+            final rwcpStatus = OtaServer.to.rwcpStatusText.value;
+            final recoveryStatus = OtaServer.to.recoveryStatusText.value;
             final compare = (before == "UNKNOWN" || after == "UNKNOWN")
                 ? "信息不足"
                 : (before == after ? "未变化（可能未升级成功）" : "已变化（升级成功）");
@@ -159,6 +85,8 @@ class _TestOtaState extends State<TestOtaView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Text("RWCP状态: $rwcpStatus"),
+                  Text("恢复状态: $recoveryStatus"),
                   Text("升级前版本: $before",
                       maxLines: 1, overflow: TextOverflow.ellipsis),
                   Text("升级后版本: $after",
@@ -175,6 +103,19 @@ class _TestOtaState extends State<TestOtaView> {
             },
             child: const Text('取消升级'),
           ),
+          MaterialButton(
+            color: Colors.orange,
+            onPressed: () {
+              OtaServer.to.quickRecoverNow();
+            },
+            child: const Text('快速恢复'),
+          ),
+          MaterialButton(
+              color: Colors.blue,
+              onPressed: () {
+                OtaServer.to.logText.value = "";
+              },
+              child: const Text('清空LOG')),
           Expanded(child: Obx(() {
             final log = OtaServer.to.logText.value;
             return SingleChildScrollView(
@@ -190,32 +131,8 @@ class _TestOtaState extends State<TestOtaView> {
 
   @override
   void dispose() {
-    _firmwarePathController.dispose();
     super.dispose();
     OtaServer.to.disconnect();
-  }
-
-  void _download() async {
-    if (isDownloading) return;
-    var url = "https://file.mymei.tv/test/1.bin";
-    //url = "https://file.mymei.tv/test/M2_20221230_DEMO.bin";
-    final filePath = await getApplicationDocumentsDirectory();
-    final saveBinPath = filePath.path + "/1.bin";
-    setState(() {
-      savePath = saveBinPath;
-    });
-    await HttpUtil().download(url, savePath: saveBinPath,
-        onReceiveProgress: (int count, int total) {
-      setState(() {
-        isDownloading = true;
-        progress = count * 100.0 ~/ total;
-      });
-    });
-    setState(() {
-      isDownloading = false;
-    });
-    OtaServer.to.setFirmwarePath(saveBinPath);
-    _firmwarePathController.text = saveBinPath;
   }
 
   Future<void> _chooseFirmwareFile() async {
@@ -240,7 +157,7 @@ class _TestOtaState extends State<TestOtaView> {
   }
 
   Future<bool> _ensureFirmwareReady() async {
-    String usePath = _firmwarePathController.text.trim();
+    String usePath = OtaServer.to.firmwarePath.value.trim();
     if (usePath.isEmpty) {
       usePath = OtaServer.to.firmwarePath.value.trim();
     }
@@ -267,7 +184,6 @@ class _TestOtaState extends State<TestOtaView> {
       return;
     }
     OtaServer.to.setFirmwarePath(usePath);
-    _firmwarePathController.text = usePath;
   }
 
   Future<String?> _validateFirmwareFile(String path) async {

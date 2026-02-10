@@ -95,6 +95,7 @@ class OtaServer extends GetxService implements RWCPListener {
 
   String fileMd5 = "";
   var firmwarePath = "".obs;
+  var rwcpStatusText = "未启用".obs;
 
   var percentage = 0.0.obs;
 
@@ -112,10 +113,21 @@ class OtaServer extends GetxService implements RWCPListener {
   int writeRTCPCount = 0;
 
   File? file;
-  final bool useDfuOnly = true;
+  final bool useDfuOnly = false;
   int _dfuPendingChunkSize = 0;
   bool _dfuWriteInFlight = false;
   Timer? _dfuResultTimer;
+  bool _rwcpSetupInProgress = false;
+  Timer? _upgradeWatchdogTimer;
+  bool _autoReconnectEnabled = true;
+  String _fatalUpgradeReason = "";
+  var autoRecoveryEnabled = true.obs;
+  var recoveryStatusText = "空闲".obs;
+  int _errorBurstCount = 0;
+  DateTime? _lastErrorTime;
+  bool _isRecovering = false;
+  int _recoveryAttempts = 0;
+  DateTime? _recoveryWindowStart;
   bool _isVersionQueryInFlight = false;
   String _currentVersionQueryTag = "";
   Timer? _versionQueryTimer;
@@ -171,6 +183,7 @@ class OtaServer extends GetxService implements RWCPListener {
 
   void connectDevice(String id) async {
     try {
+      _autoReconnectEnabled = true;
       addLog('开始连接$id');
       _connection = flutterReactiveBle
           .connectToDevice(
@@ -179,6 +192,9 @@ class OtaServer extends GetxService implements RWCPListener {
         if (connectionState.connectionState ==
             DeviceConnectionState.connected) {
           isDeviceConnected = true;
+          if (!isUpgrading) {
+            rwcpStatusText.value = "待启用";
+          }
           connectDeviceId = id;
           addLog("连接成功" + connectDeviceId);
           //IOS BUG
@@ -191,11 +207,21 @@ class OtaServer extends GetxService implements RWCPListener {
         } else if (connectionState.connectionState ==
             DeviceConnectionState.disconnected) {
           isDeviceConnected = false;
+          rwcpStatusText.value = "连接断开";
           addLog('断开连接');
-          Future.delayed(const Duration(seconds: 5))
-              .then((value) => connectDevice(connectDeviceId));
+          if (isUpgrading) {
+            _enterFatalUpgradeState("升级过程中蓝牙断链");
+            return;
+          }
+          if (_autoReconnectEnabled && connectDeviceId.isNotEmpty) {
+            Future.delayed(const Duration(seconds: 5))
+                .then((value) => connectDevice(connectDeviceId));
+          } else {
+            addLog("自动重连已关闭，等待手动重连");
+          }
         } else {
           isDeviceConnected = false;
+          rwcpStatusText.value = "连接中断";
           addLog('断开${connectionState.connectionState}');
         }
       });
@@ -206,11 +232,16 @@ class OtaServer extends GetxService implements RWCPListener {
 
   void writeMsg(List<int> data) {
     scheduleMicrotask(() async {
+      _touchUpgradeWatchdog();
       await writeData(data);
     });
   }
 
   void registerRWCP() async {
+    if (!mIsRWCPEnabled.value) {
+      return;
+    }
+    rwcpStatusText.value = "建立通道中";
     await _subscribeConnectionRWCP?.cancel();
     //IOS BUG
     await flutterReactiveBle.discoverServices(connectDeviceId);
@@ -230,13 +261,13 @@ class OtaServer extends GetxService implements RWCPListener {
     });
     addLog("isUpgrading$isUpgrading transFerComplete $transFerComplete");
     await Future.delayed(const Duration(seconds: 1));
-    if (isUpgrading && transFerComplete) {
-      transFerComplete = false;
-      sendUpgradeConnect();
-    } else {
-      if (!isUpgrading) {
-        startUpdate();
-      }
+    if (isUpgrading) {
+      rwcpStatusText.value = "已启用";
+      _rwcpSetupInProgress = false;
+      return;
+    }
+    if (!isUpgrading) {
+      startUpdate();
     }
   }
 
@@ -288,9 +319,18 @@ class OtaServer extends GetxService implements RWCPListener {
     _dfuResultTimer?.cancel();
     _versionQueryTimer?.cancel();
     _postUpgradeVersionRetryTimer?.cancel();
-    mIsRWCPEnabled.value = false;
+    _rwcpSetupInProgress = false;
+    _fatalUpgradeReason = "";
+    _autoReconnectEnabled = true;
+    mIsRWCPEnabled.value = true;
+    rwcpStatusText.value = "启用中";
     writeQueue.clear();
     resetUpload();
+    _armUpgradeWatchdog();
+    if (!useDfuOnly) {
+      enableRwcpForUpgrade();
+      return;
+    }
     if (useDfuOnly) {
       final loaded = await loadFirmwareFile();
       if (!loaded) {
@@ -332,6 +372,7 @@ class OtaServer extends GetxService implements RWCPListener {
   }
 
   void handleRecMsg(List<int> data) async {
+    _touchUpgradeWatchdog();
     GaiaPacketBLE packet = GaiaPacketBLE.fromByte(data) ?? GaiaPacketBLE(0);
     if (packet.isAcknowledgement()) {
       int status = packet.getStatus();
@@ -414,6 +455,7 @@ class OtaServer extends GetxService implements RWCPListener {
         if (mIsRWCPEnabled.value) {
           registerRWCP();
         } else {
+          _rwcpSetupInProgress = false;
           _subscribeConnectionRWCP?.cancel();
         }
 
@@ -425,7 +467,10 @@ class OtaServer extends GetxService implements RWCPListener {
     final cmd = packet.getCommand();
     final status = packet.getStatus();
     addLog(
-        "命令发送失败${StringUtils.intTo2HexString(cmd)} status=0x${status.toRadixString(16)} ${_gaiaStatusText(status)}");
+        "命令发送失败 cmd=${StringUtils.intTo2HexString(cmd)}(${_gaiaCommandText(cmd)}) status=0x${status.toRadixString(16)} ${_gaiaStatusText(status)}");
+    _reportDeviceError(
+        "ACK失败 ${_gaiaCommandText(cmd)} status=0x${status.toRadixString(16)}",
+        triggerRecovery: !isUpgrading);
     if (cmd == GAIA.COMMAND_DFU_REQUEST && useDfuOnly) {
       addLog("DFU_REQUEST不支持，尝试直接发送DFU_BEGIN");
       sendDfuBegin();
@@ -450,13 +495,30 @@ class OtaServer extends GetxService implements RWCPListener {
     }
     if (packet.getCommand() == GAIA.COMMAND_VM_UPGRADE_CONNECT ||
         packet.getCommand() == GAIA.COMMAND_VM_UPGRADE_CONTROL) {
-      sendUpgradeDisconnect();
+      addLog("升级命令失败：${_gaiaCommandText(cmd)}，触发升级断开");
+      _enterFatalUpgradeState(
+          "升级命令失败：${_gaiaCommandText(cmd)} status=0x${status.toRadixString(16)}");
     } else if (packet.getCommand() == GAIA.COMMAND_VM_UPGRADE_DISCONNECT) {
     } else if (packet.getCommand() == GAIA.COMMAND_SET_DATA_ENDPOINT_MODE ||
         packet.getCommand() == GAIA.COMMAND_GET_DATA_ENDPOINT_MODE) {
+      _rwcpSetupInProgress = false;
       mIsRWCPEnabled.value = false;
-      onRWCPNotSupported();
+      rwcpStatusText.value = "设备不支持(回退普通)";
+      addLog("RWCP不支持，回退普通升级通道");
     }
+  }
+
+  void enableRwcpForUpgrade() {
+    if (_rwcpSetupInProgress) {
+      return;
+    }
+    _rwcpSetupInProgress = true;
+    rwcpStatusText.value = "启用中";
+    addLog("启用RWCP数据通道");
+    final packet =
+        GaiaPacketBLE(GAIA.COMMAND_SET_DATA_ENDPOINT_MODE, mPayload: [0x01]);
+    writeMsg(packet.getBytes());
+    sendUpgradeConnect();
   }
 
   void startUpgradeProcess() {
@@ -485,11 +547,16 @@ class OtaServer extends GetxService implements RWCPListener {
   }
 
   void stopUpgrade({bool sendAbort = true}) async {
+    _clearUpgradeWatchdog();
     _timer?.cancel();
     _dfuResultTimer?.cancel();
     _versionQueryTimer?.cancel();
     _postUpgradeVersionRetryTimer?.cancel();
     _pendingStartAfterVersionQuery = false;
+    _rwcpSetupInProgress = false;
+    if (!mIsRWCPEnabled.value) {
+      rwcpStatusText.value = "未启用";
+    }
     timeCount.value = 0;
     if (sendAbort && !useDfuOnly) {
       abortUpgrade();
@@ -646,7 +713,8 @@ class OtaServer extends GetxService implements RWCPListener {
     _dfuWriteInFlight = false;
     isUpgrading = false;
     _timer?.cancel();
-    addLog("DFU升级失败，结果码=0x${resultCode.toRadixString(16).padLeft(2, '0')}");
+    addLog(
+        "DFU升级失败，结果码=0x${resultCode.toRadixString(16).padLeft(2, '0')} ${_dfuResultText(resultCode)}");
   }
 
   void _finishDfuUpgrade(String message, {bool queryPostVersion = false}) {
@@ -680,6 +748,57 @@ class OtaServer extends GetxService implements RWCPListener {
         return "IN_PROGRESS";
       default:
         return "UNKNOWN_STATUS";
+    }
+  }
+
+  String _gaiaCommandText(int cmd) {
+    switch (cmd) {
+      case GAIA.COMMAND_SET_DATA_ENDPOINT_MODE:
+        return "SET_DATA_ENDPOINT_MODE";
+      case GAIA.COMMAND_GET_DATA_ENDPOINT_MODE:
+        return "GET_DATA_ENDPOINT_MODE";
+      case GAIA.COMMAND_VM_UPGRADE_CONNECT:
+        return "VM_UPGRADE_CONNECT";
+      case GAIA.COMMAND_VM_UPGRADE_CONTROL:
+        return "VM_UPGRADE_CONTROL";
+      case GAIA.COMMAND_VM_UPGRADE_DISCONNECT:
+        return "VM_UPGRADE_DISCONNECT";
+      case GAIA.COMMAND_GET_APPLICATION_VERSION:
+        return "GET_APPLICATION_VERSION";
+      case GAIA.COMMAND_DFU_REQUEST:
+        return "DFU_REQUEST";
+      case GAIA.COMMAND_DFU_BEGIN:
+        return "DFU_BEGIN";
+      case GAIA.COMMAND_DFU_WRITE:
+        return "DFU_WRITE";
+      case GAIA.COMMAND_DFU_COMMIT:
+        return "DFU_COMMIT";
+      case GAIA.COMMAND_DFU_GET_RESULT:
+        return "DFU_GET_RESULT";
+      default:
+        return "UNKNOWN_COMMAND";
+    }
+  }
+
+  String _dfuResultText(int resultCode) {
+    switch (resultCode) {
+      case 0x00:
+        return "SUCCESS";
+      case 0x01:
+        return "FAIL";
+      default:
+        return "UNKNOWN_RESULT";
+    }
+  }
+
+  String _upgradeErrorText(int returnCode) {
+    switch (returnCode) {
+      case 0x21:
+        return "电量过低";
+      case 0x81:
+        return "文件校验不通过";
+      default:
+        return "未知升级错误";
     }
   }
 
@@ -967,11 +1086,19 @@ class OtaServer extends GetxService implements RWCPListener {
 
   void receiveErrorWarnIND(VMUPacket? packet) async {
     List<int> data = packet?.mData ?? [];
+    if (data.length < 2) {
+      addLog("receiveErrorWarnIND 升级失败，设备返回异常：错误码长度不足");
+      _reportDeviceError("升级错误包长度异常", triggerRecovery: true);
+      stopUpgrade();
+      return;
+    }
     sendErrorConfirmation(data); //
     int returnCode = StringUtils.extractIntFromByteArray(data, 0, 2, false);
     //A2305C3A9059C15171BD33F3BB08ADE4
     addLog(
-        "receiveErrorWarnIND 升级失败 错误码0x${returnCode.toRadixString(16)} fileMd5$fileMd5");
+        "receiveErrorWarnIND 升级失败 错误码0x${returnCode.toRadixString(16)} ${_upgradeErrorText(returnCode)} fileMd5$fileMd5");
+    _reportDeviceError("升级错误码0x${returnCode.toRadixString(16)}",
+        triggerRecovery: true);
     //noinspection IfCanBeSwitch
     if (returnCode == 0x81) {
       addLog("包不通过");
@@ -1011,7 +1138,9 @@ class OtaServer extends GetxService implements RWCPListener {
 
   void receiveCompleteIND() {
     isUpgrading = false;
+    _timer?.cancel();
     addLog("receiveCompleteIND 升级完成");
+    _schedulePostUpgradeVersionQuery();
     disconnectUpgrade();
   }
 
@@ -1164,7 +1293,9 @@ class OtaServer extends GetxService implements RWCPListener {
   }
 
   void onRWCPNotSupported() {
-    addLog("RWCP onRWCPNotSupported");
+    addLog("RWCP onRWCPNotSupported：设备不支持RWCP，终止升级");
+    rwcpStatusText.value = "设备不支持";
+    _enterFatalUpgradeState("设备不支持RWCP");
   }
 
   void askForConfirmation(int type) {
@@ -1214,7 +1345,7 @@ class OtaServer extends GetxService implements RWCPListener {
 
   @override
   void onTransferFailed() {
-    abortUpgrade();
+    _enterFatalUpgradeState("RWCP传输失败");
   }
 
   @override
@@ -1246,28 +1377,46 @@ class OtaServer extends GetxService implements RWCPListener {
 
   //一般命令写入通道
   Future<void> writeData(List<int> data) async {
-    addLog(
-        "${DateTime.now()} wenDataWrite start>${StringUtils.byteToHexString(data)}");
-    await Future.delayed(const Duration(milliseconds: 100));
-    final characteristic = QualifiedCharacteristic(
-        serviceId: otaUUID,
-        characteristicId: writeUUID,
-        deviceId: connectDeviceId);
-    await flutterReactiveBle.writeCharacteristicWithResponse(characteristic,
-        value: data);
-    addLog(
-        "${DateTime.now()} wenDataWrite end>${StringUtils.byteToHexString(data)}");
+    try {
+      addLog(
+          "${DateTime.now()} wenDataWrite start>${StringUtils.byteToHexString(data)}");
+      await Future.delayed(const Duration(milliseconds: 100));
+      final characteristic = QualifiedCharacteristic(
+          serviceId: otaUUID,
+          characteristicId: writeUUID,
+          deviceId: connectDeviceId);
+      await flutterReactiveBle.writeCharacteristicWithResponse(characteristic,
+          value: data);
+      _touchUpgradeWatchdog();
+      addLog(
+          "${DateTime.now()} wenDataWrite end>${StringUtils.byteToHexString(data)}");
+    } catch (e) {
+      addLog("写入失败(writeWithResponse): $e");
+      _reportDeviceError("写通道异常(writeWithResponse)");
+      if (isUpgrading) {
+        _enterFatalUpgradeState("写入通道异常");
+      }
+    }
   }
 
   //RWCP写入通道
   void writeMsgRWCP(List<int> data) async {
-    await Future.delayed(const Duration(milliseconds: 100));
-    final characteristic = QualifiedCharacteristic(
-        serviceId: otaUUID,
-        characteristicId: writeNoResUUID,
-        deviceId: connectDeviceId);
-    await flutterReactiveBle.writeCharacteristicWithoutResponse(characteristic,
-        value: data);
+    try {
+      await Future.delayed(const Duration(milliseconds: 100));
+      final characteristic = QualifiedCharacteristic(
+          serviceId: otaUUID,
+          characteristicId: writeNoResUUID,
+          deviceId: connectDeviceId);
+      await flutterReactiveBle
+          .writeCharacteristicWithoutResponse(characteristic, value: data);
+      _touchUpgradeWatchdog();
+    } catch (e) {
+      addLog("写入失败(writeWithoutResponse): $e");
+      _reportDeviceError("写通道异常(writeWithoutResponse)");
+      if (isUpgrading) {
+        _enterFatalUpgradeState("RWCP写入异常");
+      }
+    }
   }
 
   void disconnect() {
@@ -1290,6 +1439,115 @@ class OtaServer extends GetxService implements RWCPListener {
   void addLog(String s) {
     debugPrint("wenTest " + s);
     logText.value += s + "\n";
+  }
+
+  void _armUpgradeWatchdog() {
+    _clearUpgradeWatchdog();
+    if (!isUpgrading) {
+      return;
+    }
+    _upgradeWatchdogTimer = Timer(const Duration(seconds: 15), () {
+      if (!isUpgrading) {
+        return;
+      }
+      _enterFatalUpgradeState("升级超时：15秒内未收到有效进展");
+    });
+  }
+
+  void _touchUpgradeWatchdog() {
+    if (!isUpgrading) {
+      return;
+    }
+    _armUpgradeWatchdog();
+  }
+
+  void _clearUpgradeWatchdog() {
+    _upgradeWatchdogTimer?.cancel();
+    _upgradeWatchdogTimer = null;
+  }
+
+  void _enterFatalUpgradeState(String reason) {
+    if (_fatalUpgradeReason == reason && !isUpgrading) {
+      return;
+    }
+    _fatalUpgradeReason = reason;
+    _autoReconnectEnabled = false;
+    rwcpStatusText.value = "错误已退出";
+    addLog("致命错误：$reason，已自动退出升级并关闭自动重连");
+    if (isUpgrading) {
+      stopUpgrade(sendAbort: false);
+    } else {
+      _clearUpgradeWatchdog();
+    }
+    _reportDeviceError(reason, triggerRecovery: true);
+  }
+
+  void _reportDeviceError(String reason, {bool triggerRecovery = false}) {
+    if (!autoRecoveryEnabled.value) {
+      return;
+    }
+    final now = DateTime.now();
+    if (_lastErrorTime == null ||
+        now.difference(_lastErrorTime!).inSeconds > 10) {
+      _errorBurstCount = 0;
+    }
+    _lastErrorTime = now;
+    _errorBurstCount += 1;
+    addLog("错误累计($_errorBurstCount/3): $reason");
+    if (triggerRecovery || _errorBurstCount >= 3) {
+      _quickRecoverFromDeviceError("自动恢复触发: $reason");
+    }
+  }
+
+  void quickRecoverNow() {
+    _quickRecoverFromDeviceError("手动快速恢复");
+  }
+
+  void _quickRecoverFromDeviceError(String reason) async {
+    if (_isRecovering) {
+      addLog("恢复进行中，忽略重复触发");
+      return;
+    }
+    final now = DateTime.now();
+    _recoveryWindowStart ??= now;
+    if (now.difference(_recoveryWindowStart!).inMinutes >= 1) {
+      _recoveryWindowStart = now;
+      _recoveryAttempts = 0;
+    }
+    if (_recoveryAttempts >= 3) {
+      recoveryStatusText.value = "恢复受限";
+      addLog("1分钟内恢复次数过多，暂停自动恢复");
+      return;
+    }
+    _isRecovering = true;
+    _recoveryAttempts += 1;
+    _errorBurstCount = 0;
+    recoveryStatusText.value = "恢复中";
+    rwcpStatusText.value = "恢复中";
+    addLog("执行快速恢复(${_recoveryAttempts}/3): $reason");
+    try {
+      stopUpgrade(sendAbort: false);
+      await _subscribeConnection?.cancel();
+      await _subscribeConnectionRWCP?.cancel();
+      await _connection?.cancel();
+      _subscribeConnection = null;
+      _subscribeConnectionRWCP = null;
+      _connection = null;
+      isDeviceConnected = false;
+      if (connectDeviceId.isNotEmpty) {
+        await Future.delayed(const Duration(seconds: 2));
+        connectDevice(connectDeviceId);
+      } else {
+        addLog("无连接设备ID，无法自动重连");
+      }
+      recoveryStatusText.value = "已恢复";
+      rwcpStatusText.value = "待启用";
+    } catch (e) {
+      recoveryStatusText.value = "恢复失败";
+      addLog("快速恢复失败: $e");
+    } finally {
+      _isRecovering = false;
+    }
   }
 
   void startScan() async {
