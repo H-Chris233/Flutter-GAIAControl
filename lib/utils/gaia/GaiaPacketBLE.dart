@@ -1,6 +1,4 @@
-
 import 'package:flutter/material.dart';
-
 
 import '../StringUtils.dart';
 import 'GAIA.dart';
@@ -25,13 +23,19 @@ class GaiaPacketBLE {
   /// <p>The bytes which represent this packet.</p>
   List<int>? mBytes;
 
-  GaiaPacketBLE(this.mCommandId, {this.mPayload});
+  GaiaPacketBLE(this.mCommandId, {this.mPayload, int? mVendorId}) {
+    if (mVendorId != null) {
+      this.mVendorId = mVendorId;
+    }
+  }
 
   int getStatus() {
     final int STATUS_OFFSET = 0;
     final int STATUS_LENGTH = 1;
 
-    if (!isAcknowledgement() || mPayload == null || (mPayload ?? []).length < STATUS_LENGTH) {
+    if (!isAcknowledgement() ||
+        mPayload == null ||
+        (mPayload ?? []).length < STATUS_LENGTH) {
       return GAIA.NOT_STATUS;
     } else {
       return (mPayload ?? [0])[STATUS_OFFSET];
@@ -85,14 +89,16 @@ class GaiaPacketBLE {
     }
   }
 
-  static GaiaPacketBLE buildGaiaNotificationPacket(int commandID, int event, List<int>? data, int type) {
+  static GaiaPacketBLE buildGaiaNotificationPacket(
+      int commandID, int event, List<int>? data, int type,
+      {int? mVendorId}) {
     List<int> payload = [];
     payload.add(event);
     if (data != null && data.isNotEmpty) {
       payload.addAll(data);
     }
 
-    return GaiaPacketBLE(commandID, mPayload: payload);
+    return GaiaPacketBLE(commandID, mPayload: payload, mVendorId: mVendorId);
   }
 
   /**
@@ -129,7 +135,8 @@ class GaiaPacketBLE {
   /**
    * <p>The number of bytes which contains the information to identify the type of packet.</p>
    */
-  static final int PACKET_INFORMATION_LENGTH = LENGTH_COMMAND_ID + LENGTH_VENDOR_ID;
+  static final int PACKET_INFORMATION_LENGTH =
+      LENGTH_COMMAND_ID + LENGTH_VENDOR_ID;
 
   /**
    * <p>The minimum length of a packet.</p>
@@ -142,8 +149,10 @@ class GaiaPacketBLE {
       debugPrint("GaiaPacketBLE fromByte error");
       return null;
     }
-    int mVendorId = StringUtils.extractIntFromByteArray(source, OFFSET_VENDOR_ID, LENGTH_VENDOR_ID, false);
-    int mCommandId = StringUtils.extractIntFromByteArray(source, OFFSET_COMMAND_ID, LENGTH_COMMAND_ID, false);
+    int mVendorId = StringUtils.extractIntFromByteArray(
+        source, OFFSET_VENDOR_ID, LENGTH_VENDOR_ID, false);
+    int mCommandId = StringUtils.extractIntFromByteArray(
+        source, OFFSET_COMMAND_ID, LENGTH_COMMAND_ID, false);
     var mCommandIdStr = StringUtils.intTo2HexString(mCommandId);
     debugPrint(
         "GaiaPacketBLE ${StringUtils.byteToHexString(source)} vendorId $mVendorId payloadLength$payloadLength mCommandId$mCommandId mCommandIdStr $mCommandIdStr");
@@ -151,7 +160,8 @@ class GaiaPacketBLE {
     if (payloadLength > 0) {
       mPayload.addAll(source.sublist(PACKET_INFORMATION_LENGTH));
     }
-    GaiaPacketBLE gaiaPacketBLE = GaiaPacketBLE(mCommandId, mPayload: mPayload);
+    GaiaPacketBLE gaiaPacketBLE =
+        GaiaPacketBLE(mCommandId, mPayload: mPayload, mVendorId: mVendorId);
     gaiaPacketBLE.mBytes = source;
     return gaiaPacketBLE;
   }

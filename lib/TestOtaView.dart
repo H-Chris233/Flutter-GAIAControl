@@ -24,9 +24,37 @@ class _TestOtaState extends State<TestOtaView> {
         children: [
           Obx(() {
             final currentPath = OtaServer.to.firmwarePath.value;
+            final currentMode = OtaServer.to.vendorMode.value;
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Row(
+                    children: [
+                      const Text("Vendor模式: "),
+                      DropdownButton<String>(
+                        value: currentMode,
+                        items: const [
+                          DropdownMenuItem(
+                              value: OtaServer.vendorModeV3,
+                              child: Text("V3 (001D)")),
+                          DropdownMenuItem(
+                              value: OtaServer.vendorModeV1V2,
+                              child: Text("V1/V2 (000A)")),
+                          DropdownMenuItem(
+                              value: OtaServer.vendorModeAuto,
+                              child: Text("Auto")),
+                        ],
+                        onChanged: (mode) {
+                          if (mode != null) {
+                            OtaServer.to.setVendorMode(mode);
+                          }
+                        },
+                      )
+                    ],
+                  ),
+                ),
                 Row(
                   children: [
                     Expanded(
