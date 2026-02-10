@@ -1,0 +1,152 @@
+{
+  "timestamp": "2026-02-10T22:00:06+08:00",
+  "project": {
+    "name": "GAIA Control",
+    "package": "gaia",
+    "version": "1.0.0+1",
+    "description": "基于官方 gaiacontrol_3_4_0_52，通过 Dart 完全移植 BLE OTA 功能，支持 Android/iOS",
+    "sdk": "Flutter >=3.5.0 <4.0.0",
+    "language": "Dart"
+  },
+  "scanInfo": {
+    "totalFiles": 18,
+    "scannedFiles": 17,
+    "coveragePercent": 94.4,
+    "truncated": false,
+    "skippedDirectories": [
+      "gaia-client-src/ (Java 参考源码, 非 Flutter 代码)",
+      "android/ (平台壳工程)",
+      "ios/ (平台壳工程)",
+      "img/ (图片资源)"
+    ],
+    "ignoredPatterns": [
+      "node_modules/**", ".git/**", ".github/**", "dist/**", "build/**",
+      ".dart_tool/", ".idea/", "*.iml", "*.log", "*.class",
+      ".pub-cache/", ".pub/", "**/doc/api/"
+    ]
+  },
+  "root": {
+    "claudeMd": "CLAUDE.md",
+    "agentsMd": "AGENTS.md",
+    "readmeMd": "README.md"
+  },
+  "modules": [
+    {
+      "name": "controlller",
+      "path": "lib/controlller/",
+      "claudeMd": "lib/controlller/CLAUDE.md",
+      "language": "Dart",
+      "description": "OTA 服务核心 -- BLE 连接管理、升级状态机、分包传输编排",
+      "entryFiles": ["lib/controlller/OtaServer.dart"],
+      "interfaces": [
+        "startScan()", "connectDevice()", "startUpdate()",
+        "startUpdateWithVersionCheck()", "stopUpgrade()",
+        "setFirmwarePath()", "setVendorMode()",
+        "sendRWCPSegment()", "onTransferFailed()",
+        "onTransferFinished()", "onTransferProgress()"
+      ],
+      "testDirectory": null,
+      "configFiles": [],
+      "coverage": {
+        "scanned": true,
+        "entryFound": true,
+        "interfaceFound": true,
+        "testExists": false,
+        "dataModelFound": true
+      },
+      "gaps": ["缺少专属单元测试"]
+    },
+    {
+      "name": "gaia",
+      "path": "lib/utils/gaia/",
+      "claudeMd": "lib/utils/gaia/CLAUDE.md",
+      "language": "Dart",
+      "description": "GAIA 协议实现 -- Qualcomm CSR 蓝牙协议命令、数据包、操作码",
+      "entryFiles": [
+        "lib/utils/gaia/GAIA.dart",
+        "lib/utils/gaia/GaiaPacketBLE.dart"
+      ],
+      "interfaces": [
+        "GaiaPacketBLE.buildBytes()", "GaiaPacketBLE.getCommand()",
+        "GaiaPacketBLE.isAcknowledgement()", "GaiaPacketBLE.getStatus()",
+        "VMUPacket.get()", "VMUPacket.buildBytes()"
+      ],
+      "testDirectory": null,
+      "configFiles": [],
+      "coverage": {
+        "scanned": true,
+        "entryFound": true,
+        "interfaceFound": true,
+        "testExists": false,
+        "dataModelFound": true
+      },
+      "gaps": ["缺少专属单元测试"]
+    },
+    {
+      "name": "rwcp",
+      "path": "lib/utils/gaia/rwcp/",
+      "claudeMd": "lib/utils/gaia/rwcp/CLAUDE.md",
+      "language": "Dart",
+      "description": "RWCP 可靠传输协议 -- 滑动窗口、序列号管理、数据分段",
+      "entryFiles": ["lib/utils/gaia/rwcp/RWCPClient.dart"],
+      "interfaces": [
+        "RWCPClient.startSession()", "RWCPClient.sendData()",
+        "RWCPClient.onReceiveRWCPSegment()", "RWCPClient.terminateSession()",
+        "RWCPListener.sendRWCPSegment()", "RWCPListener.onTransferFailed()",
+        "RWCPListener.onTransferFinished()", "RWCPListener.onTransferProgress()",
+        "Segment.get()", "Segment.parse()"
+      ],
+      "testDirectory": null,
+      "configFiles": [],
+      "coverage": {
+        "scanned": true,
+        "entryFound": true,
+        "interfaceFound": true,
+        "testExists": false,
+        "dataModelFound": true
+      },
+      "gaps": ["缺少专属单元测试"]
+    }
+  ],
+  "utilFiles": [
+    {
+      "path": "lib/utils/Log.dart",
+      "description": "日志工具 -- 封装 debugPrint，支持 i/d/e/w 四个级别，全局开关"
+    },
+    {
+      "path": "lib/utils/StringUtils.dart",
+      "description": "字符串/字节工具 -- 十六进制转换、MD5 计算、字节序提取"
+    },
+    {
+      "path": "lib/utils/http.dart",
+      "description": "HTTP 封装 -- 基于 Dio 的 RESTful 客户端（get/post/download/put/patch/delete）"
+    }
+  ],
+  "topLevelFiles": [
+    {
+      "path": "lib/main.dart",
+      "description": "应用入口 -- GetMaterialApp、OtaServer 注入、设备列表页"
+    },
+    {
+      "path": "lib/TestOtaView.dart",
+      "description": "OTA 测试页面 -- Vendor 模式选择、固件选择、升级操作、日志显示"
+    }
+  ],
+  "gapsSummary": {
+    "totalModules": 3,
+    "coveredModules": 3,
+    "modulesWithTests": 0,
+    "missingTests": [
+      "lib/controlller/ -- OtaServer 状态机逻辑",
+      "lib/utils/gaia/ -- GaiaPacketBLE 数据包构建/解析",
+      "lib/utils/gaia/rwcp/ -- RWCPClient 窗口控制与重传逻辑"
+    ],
+    "nextStepRecommendations": [
+      "为 RWCPClient 添加单元测试（纯逻辑，无平台依赖，最易测试）",
+      "为 GaiaPacketBLE.buildBytes() / fromBytes() 添加序列化/反序列化测试",
+      "为 Segment.get() / Segment.parse() 添加编解码测试",
+      "为 StringUtils 添加工具方法测试（hexStringToBytes、extractIntFromByteArray）",
+      "为 VMUPacket.buildBytes() 添加构建测试"
+    ]
+  }
+}
