@@ -28,6 +28,8 @@ class OtaServer extends GetxService implements RWCPListener {
   static const int _v3PacketTypeResponse = 0x02;
   static const int _v3PacketTypeError = 0x03;
   static const int _v3CmdAppVersion = 0x05;
+  static const int _v3CmdRegisterNotification = 0x07;
+  static const int _v3CmdCancelNotification = 0x08;
   static const int _v3CmdUpgradeNotification = 0x00;
   static const int _v3CmdUpgradeConnect = 0x00;
   static const int _v3CmdUpgradeDisconnect = 0x01;
@@ -147,12 +149,10 @@ class OtaServer extends GetxService implements RWCPListener {
   static const String vendorModeV1V2 = "v1v2";
   var vendorMode = vendorModeV3.obs;
   int _activeVendorId = 0x001D;
-  bool _isVendorReady = false;
   bool _isVendorDetecting = false;
   int _vendorProbeIndex = 0;
   Timer? _vendorProbeTimer;
-  bool _vendorFallbackTried = false;
-  final List<int> _vendorCandidates = [0x001D, GAIA.VENDOR_QUALCOMM];
+  final List<int> _vendorCandidates = [0x001D];
   VoidCallback? _onVendorReady;
   VoidCallback? _onVendorFailed;
   var autoRecoveryEnabled = true.obs;
@@ -225,8 +225,6 @@ class OtaServer extends GetxService implements RWCPListener {
       _subscribeConnection = null;
       _subscribeConnectionRWCP = null;
       _autoReconnectEnabled = true;
-      _isVendorReady = false;
-      _vendorFallbackTried = false;
       addLog('开始连接$id');
       _connection = flutterReactiveBle
           .connectToDevice(
@@ -336,72 +334,40 @@ class OtaServer extends GetxService implements RWCPListener {
           _v3FeatureFramework, _v3PacketTypeCommand, _v3CmdAppVersion)
       : GAIA.COMMAND_GET_APPLICATION_VERSION;
 
+  int _registerNotificationCommand() => _isV3VendorActive()
+      ? _buildV3Command(
+          _v3FeatureFramework, _v3PacketTypeCommand, _v3CmdRegisterNotification)
+      : GAIA.COMMAND_REGISTER_NOTIFICATION;
+
+  int _cancelNotificationCommand() => _isV3VendorActive()
+      ? _buildV3Command(
+          _v3FeatureFramework, _v3PacketTypeCommand, _v3CmdCancelNotification)
+      : GAIA.COMMAND_CANCEL_NOTIFICATION;
+
   int _v3CommandFeature(int cmd) => (cmd >> 9) & 0x7F;
   int _v3CommandType(int cmd) => (cmd >> 7) & 0x03;
   int _v3CommandId(int cmd) => cmd & 0x7F;
 
   void setVendorMode(String mode) {
-    if (mode != vendorModeAuto &&
-        mode != vendorModeV3 &&
-        mode != vendorModeV1V2) {
-      return;
-    }
-    vendorMode.value = mode;
+    vendorMode.value = vendorModeV3;
     _isVendorDetecting = false;
     _vendorProbeTimer?.cancel();
-    _vendorFallbackTried = false;
-    if (mode == vendorModeV3) {
-      _activeVendorId = 0x001D;
-      _isVendorReady = true;
-      addLog("Vendor模式切换为V3，使用${_vendorToHex(_activeVendorId)}");
-      return;
-    }
-    if (mode == vendorModeV1V2) {
-      _activeVendorId = GAIA.VENDOR_QUALCOMM;
-      _isVendorReady = true;
-      addLog("Vendor模式切换为V1/V2，使用${_vendorToHex(_activeVendorId)}");
-      return;
-    }
     _activeVendorId = 0x001D;
-    _isVendorReady = false;
-    addLog("Vendor模式切换为自动探测（优先V3）");
+    addLog("Vendor模式固定为V3，使用${_vendorToHex(_activeVendorId)}");
   }
 
   void _startVendorProbe(
       {required VoidCallback onSuccess, required VoidCallback onFailed}) {
-    if (vendorMode.value == vendorModeV3) {
-      _activeVendorId = 0x001D;
-      _isVendorReady = true;
-      onSuccess();
-      return;
-    }
-    if (vendorMode.value == vendorModeV1V2) {
-      _activeVendorId = GAIA.VENDOR_QUALCOMM;
-      _isVendorReady = true;
-      onSuccess();
-      return;
-    }
-    if (_isVendorReady) {
-      onSuccess();
-      return;
-    }
-    if (_isVendorDetecting) {
-      _onVendorReady = onSuccess;
-      _onVendorFailed = onFailed;
-      return;
-    }
-    _isVendorDetecting = true;
-    _vendorProbeIndex = 0;
-    _onVendorReady = onSuccess;
-    _onVendorFailed = onFailed;
-    _probeNextVendor();
+    _activeVendorId = 0x001D;
+    _isVendorDetecting = false;
+    _vendorProbeTimer?.cancel();
+    onSuccess();
   }
 
   void _probeNextVendor() {
     _vendorProbeTimer?.cancel();
     if (_vendorProbeIndex >= _vendorCandidates.length) {
       _isVendorDetecting = false;
-      _isVendorReady = false;
       rwcpStatusText.value = "Vendor探测失败";
       _onVendorFailed?.call();
       _onVendorReady = null;
@@ -429,7 +395,6 @@ class OtaServer extends GetxService implements RWCPListener {
     _vendorProbeTimer?.cancel();
     _isVendorDetecting = false;
     _activeVendorId = vendor;
-    _isVendorReady = true;
     rwcpStatusText.value = "Vendor ${_vendorToHex(vendor)} 就绪";
     final callback = _onVendorReady;
     _onVendorReady = null;
@@ -494,13 +459,12 @@ class OtaServer extends GetxService implements RWCPListener {
       // code to handle errors
     });
     await Future.delayed(const Duration(seconds: 1));
-    if (!_isV3VendorActive()) {
-      GaiaPacketBLE packet = _buildGaiaPacket(
-        GAIA.COMMAND_REGISTER_NOTIFICATION,
-        payload: [GAIA.VMU_PACKET],
-      );
-      writeMsg(packet.getBytes());
-    }
+    final registerPayload = _isV3VendorActive() ? [0x06] : [GAIA.VMU_PACKET];
+    GaiaPacketBLE registerPacket = _buildGaiaPacket(
+      _registerNotificationCommand(),
+      payload: registerPayload,
+    );
+    writeMsg(registerPacket.getBytes());
     //如果开启RWCP那么需要在重连之后启用RWCP
     if (isUpgrading && transFerComplete && mIsRWCPEnabled.value) {
       //开启RWCP
@@ -530,7 +494,6 @@ class OtaServer extends GetxService implements RWCPListener {
     _rwcpSetupInProgress = false;
     _fatalUpgradeReason = "";
     _autoReconnectEnabled = true;
-    _vendorFallbackTried = false;
     mIsRWCPEnabled.value = true;
     rwcpStatusText.value = "启用中";
     writeQueue.clear();
@@ -590,37 +553,11 @@ class OtaServer extends GetxService implements RWCPListener {
   void handleRecMsg(List<int> data) async {
     _touchUpgradeWatchdog();
     GaiaPacketBLE packet = GaiaPacketBLE.fromByte(data) ?? GaiaPacketBLE(0);
-    if (packet.mVendorId == 0x001D) {
-      _handleV3Packet(packet);
+    if (packet.mVendorId != 0x001D) {
+      addLog("忽略非V3 Vendor包: ${_vendorToHex(packet.mVendorId)}");
       return;
     }
-    if (packet.isAcknowledgement()) {
-      int status = packet.getStatus();
-      if (status == GAIA.SUCCESS) {
-        receiveSuccessfulAcknowledgement(packet);
-      } else {
-        receiveUnsuccessfulAcknowledgement(packet);
-      }
-    } else if (packet.getCommand() == GAIA.COMMAND_EVENT_NOTIFICATION) {
-      final payload = packet.mPayload ?? [];
-      //000AC0010012
-      if (payload.isNotEmpty) {
-        int event = packet.getEvent();
-        if (event == GAIA.VMU_PACKET) {
-          createAcknowledgmentRequest();
-          await Future.delayed(const Duration(milliseconds: 1000));
-          receiveVMUPacket(payload.sublist(1));
-          return;
-        } else {
-          // not supported
-          return;
-        }
-      } else {
-        createAcknowledgmentRequest();
-        await Future.delayed(const Duration(milliseconds: 1000));
-        return;
-      }
-    }
+    _handleV3Packet(packet);
   }
 
   void _handleV3Packet(GaiaPacketBLE packet) {
@@ -691,25 +628,6 @@ class OtaServer extends GetxService implements RWCPListener {
         }
         _finishVersionQueryFailed(
             "$_currentVersionQueryTag版本查询失败 status=0x${status.toRadixString(16)}");
-        return;
-      }
-
-      if (feature == _v3FeatureUpgrade &&
-          commandId == _v3CmdUpgradeConnect &&
-          vendorMode.value == vendorModeAuto &&
-          !_vendorFallbackTried) {
-        _vendorFallbackTried = true;
-        _activeVendorId = _activeVendorId == GAIA.VENDOR_QUALCOMM
-            ? 0x001D
-            : GAIA.VENDOR_QUALCOMM;
-        _isVendorReady = true;
-        addLog("V3连接失败，切换Vendor后重试: ${_vendorToHex(_activeVendorId)}");
-        _rwcpSetupInProgress = false;
-        if (mIsRWCPEnabled.value) {
-          enableRwcpForUpgrade();
-        } else {
-          sendUpgradeConnect();
-        }
         return;
       }
 
@@ -833,23 +751,6 @@ class OtaServer extends GetxService implements RWCPListener {
     }
     if (packet.getCommand() == _upgradeConnectCommand() ||
         packet.getCommand() == _upgradeControlCommand()) {
-      if (packet.getCommand() == _upgradeConnectCommand() &&
-          vendorMode.value == vendorModeAuto &&
-          !_vendorFallbackTried) {
-        _vendorFallbackTried = true;
-        _activeVendorId = _activeVendorId == GAIA.VENDOR_QUALCOMM
-            ? 0x001D
-            : GAIA.VENDOR_QUALCOMM;
-        _isVendorReady = true;
-        addLog("升级连接失败，切换Vendor后重试: ${_vendorToHex(_activeVendorId)}");
-        _rwcpSetupInProgress = false;
-        if (mIsRWCPEnabled.value) {
-          enableRwcpForUpgrade();
-        } else {
-          sendUpgradeConnect();
-        }
-        return;
-      }
       addLog("升级命令失败：${_gaiaCommandText(cmd)}，触发升级断开");
       _enterFatalUpgradeState(
           "升级命令失败：${_gaiaCommandText(cmd)} status=0x${status.toRadixString(16)}");
@@ -1127,6 +1028,12 @@ class OtaServer extends GetxService implements RWCPListener {
     }
     if (cmd == _getApplicationVersionCommand()) {
       return "GET_APPLICATION_VERSION";
+    }
+    if (cmd == _registerNotificationCommand()) {
+      return "REGISTER_NOTIFICATION";
+    }
+    if (cmd == _cancelNotificationCommand()) {
+      return "CANCEL_NOTIFICATION";
     }
     switch (cmd) {
       case GAIA.COMMAND_SET_DATA_ENDPOINT_MODE:
@@ -1424,9 +1331,10 @@ class OtaServer extends GetxService implements RWCPListener {
   }
 
   void cancelNotification() async {
+    final cancelPayload = _isV3VendorActive() ? [0x06] : [GAIA.VMU_PACKET];
     GaiaPacketBLE packet = _buildGaiaPacket(
-      GAIA.COMMAND_CANCEL_NOTIFICATION,
-      payload: [GAIA.VMU_PACKET],
+      _cancelNotificationCommand(),
+      payload: cancelPayload,
     );
     writeMsg(packet.getBytes());
   }
