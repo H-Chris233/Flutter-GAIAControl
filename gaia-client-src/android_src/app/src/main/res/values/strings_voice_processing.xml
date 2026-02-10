@@ -1,0 +1,39 @@
+<!--
+  ~ ************************************************************************************************
+  ~ * © 2021 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.             *
+  ~ ************************************************************************************************
+  -->
+
+<resources>
+
+    <!-- Voice processing Settings -->
+    <string name="settings_voice_processing_3mic_capability">Qualcomm&#174; cVc&#8482; 3-Mic</string>
+    <string name="settings_voice_processing_operation_mode">Operation mode</string>
+    <string name="settings_voice_processing_microphone_mode">Microphone mode</string>
+    <string name="settings_voice_processing_bypass_mode">Bypass mode</string>
+
+    <!-- cVc 3 Mic capability - Operation mode -->
+    <string name="voice_processing_operation_mode_3mic">Three mic</string>
+    <string name="voice_processing_operation_mode_2mic">Two mic</string>
+
+    <!-- cVc 3 Mic capability - Microphone mode -->
+    <string name="voice_processing_microphone_mode_bypass">Bypass</string>
+    <plurals name="voice_processing_microphones">
+        <item quantity="one">%1$d mic</item>
+        <item quantity="other">%1$d mics</item>
+    </plurals>
+
+    <!-- cVc 3 Mic capability - Bypass mode -->
+    <string name="voice_processing_bypass_voice">Voice mic bypass</string>
+    <string name="voice_processing_bypass_external">Background mic bypass</string>
+    <string name="voice_processing_bypass_internal">In-ear mic bypass</string>
+
+    <!-- Other messages -->
+    <string name="voice_processing_unsupported_value">Unsupported value</string>
+    <string name="voice_processing_error_supported_enhancements">Could not get the supported settings,
+        reason:%1$s</string>
+    <string name="voice_processing_error_get_configuration">Could not retrieve the configuration, reason: %1$s</string>
+    <string name="voice_processing_error_set_configuration">Could not set the configuration, reason: %1$s</string>
+    <string name="voice_processing_error">An error occurred, reason: %1$s</string>
+
+</resources>

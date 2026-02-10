@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ *************************************************************************************************
+  ~ * © 2024 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.              *
+  ~ *************************************************************************************************
+  -->
+
+<resources>
+
+    <!-- Upgrade Settings -->
+    <string name="settings_upgrade_device_information_title">Device information</string>
+    <string name="settings_upgrade_application_version">Application version</string>
+    <string name="settings_upgrade_application_build_id">Application build ID</string>
+    <string name="settings_upgrade_not_available">Not available</string>
+    <string name="settings_upgrade_versions">Gaia and protocol versions</string>
+    <string name="settings_upgrade_versions_summary">Gaia: %1$s, protocol: %2$s</string>
+    <string name="settings_upgrade_options_title">Developer options</string>
+    <string name="settings_upgrade_transfer_default">Use default data transfer options</string>
+    <string name="settings_upgrade_transfer_default_details">To use the default parameters during
+        the data transfer of the upgrade.</string>
+    <string name="settings_upgrade_transfer_default_dialog_title">Confirm</string>
+    <string name="settings_upgrade_transfer_default_dialog_message">Changing the transfer
+        parameters can break the upgrade process. Please confirm to access the transfer
+        parameters.</string>
+    <string name="settings_upgrade_flush_data">Flush each packet</string>
+    <string name="settings_upgrade_flush_data_details">Force the system to send the
+        Bluetooth packet. For Android performances this is not recommended.</string>
+    <string name="settings_upgrade_acknowledgements">Wait for acknowledgements</string>
+    <string name="settings_upgrade_acknowledgements_details">Wait for a packet to be acknowledged
+        to send the next one during the upload.</string>
+    <string name="settings_upgrade_chunk_size">Set chunk size for upload</string>
+    <plurals name="settings_upgrade_chunk_size_details">
+        <item quantity="one">%1$d byte</item>
+        <item quantity="other">%1$d bytes</item>
+    </plurals>
+    <string name="settings_upgrade_chunk_size_dialog_title">Set the chunk size for data
+        upload</string>
+    <string name="settings_upgrade_chunk_size_dialog_message">Set the number of data bytes to
+        be sent in a packet during the upload.
+        \n- protocol &lt;4: range is 1 to 250.
+        \n- protocol &gt;=4: range is  to 65530 - subject to the device maximum support.</string>
+    <string name="settings_upgrade_chunk_size_alert_out_of_range_title">Size is out of
+        range</string>
+    <string name="settings_upgrade_chunk_size_alert_out_of_range_message">The device
+        supports a chunk size from 1 to %1$s.</string>
+    <string name="settings_upgrade_chunk_size_alert_out_of_range_positive_label">Use %1$d</string>
+    <string name="settings_upgrade_logs">Log packets during upgrade</string>
+    <string name="settings_upgrade_logs_details">Warning: slows down the upgrade.</string>
+    <string name="settings_upgrade_select_file">Select upgrade file</string>
+    <string name="settings_upgrade_check_for_updates">Check for updates</string>
+
+    <!-- Upgrade -->
+    <string name="alert_upgrade_low_battery_message">The battery is low on this device.
+        Please connect it to a charger.</string>
+    <string name="alert_upgrade_low_battery_title">Low battery</string>
+    <string name="alert_upgrade_transfer_complete_title">File upload complete</string>
+    <string name="alert_upgrade_transfer_complete_message">The file is ready for installation.
+        \nDo you want to proceed?
+        \nThe device might reboot.</string>
+    <string name="alert_upgrade_commit_title">Upgrade installed</string>
+    <string name="alert_upgrade_commit_message">The device has updated its software. Do you want to
+        commit the upgrade?
+        \n\nPlease note that this can result in a reboot of the device. This
+        would terminate any ongoing connection with the device – streaming, call, etc.</string>
+    <string name="alert_upgrade_sync_id_different_title">Different file</string>
+    <string name="alert_upgrade_sync_id_different_message">A previous unfinished upgrade has been processed with a
+        different file. By continuing the current upgrade the device will loose all information from that
+        previous upgrade.
+        \nDo you want to continue?</string>
+    <string name="alert_upgrade_earbud_in_case_title">Put earbuds in case</string>
+    <string name="alert_upgrade_earbud_in_case_message">Please put both earbuds in the case and close the lid to continue the
+        upgrade.
+        \nPlease do not open the lid until the upgrade has completed.
+        \n\nThis alert will disappear once the earbuds are in case and the lid closed.</string>
+    <string name="toast_upgrade_set_size">Chunk size is %1$s</string>
+    <string name="cross_update_version_dialog_title">Upgrade required</string>
+    <string name="cross_update_version_dialog_message">Please upgrade the Earbuds to version: %1$d.%2$d,
+        PS-version %3$d</string>
+
+    <!-- Errors -->
+    <string name="upgrade_error_title">Upgrade failed</string>
+    <string name="upgrade_error_format">%1$s
+        \n\nRefs: %2$s</string>
+    <string name="upgrade_error_references">%1$s, %2$s</string>
+    <string name="upgrade_error_default">An error has occurred during the upgrade.</string>
+    <string name="upgrade_error_protocol">The upgrade has failed due to a protocol error.
+            \nPlease look for a more recent version of this mobile application.</string>
+    <string name="upgrade_error_file">The file is incompatible, empty or non existent, the upgrade has been
+        aborted.</string>
+    <string name="upgrade_error_reconnection">The application failed to reconnect with the device within 40 seconds.
+        \nPlease try to reconnect manually from the application settings and restart the upgrade.</string>
+    <string name="upgrade_error_process_default">The upgrade has failed due to a process error.</string>
+    <string name="upgrade_error_board_not_ready">The device is not ready for an update.
+        \nThe process has been aborted, try again later.</string>
+    <string name="upgrade_error_exception">The upgrade has failed due to an internal process error.
+         \nPlease look for a more recent version of this mobile application.</string>
+    <string name="upgrade_error_upgrade_already_in_progress">The upgrade could not be started, the device is already
+        processing another upgrade.</string>
+    <string name="upgrade_error_unsupported_confirmation">The selected option is not supported by the device.
+        \nPlease restart the upgrade and select a different option.</string>
+    <string name="upgrade_error_device_error">The upgrade has failed due to an error on the device.</string>
+    <string name="upgrade_error_code">%1$s (%2$s)</string>
+
+    <!-- End messages -->
+    <string name="upgrade_finish_complete">The upgrade has successfully completed.</string>
+    <string name="upgrade_finish_complete_with_security_update_failed">The upgrade was installed but the security
+        version could not be updated. \nTrying again may resolve the version update.</string>
+    <string name="upgrade_finish_silent_commit">The file has successfully been uploaded to the device.
+        \nThe device will reboot at a later time to install the update.</string>
+    <string name="upgrade_finish_different_upgrade_in_progress">The upgrade was cancelled as a different upgrade is
+        currently in progress.</string>
+    <string name="upgrade_end_aborted">The upgrade has aborted.</string>
+
+</resources>

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ *************************************************************************************************
+  ~ * © 2021-2022 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.         *
+  ~ *************************************************************************************************
+  -->
+
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <data>
+
+        <variable
+            name="leftTouchpadData"
+            type="com.qualcomm.qti.gaiaclient.ui.settings.audiocuration.demo.TouchpadViewData" />
+
+        <variable
+            name="rightTouchpadData"
+            type="com.qualcomm.qti.gaiaclient.ui.settings.audiocuration.demo.TouchpadViewData" />
+
+    </data>
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="@dimen/default_margin">
+
+        <ImageView
+            android:id="@+id/right_touchpad"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@{rightTouchpadData.contentDescription}"
+            android:src="@drawable/ic_right_touchpad"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:tint="@color/touchpad_indicator_color_selector" />
+
+        <ImageView
+            android:id="@+id/left_touchpad"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="@dimen/default_margin"
+            android:contentDescription="@{leftTouchpadData.contentDescription}"
+            android:src="@drawable/ic_left_touchpad"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/right_touchpad"
+            app:layout_constraintTop_toTopOf="parent"
+            app:tint="@color/touchpad_indicator_color_selector" />
+
+        <TextView
+            android:id="@android:id/title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:paddingBottom="@dimen/default_margin"
+            android:textAppearance="?android:attr/textAppearanceListItem"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/left_touchpad"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</layout>

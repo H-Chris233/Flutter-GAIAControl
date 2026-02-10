@@ -1,0 +1,26 @@
+<!--
+  ~ *************************************************************************************************
+  ~ * © 2020-2021 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.         *
+  ~ *************************************************************************************************
+  -->
+
+<resources>
+
+    <!-- ANC Legacy Settings -->
+    <string name="settings_legacy_anc_state">Active noise cancellation</string>
+    <string name="settings_legacy_anc_adaptive_state">Adaptive state</string>
+    <string name="settings_legacy_anc_mode">Mode</string>
+    <string name="settings_legacy_anc_adapted_gain">Adapted gain</string>
+    <string name="settings_legacy_anc_adaptive_label">Left: %1$s - Right: %2$s</string>
+    <string name="legacy_anc_state_enabled">enabled</string>
+    <string name="legacy_anc_state_disabled">disabled</string>
+    <string name="legacy_anc_state_unknown">unknown</string>
+    <string name="settings_legacy_anc_leakthrough_gain">Leakthrough gain</string>
+    <string name="settings_legacy_anc_leakthrough_gain_dialog_title">Set the leakthrough gain</string>
+    <string name="settings_legacy_anc_mode_label">Mode %1$d</string>
+    <string name="legacy_anc_gain_alert_out_of_range_title">Gain out of range</string>
+    <string name="legacy_anc_gain_alert_out_of_range_message">Gain must be from %1$d to %2$d.
+        \nValue: %3$d.</string>
+    <string name="anc_gain_alert_out_of_range_positive_label">Set %1$d</string>
+
+</resources>

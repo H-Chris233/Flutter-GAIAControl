@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ ************************************************************************************************
+  ~ * © 2020, 2022-2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.  *
+  ~ ************************************************************************************************
+  -->
+
+<paths>
+    <files-path name="device_logs" path="device_logs/" />
+    <files-path name="statistics_recordings" path="statistics_recordings/" />
+    <files-path name="upgrade_files" path="upgrade_files/" />
+</paths>

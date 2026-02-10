@@ -1,0 +1,24 @@
+<!--
+  ~ *************************************************************************************************
+  ~ * © 2021 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.              *
+  ~ *************************************************************************************************
+  -->
+
+<resources>
+
+    <dimen name="eq_preset_btn_margin">5dp</dimen>
+
+    <dimen name="eq_bar_maxmin_radius">10dp</dimen>
+    <dimen name="eq_bar_width">2dp</dimen>
+
+    <dimen name="eq_bar_thumb_dimen">32dp</dimen>
+    <dimen name="eq_bar_thumb_dimen_padding">14dp</dimen>
+
+    <dimen name="eq_sliders_padding_left">32dp</dimen>
+    <dimen name="eq_label_button_width">48dp</dimen>
+    <dimen name="eq_labels_top_margin">8dp</dimen>
+    <dimen name="eq_labels_bottom_margin">28dp</dimen>
+    <dimen name="eq_label_text_size">12sp</dimen>
+    <dimen name="eq_label_button_horizontal_padding">2dp</dimen>
+
+</resources>

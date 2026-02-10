@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ *************************************************************************************************
+  ~ * © 2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.              *
+  ~ *************************************************************************************************
+  -->
+
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <data>
+
+        <import type="android.view.View" />
+
+        <variable
+            name="viewModel"
+            type="com.qualcomm.qti.gaiaclient.ui.upgrade.download.DownloadViewModel" />
+
+    </data>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <include
+                    android:id="@+id/status_bar"
+                    layout="@layout/download_file_status_bar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:viewModel="@{viewModel}" />
+
+                <include
+                    android:id="@+id/content_view"
+                    layout="@layout/download_file_content"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="@dimen/default_margin"
+                    app:viewModel="@{viewModel}" />
+
+            </LinearLayout>
+
+        </ScrollView>
+
+        <Button
+            android:id="@+id/download"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="@dimen/default_margin"
+            android:onClick="@{() -> viewModel.downloadFile()}"
+            android:text="@string/button_download"
+            android:visibility="@{viewModel.progress == null ? View.VISIBLE : View.GONE}" />
+
+    </LinearLayout>
+
+</layout>

@@ -1,0 +1,36 @@
+<!--
+  ~ ************************************************************************************************
+  ~ * © 2021 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.             *
+  ~ ************************************************************************************************
+  -->
+
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- Default visibility, enabled mode and summary are override by VoiceProcessingSettingsViewData -->
+
+    <PreferenceCategory
+        app:iconSpaceReserved="false"
+        app:key="@string/settings_id_voice_processing_3mic_capability"
+        app:title="@string/settings_voice_processing_3mic_capability">
+
+        <Preference
+            app:iconSpaceReserved="false"
+            app:key="@string/settings_id_voice_processing_operation_mode"
+            app:selectable="false"
+            app:title="@string/settings_voice_processing_operation_mode" />
+
+        <ListPreference
+            app:iconSpaceReserved="false"
+            app:key="@string/settings_id_voice_processing_microphone_mode"
+            app:summary="%s"
+            app:title="@string/settings_voice_processing_microphone_mode" />
+
+        <ListPreference
+            app:iconSpaceReserved="false"
+            app:key="@string/settings_id_voice_processing_bypass_mode"
+            app:summary="%s"
+            app:title="@string/settings_voice_processing_bypass_mode" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

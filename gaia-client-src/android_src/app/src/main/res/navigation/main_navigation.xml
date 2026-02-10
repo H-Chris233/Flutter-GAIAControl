@@ -1,0 +1,331 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ ************************************************************************************************
+  ~ * © 2020-2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.        *
+  ~ ************************************************************************************************
+  -->
+
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/main_navigation"
+    app:startDestination="@id/destination_discovery">
+
+    <fragment
+        android:id="@+id/destination_discovery"
+        android:name="com.qualcomm.qti.gaiaclient.ui.discovery.DiscoveryFragment"
+        android:label="@string/title_discovery">
+
+        <action
+            android:id="@+id/to_connection"
+            app:destination="@id/destination_connection" />
+
+    </fragment>
+
+    <fragment
+        android:id="@+id/destination_connection"
+        android:name="com.qualcomm.qti.gaiaclient.ui.connection.ConnectionFragment"
+        android:label="@string/title_connection">
+
+        <action
+            android:id="@+id/to_information"
+            app:destination="@id/destination_information" />
+
+        <action
+            android:id="@+id/back"
+            app:destination="@id/destination_discovery"
+            app:popUpTo="@id/destination_discovery"
+            app:popUpToInclusive="true" />
+
+        <argument
+            android:name="device"
+            app:argType="com.qualcomm.qti.gaiaclient.repository.connection.Device" />
+
+    </fragment>
+
+    <fragment
+        android:id="@+id/destination_information"
+        android:name="com.qualcomm.qti.gaiaclient.ui.information.InformationFragment"
+        android:label="@string/title_information" />
+
+    <fragment
+        android:id="@+id/destination_settings"
+        android:name="com.qualcomm.qti.gaiaclient.ui.settings.main.MainSettingsFragment"
+        android:label="@string/title_settings">
+
+        <action
+            android:id="@+id/back"
+            app:destination="@id/destination_discovery"
+            app:popUpTo="@+id/destination_discovery"
+            app:popUpToInclusive="true" />
+
+        <action
+            android:id="@+id/to_anc_legacy"
+            app:destination="@id/destination_anc_legacy" />
+
+        <action
+            android:id="@+id/to_audio_curation_settings"
+            app:destination="@id/destination_audio_curation_settings" />
+
+        <action
+            android:id="@+id/to_music_processing"
+            app:destination="@id/destination_music_processing" />
+
+        <action
+            android:id="@+id/to_logs_settings"
+            app:destination="@id/destination_logs_settings" />
+
+        <action
+            android:id="@+id/to_upgrade_settings"
+            app:destination="@id/destination_upgrade_settings" />
+
+        <action
+            android:id="@+id/to_earbud_fit"
+            app:destination="@id/destination_earbud_fit" />
+
+        <action
+            android:id="@+id/to_handset_service"
+            app:destination="@id/destination_handset_service" />
+
+        <action
+            android:id="@+id/to_voice_processing"
+            app:destination="@id/destination_voice_processing" />
+
+        <action
+            android:id="@+id/to_gestures"
+            app:destination="@id/destination_gestures" />
+
+        <action
+            android:id="@+id/to_statistics"
+            app:destination="@id/destination_statistics_categories" />
+
+        <action
+            android:id="@+id/to_feedback_form"
+            app:destination="@id/destination_feedback_form" />
+
+    </fragment>
+
+    <fragment
+        android:id="@+id/destination_anc_legacy"
+        android:name="com.qualcomm.qti.gaiaclient.ui.settings.anclegacy.ANCLegacyFragment"
+        android:label="@string/title_anc_legacy" />
+
+    <fragment
+        android:id="@+id/destination_audio_curation_settings"
+        android:name="com.qualcomm.qti.gaiaclient.ui.settings.audiocuration.configuration.AudioCurationSettingsFragment"
+        android:label="@string/title_audio_curation_settings">
+
+        <action
+            android:id="@+id/to_audio_curation_demo"
+            app:destination="@id/destination_audio_curation_demo" />
+
+    </fragment>
+
+    <fragment
+        android:id="@+id/destination_audio_curation_demo"
+        android:name="com.qualcomm.qti.gaiaclient.ui.settings.audiocuration.demo.AudioCurationDemoFragment"
+        android:label="@string/title_audio_curation_demo" />
+
+    <fragment
+        android:id="@+id/destination_music_processing"
+        android:name="com.qualcomm.qti.gaiaclient.ui.settings.musicprocessing.MusicProcessingFragment"
+        android:label="@string/title_music_processing" />
+
+    <fragment
+        android:id="@+id/destination_logs_settings"
+        android:name="com.qualcomm.qti.gaiaclient.ui.settings.logs.LogsSettingsFragment"
+        android:label="@string/title_logs_settings">
+
+        <action
+            android:id="@+id/to_download_logs"
+            app:destination="@id/destination_download_logs" />
+
+    </fragment>
+
+    <fragment
+        android:id="@+id/destination_download_logs"
+        android:name="com.qualcomm.qti.gaiaclient.ui.devicelogs.DownloadLogsFragment"
+        android:label="@string/title_download_logs">
+
+        <action
+            android:id="@+id/back"
+            app:destination="@id/destination_logs_settings"
+            app:popUpTo="@id/destination_logs_settings"
+            app:popUpToInclusive="true" />
+
+    </fragment>
+
+    <fragment
+        android:id="@+id/destination_upgrade_settings"
+        android:name="com.qualcomm.qti.gaiaclient.ui.settings.upgrade.UpgradeSettingsFragment"
+        android:label="@string/title_upgrade_settings">
+
+        <action
+            android:id="@+id/to_upgrade"
+            app:destination="@id/destination_upgrade" />
+
+        <action
+            android:id="@+id/to_download_settings"
+            app:destination="@id/destination_download_settings" />
+
+    </fragment>
+
+    <fragment
+        android:id="@+id/destination_download_settings"
+        android:name="com.qualcomm.qti.gaiaclient.ui.settings.download.DownloadSettingsFragment"
+        android:label="@string/title_download_settings">
+
+        <action
+            android:id="@+id/to_get_files"
+            app:destination="@id/destination_get_files" />
+
+        <argument
+            android:name="options"
+            app:argType="com.qualcomm.qti.gaiaclient.repository.upgrade.UpgradeOptions" />
+
+    </fragment>
+
+    <fragment
+        android:id="@+id/destination_get_files"
+        android:name="com.qualcomm.qti.gaiaclient.ui.upgrade.files.GetFilesFragment"
+        android:label="@string/title_get_files">
+
+        <action
+            android:id="@+id/to_download_file"
+            app:destination="@id/destination_download_file" />
+
+        <argument
+            android:name="options"
+            app:argType="com.qualcomm.qti.gaiaclient.repository.upgrade.UpgradeOptions" />
+
+        <argument
+            android:name="filters"
+            app:argType="com.qualcomm.qti.gaiaclient.ui.upgrade.files.FilesFilters" />
+
+    </fragment>
+
+    <fragment
+        android:id="@+id/destination_download_file"
+        android:name="com.qualcomm.qti.gaiaclient.ui.upgrade.download.DownloadFileFragment"
+        android:label="@string/title_download_file">
+
+        <action
+            android:id="@+id/to_upgrade"
+            app:destination="@id/destination_upgrade" />
+
+        <argument
+            android:name="file"
+            app:argType="com.qualcomm.qti.gaiaclient.repository.service.getfiles.FileData" />
+
+        <argument
+            android:name="options"
+            app:argType="com.qualcomm.qti.gaiaclient.repository.upgrade.UpgradeOptions" />
+
+    </fragment>
+
+    <fragment
+        android:id="@+id/destination_upgrade"
+        android:name="com.qualcomm.qti.gaiaclient.ui.upgrade.upgrade.UpgradeProgressFragment"
+        android:label="@string/title_upgrade">
+
+        <action
+            android:id="@+id/back"
+            app:destination="@id/destination_upgrade_settings"
+            app:popUpTo="@id/destination_upgrade_settings"
+            app:popUpToInclusive="true" />
+
+    </fragment>
+
+    <fragment
+        android:id="@+id/destination_earbud_fit"
+        android:name="com.qualcomm.qti.gaiaclient.ui.earbudfit.EarbudFitFragment"
+        android:label="@string/title_earbud_fit">
+
+        <action
+            android:id="@+id/back"
+            app:destination="@id/destination_settings"
+            app:popUpTo="@id/destination_settings"
+            app:popUpToInclusive="true" />
+
+    </fragment>
+
+    <fragment
+        android:id="@+id/destination_handset_service"
+        android:name="com.qualcomm.qti.gaiaclient.ui.settings.handsetservice.HandsetServiceFragment"
+        android:label="@string/title_handset_service" />
+
+    <fragment
+        android:id="@+id/destination_voice_processing"
+        android:name="com.qualcomm.qti.gaiaclient.ui.settings.voiceprocessing.VoiceProcessingFragment"
+        android:label="@string/title_voice_processing" />
+
+    <fragment
+        android:id="@+id/destination_gestures"
+        android:name="com.qualcomm.qti.gaiaclient.ui.gestures.gestures.GesturesFragment"
+        android:label="@string/title_gestures">
+
+        <action
+            android:id="@+id/to_gesture_configuration"
+            app:destination="@id/destination_gesture_configuration" />
+
+    </fragment>
+
+    <fragment
+        android:id="@+id/destination_gesture_configuration"
+        android:name="com.qualcomm.qti.gaiaclient.ui.gestures.configuration.GestureConfigurationFragment"
+        android:label="@string/title_gesture_configuration">
+
+        <argument
+            android:name="gesture"
+            app:argType="com.qualcomm.qti.gaiaclient.core.gaia.qtil.data.gestures.Gesture" />
+
+    </fragment>
+
+    <fragment
+        android:id="@+id/destination_statistics_categories"
+        android:name="com.qualcomm.qti.gaiaclient.ui.settings.statistics.categories.StatisticsCategoriesFragment"
+        android:label="@string/settings_statistics">
+
+        <action
+            android:id="@+id/to_statistics_category"
+            app:destination="@id/destination_statistics_category" />
+
+    </fragment>
+
+    <fragment
+        android:id="@+id/destination_statistics_category"
+        android:name="com.qualcomm.qti.gaiaclient.ui.settings.statistics.category.StatisticsStatisticsFragment">
+
+        <argument
+            android:name="category"
+            app:argType="com.qualcomm.qti.gaiaclient.core.gaia.qtil.data.CategoryID" />
+
+    </fragment>
+
+    <fragment
+        android:id="@+id/destination_feedback_form"
+        android:name="com.qualcomm.qti.gaiaclient.ui.feedback.FeedbackFormFragment"
+        android:label="@string/title_feedback_form">
+
+        <action
+            android:id="@+id/to_send_feedback"
+            app:destination="@id/destination_send_feedback" />
+
+    </fragment>
+
+    <fragment
+        android:id="@+id/destination_send_feedback"
+        android:name="com.qualcomm.qti.gaiaclient.ui.feedback.SendFeedbackFragment"
+        android:label="@string/title_send_feedback">
+
+        <argument
+            android:name="form"
+            app:argType="com.qualcomm.qti.gaiaclient.ui.feedback.FeedbackForm" />
+
+        <action
+            android:id="@+id/back"
+            app:destination="@id/destination_settings"
+            app:popUpTo="@id/destination_settings"
+            app:popUpToInclusive="true" />
+
+    </fragment>
+
+</navigation>

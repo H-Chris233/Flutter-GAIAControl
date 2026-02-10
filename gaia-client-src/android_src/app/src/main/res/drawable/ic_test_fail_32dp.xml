@@ -1,0 +1,38 @@
+<!--
+  ~ ************************************************************************************************
+  ~ * © 2021 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.             *
+  ~ ************************************************************************************************
+  -->
+
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="32dp"
+    android:height="32dp"
+    android:viewportWidth="32"
+    android:viewportHeight="32">
+  <path
+      android:pathData="M16,32C7.1633,32 0,24.8365 0,16C0,7.1635 7.1633,0 16,0C24.8367,0 32,7.1635 32,16C32,24.8365 24.8367,32 16,32Z"
+      android:strokeWidth="1"
+      android:fillColor="#E04F4F"
+      android:fillType="evenOdd"
+      android:strokeColor="#00000000"/>
+  <path
+      android:pathData="M16,32C7.1633,32 0,24.8365 0,16C0,7.1635 7.1633,0 16,0C24.8367,0 32,7.1635 32,16C32,24.8365 24.8367,32 16,32Z"
+      android:strokeWidth="1"
+      android:fillColor="#DE3737"
+      android:fillType="evenOdd"
+      android:strokeColor="#00000000"/>
+  <path
+      android:pathData="M11.0503,11.0503L20.9497,20.9497"
+      android:strokeWidth="2"
+      android:fillColor="#00000000"
+      android:strokeColor="#FFFFFF"
+      android:fillType="evenOdd"
+      android:strokeLineCap="square"/>
+  <path
+      android:pathData="M11.0503,20.9497L20.9497,11.0503"
+      android:strokeWidth="2"
+      android:fillColor="#00000000"
+      android:strokeColor="#FFFFFF"
+      android:fillType="evenOdd"
+      android:strokeLineCap="square"/>
+</vector>

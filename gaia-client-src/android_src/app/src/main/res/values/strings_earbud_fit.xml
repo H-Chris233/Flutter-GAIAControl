@@ -1,0 +1,40 @@
+<!--
+  ~ *************************************************************************************************
+  ~ * © 2021 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.              *
+  ~ *************************************************************************************************
+  -->
+
+<resources>
+
+    <!-- Titles -->
+    <string name="earbud_fit_initial_title">Earbud Fit Test</string>
+    <string name="earbud_fit_in_progress_title">Test in Progress</string>
+    <string name="earbud_fit_cancelled_title">Test Cancelled</string>
+    <string name="earbud_fit_failed_title">Test Failed</string>
+    <string name="earbud_fit_complete_title">Test Complete</string>
+
+    <!-- Messages -->
+    <string name="earbud_fit_initial_message">Place both earbuds in your ears.
+        \nOnce they are secure, press start to test the fit.</string>
+    <string name="earbud_fit_in_progress_message">Do not remove earbuds.</string>
+    <string name="earbud_fit_cancelled_message">The test has been cancelled.
+        \n\nPlace both earbuds securely in your ears.
+        \nOnce they are secure, press start to test the fit.</string>
+    <string name="earbud_fit_failed_message">The test was not completed.\n\nPress start to test again.</string>
+
+    <!-- Results on test complete -->
+    <string name="earbud_fit_complete_message">%1$s\n\nPress start to test again.</string>
+    <string name="earbud_fit_combine_left_right">%1$s\n\n%2$s</string>
+    <string name="earbud_fit_result_good_both">Both your earbuds are a good fit.</string>
+    <string name="earbud_fit_result_bad_both">Both your earbuds are a poor fit.
+        \nTry changing the earbud tips.</string>
+    <string name="earbud_fit_result_fail_both">The test failed for both earbuds.</string>
+    <string name="earbud_fit_position_left">left</string>
+    <string name="earbud_fit_position_right">right</string>
+    <string name="earbud_fit_position_unknown">unknown</string>
+    <string name="earbud_fit_result_good">Your %1$s earbud is a good fit.</string>
+    <string name="earbud_fit_result_bad">Your %1$s earbud is a poor fit.
+        \nTry changing the earbud tips.</string>
+    <string name="earbud_fit_result_fail">The test failed for your %1$s earbud.</string>
+
+</resources>

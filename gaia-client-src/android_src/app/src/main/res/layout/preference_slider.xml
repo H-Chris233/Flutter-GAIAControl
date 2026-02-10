@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ *************************************************************************************************
+  ~ * © 2021, 2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.        *
+  ~ *************************************************************************************************
+  -->
+
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <data>
+
+        <variable
+            name="data"
+            type="com.qualcomm.qti.gaiaclient.ui.settings.audiocuration.demo.SliderViewData" />
+
+        <variable
+            name="max"
+            type="int" />
+
+    </data>
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="@dimen/default_margin">
+
+        <androidx.constraintlayout.widget.Guideline
+            android:id="@+id/vertical_guideline"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            app:layout_constraintGuide_percent="0.66" />
+
+        <TextView
+            android:id="@android:id/title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:paddingBottom="@dimen/default_margin"
+            android:textAppearance="?android:attr/textAppearanceListItem"
+            app:layout_constraintEnd_toStartOf="@id/vertical_guideline"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/mode_label"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:text="@{data.label}"
+            android:textAlignment="textEnd"
+            android:textAppearance="?android:attr/textAppearanceListItemSecondary"
+            android:textColor="?android:attr/textColorSecondary"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@id/vertical_guideline"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <androidx.appcompat.widget.AppCompatSeekBar
+            android:id="@+id/slider"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_margin="@dimen/no_margin"
+            android:max="@{max}"
+            android:paddingBottom="@dimen/default_margin"
+            android:progress="@{data.progress}"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@android:id/title" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</layout>

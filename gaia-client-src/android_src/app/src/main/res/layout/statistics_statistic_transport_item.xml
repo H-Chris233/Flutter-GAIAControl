@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ *************************************************************************************************
+  ~ * © 2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.              *
+  ~ *************************************************************************************************
+  -->
+
+<layout xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <data>
+        <import type="android.view.View" />
+
+        <variable
+            name="data"
+            type="com.qualcomm.qti.gaiaclient.ui.settings.statistics.category.StatisticViewData" />
+
+        <variable
+            name="showActions"
+            type="boolean" />
+
+        <variable
+            name="showDetailedActions"
+            type="boolean" />
+    </data>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:minHeight="@dimen/height_list_item_min"
+        android:orientation="vertical"
+        android:padding="@dimen/default_margin_half">
+
+        <TextView
+            android:id="@+id/statistic_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@{data.title}"
+            android:textAppearance="?android:attr/textAppearanceListItem" />
+
+        <TextView
+            android:id="@+id/statistic_subtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@{data.subtitle}"
+            android:textAppearance="?android:attr/textAppearanceListItemSecondary"
+            android:textColor="?android:attr/textColorSecondary" />
+
+        <Button
+            android:id="@+id/statistic_toggle_button"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginVertical="@dimen/default_margin"
+            android:layout_marginHorizontal="@dimen/default_margin_half"
+            android:text="@string/statistics_streaming_button_toggle"
+            android:visibility="@{showActions ? View.VISIBLE : View.GONE}" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:visibility="@{showActions &amp;&amp; showDetailedActions ? View.VISIBLE : View.GONE}">
+
+            <Button
+                android:id="@+id/statistic_wifi_button"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginVertical="@dimen/default_margin"
+                android:layout_marginHorizontal="@dimen/default_margin_half"
+                android:layout_weight="1"
+                android:text="@string/statistics_streaming_button_wifi" />
+
+            <Button
+                android:id="@+id/statistics_lea_button"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginVertical="@dimen/default_margin"
+                android:layout_marginHorizontal="@dimen/default_margin_half"
+                android:layout_weight="1"
+                android:text="@string/statistics_streaming_button_lea" />
+
+            <Button
+                android:id="@+id/statistics_ap_button"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginVertical="@dimen/default_margin"
+                android:layout_marginHorizontal="@dimen/default_margin_half"
+                android:layout_weight="1"
+                android:text="@string/statistics_streaming_button_ap" />
+
+        </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:visibility="@{showActions &amp;&amp; showDetailedActions ? View.VISIBLE : View.GONE}">
+
+        <Button
+            android:id="@+id/statistic_connect_ap_button"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginVertical="@dimen/default_margin"
+            android:layout_marginHorizontal="@dimen/default_margin_half"
+            android:layout_weight="1"
+            android:text="@string/statistics_streaming_button_connect_ap" />
+
+        <Button
+            android:id="@+id/statistics_disconnect_ap_button"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginVertical="@dimen/default_margin"
+            android:layout_marginHorizontal="@dimen/default_margin_half"
+            android:layout_weight="1"
+            android:text="@string/statistics_streaming_button_disconnect_ap" />
+    </LinearLayout>
+
+    </LinearLayout>
+
+</layout>

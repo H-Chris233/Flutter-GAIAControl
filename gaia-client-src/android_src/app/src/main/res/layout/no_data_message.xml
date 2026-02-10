@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ ************************************************************************************************
+  ~ * © 2022-2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.        *
+  ~ ************************************************************************************************
+  -->
+
+<layout xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <data>
+
+        <import type="android.view.View" />
+
+        <variable
+            name="message"
+            type="com.qualcomm.qti.gaiaclient.ui.common.MessageData" />
+
+    </data>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="@{message == null || !message.show ? View.GONE : View.VISIBLE}">
+
+        <TextView
+            style="@style/AppTheme.Text.Title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/default_margin_double"
+            android:layout_marginTop="@dimen/no_margin"
+            android:layout_marginEnd="@dimen/default_margin_double"
+            android:layout_marginBottom="@dimen/default_margin_one_and_half"
+            android:text="@{message.title ?? @string/default_no_data_title}"
+            android:textAlignment="center" />
+
+        <TextView
+            style="@style/AppTheme.Text.Message"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginStart="@dimen/default_margin_double"
+            android:layout_marginTop="@dimen/default_margin_triple"
+            android:layout_marginEnd="@dimen/default_margin_double"
+            android:layout_marginBottom="@dimen/no_margin"
+            android:text="@{message.message ?? @string/default_no_data_message}"
+            android:textAlignment="center" />
+
+        <TextView
+            style="@style/AppTheme.Text.Refs"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginStart="@dimen/default_margin_double"
+            android:layout_marginTop="@dimen/default_margin_double"
+            android:layout_marginEnd="@dimen/default_margin_double"
+            android:layout_marginBottom="@dimen/no_margin"
+            android:visibility="@{message == null || message.refs == null || message.refs.isEmpty() ? View.GONE : View.VISIBLE}"
+            android:text="@{String.format(@string/default_refs, message.refs)}"
+            android:textAlignment="center" />
+
+    </LinearLayout>
+
+</layout>

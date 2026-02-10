@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ *************************************************************************************************
+  ~ * © 2020-2021, 2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.   *
+  ~ *************************************************************************************************
+  -->
+
+<resources>
+
+    <!-- Heights -->
+    <dimen name="height_progressbar">5dp</dimen>
+    <dimen name="height_list_item_min">56dp</dimen>
+    <dimen name="height_device_item_min">@dimen/height_list_item_min</dimen>
+    <dimen name="height_gesture_image">40dp</dimen>
+
+    <!-- Widths -->
+    <dimen name="width_gesture_image">48dp</dimen>
+
+    <!-- Sizes -->
+    <dimen name="device_icon_size">40dp</dimen>
+    <dimen name="indeterminate_progress_message">44dp</dimen>
+    <dimen name="download_filter_indication_size">24dp</dimen>
+    <dimen name="feedback_progress_indicator_size">32dp</dimen>
+    <dimen name="download_file_progress_image_size_width">56dp</dimen>
+    <dimen name="download_file_progress_image_size_height">32dp</dimen>
+    <dimen name="ring_thickness_ratio">20</dimen>
+    <dimen name="ring_tone_1_size">180dp</dimen>
+    <dimen name="ring_tone_2_size">150dp</dimen>
+
+    <!-- Margins -->
+    <dimen name="no_margin">0dp</dimen>
+    <dimen name="default_margin_eighth">2dp</dimen>
+    <dimen name="default_margin_quarter">4dp</dimen>
+    <dimen name="default_margin_half">8dp</dimen>
+    <dimen name="default_margin">16dp</dimen>
+    <dimen name="default_margin_one_and_half">24dp</dimen>
+    <dimen name="default_margin_double">32dp</dimen>
+    <dimen name="default_margin_triple">48dp</dimen>
+    <dimen name="default_margin_right_for_right_touchpad">8dp</dimen> <!-- This must be the default_margin minus 8dp -->
+
+    <!-- Text -->
+    <dimen name="text">16sp</dimen>
+    <dimen name="text_title">24sp</dimen>
+    <dimen name="text_subtitle">20sp</dimen>
+    <dimen name="text_secondary">14sp</dimen>
+    <dimen name="text_caption">12sp</dimen>
+    <dimen name="ring_progress_label">@dimen/text_secondary</dimen>
+    <dimen name="ring_progress_title">@dimen/text_secondary</dimen>
+
+</resources>

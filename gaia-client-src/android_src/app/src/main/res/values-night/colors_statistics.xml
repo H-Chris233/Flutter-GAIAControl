@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ ************************************************************************************************
+  ~ * © 2022 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.             *
+  ~ ************************************************************************************************
+  -->
+
+<resources>
+
+    <color name="statistics_action_button_background_selected">@color/qualcomm_red_luminance_70</color>
+    <color name="statistics_action_button_background_not_selected">@color/colorAccent</color>
+
+    <color name="statistics_recording_indicator">@color/qualcomm_red_luminance_70</color>
+
+</resources>

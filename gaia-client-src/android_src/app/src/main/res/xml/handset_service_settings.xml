@@ -1,0 +1,16 @@
+<!--
+  ~ ************************************************************************************************
+  ~ * © 2021 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.             *
+  ~ ************************************************************************************************
+  -->
+
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- Default visibility, enabled mode and summary are override by HandsetServiceSettingsViewData -->
+
+    <SwitchPreference
+        app:iconSpaceReserved="false"
+        app:key="@string/settings_id_handset_service"
+        app:title="@string/settings_handset_service_multipoint" />
+
+</PreferenceScreen>

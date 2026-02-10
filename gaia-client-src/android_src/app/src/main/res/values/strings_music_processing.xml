@@ -1,0 +1,37 @@
+<!--
+  ~ *************************************************************************************************
+  ~ * © 2021 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.              *
+  ~ *************************************************************************************************
+  -->
+
+<resources>
+
+    <!-- Preset Names -->
+    <string name="eq_preset_off">FLAT</string>
+    <string name="eq_preset_user">USER</string>
+    <string name="eq_preset_numbered">PRESET %1$d</string>
+    <string name="eq_preset_rock">ROCK</string>
+    <string name="eq_preset_pop">POP</string>
+    <string name="eq_preset_classical">CLASSICAL</string>
+    <string name="eq_preset_techno">TECHNO</string>
+    <string name="eq_preset_rnb">R&amp;B</string>
+    <string name="eq_preset_ambient">AMBIENT</string>
+    <string name="eq_preset_metal">METAL</string>
+    <string name="eq_preset_funk">FUNK</string>
+    <string name="eq_preset_speech">SPEECH</string>
+
+    <!-- Full screen notices -->
+    <string name="eq_error_device_not_connected">Device not connected</string>
+    <string name="eq_error_not_enabled">EQ is not in use.\nAudio needs to be playing.</string>
+    <string name="eq_please_wait">Please Wait\nFetching EQ Info</string>
+
+    <!-- Frequencies -->
+    <string name="eq_frequency_k_param">%1$sK</string>
+
+    <!-- Gain labels -->
+    <string name="eq_3_db">+3 dB</string>
+    <string name="eq_0_db">0 dB</string>
+    <string name="eq_minus_6_db">-6 dB</string>
+    <string name="eq_minus_12_db">-12 dB</string>
+
+</resources>

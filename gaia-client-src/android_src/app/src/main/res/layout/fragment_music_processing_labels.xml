@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ *************************************************************************************************
+  ~ * © 2021-2022 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.         *
+  ~ *************************************************************************************************
+  -->
+
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/labels_container"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_marginTop="@dimen/eq_labels_top_margin"
+        android:layout_marginBottom="@dimen/eq_labels_bottom_margin">
+
+        <androidx.constraintlayout.widget.Guideline
+            android:id="@+id/top_guideline"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            app:layout_constraintGuide_percent="0.22" />
+
+        <androidx.constraintlayout.widget.Guideline
+            android:id="@+id/bottom_guideline"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            app:layout_constraintGuide_percent="0.60" />
+
+        <TextView
+            style="@style/AppTheme.Text.SliderLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/eq_3_db"
+            android:textAlignment="center"
+            app:layout_constraintLeft_toLeftOf="@id/button_0"
+            app:layout_constraintRight_toRightOf="@id/button_0"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <Button
+            android:id="@+id/button_0"
+            style="@style/AppTheme.Button.SliderLabelButton"
+            android:layout_width="@dimen/eq_label_button_width"
+            android:layout_height="wrap_content"
+            android:backgroundTint="@color/vertical_slider_label_button_background"
+            android:text="@string/eq_0_db"
+            app:layout_constraintBottom_toBottomOf="@id/top_guideline"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintTop_toTopOf="@id/top_guideline" />
+
+        <TextView
+            style="@style/AppTheme.Text.SliderLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/eq_minus_6_db"
+            android:textAlignment="center"
+            app:layout_constraintBottom_toBottomOf="@id/bottom_guideline"
+            app:layout_constraintLeft_toLeftOf="@id/button_0"
+            app:layout_constraintRight_toRightOf="@id/button_0"
+            app:layout_constraintTop_toTopOf="@id/bottom_guideline" />
+
+        <TextView
+            style="@style/AppTheme.Text.SliderLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/eq_minus_12_db"
+            android:textAlignment="center"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintLeft_toLeftOf="@id/button_0"
+            app:layout_constraintRight_toRightOf="@id/button_0" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</layout>

@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ *************************************************************************************************
+  ~ * © 2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.              *
+  ~ *************************************************************************************************
+  -->
+
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <data>
+
+        <import type="android.view.View" />
+
+        <variable
+            name="viewModel"
+            type="com.qualcomm.qti.gaiaclient.ui.upgrade.download.DownloadViewModel" />
+
+    </data>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/title"
+            style="@style/AppTheme.Text.Title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@{viewModel.content.title(@string/download_content_no_title)}" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/tags"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/default_margin"
+            android:layout_marginBottom="@dimen/default_margin_eighth"
+            android:adapter="@{viewModel.content.tagsAdapter}"
+            android:visibility="@{viewModel.content.file.tags.length > 0 ? View.VISIBLE : View.GONE}"
+            app:layoutManager="@{viewModel.content.layoutManager}" />
+
+        <TextView
+            android:id="@+id/chip_family"
+            style="@style/AppTheme.Text.Secondary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginVertical="@dimen/default_margin_eighth"
+            android:text="@{viewModel.content.chipFamily(@string/download_content_no_chip_family)}" />
+
+        <TextView
+            android:id="@+id/date"
+            style="@style/AppTheme.Text.Secondary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/default_margin_eighth"
+            android:layout_marginBottom="@dimen/default_margin_half"
+            android:text="@{viewModel.content.date(@string/download_content_no_date)}" />
+
+        <TextView
+            android:id="@+id/description"
+            style="@style/AppTheme.Text.Message"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginVertical="@dimen/default_margin_half"
+            android:text="@{viewModel.content.description(@string/download_content_no_description)}" />
+
+        <TextView
+            android:id="@+id/id"
+            style="@style/AppTheme.Text.Secondary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/default_margin_half"
+            android:layout_marginBottom="@dimen/default_margin_eighth"
+            android:text="@{String.format(@string/download_content_id, viewModel.content.id(@string/download_content_no_id))}" />
+
+        <TextView
+            android:id="@+id/hardware_versions"
+            style="@style/AppTheme.Text.Secondary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/default_margin_eighth"
+            android:layout_marginBottom="@dimen/no_margin"
+            android:visibility="@{viewModel.content.file.hardwareVersions.length > 0 ? View.VISIBLE : View.GONE}"
+            android:text="@{String.format(@string/download_content_hardware_versions, viewModel.content.hardwareVersions)}" />
+
+    </LinearLayout>
+
+</layout>

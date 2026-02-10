@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ *************************************************************************************************
+  ~ * © 2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.              *
+  ~ *************************************************************************************************
+  -->
+
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <data>
+
+        <variable
+            name="title"
+            type="String" />
+
+        <variable
+            name="placeholder"
+            type="String" />
+
+        <variable
+            name="helper"
+            type="String" />
+
+        <variable
+            name="maximumLength"
+            type="Integer" />
+
+    </data>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/title_text_view"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/default_margin_half"
+                android:clickable="false"
+                android:text="@{title}"
+                android:textAppearance="@android:style/TextAppearance.Material.Body2"
+                android:textColor="?android:attr/colorAccent" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/input_layout"
+                style="?attr/textInputFilledStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:counterEnabled="@{maximumLength != null &amp;&amp; maximumLength > 0}"
+                app:counterMaxLength="@{maximumLength}"
+                app:helperText="@{helper}"
+                app:helperTextEnabled="@{helper != null}"
+                app:placeholderText="@{placeholder}">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/input"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+            </com.google.android.material.textfield.TextInputLayout>
+
+        </LinearLayout>
+
+</layout>

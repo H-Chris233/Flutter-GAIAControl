@@ -1,0 +1,88 @@
+<!--
+  ~ *************************************************************************************************
+  ~ * © 2021-2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.         *
+  ~ *************************************************************************************************
+  -->
+
+<resources>
+
+    <!-- Audio Curation Settings -->
+    <string name="settings_audio_curation_anc_state">Active noise cancellation</string>
+    <string name="settings_audio_curation_toggle_configuration">Toggle behaviour</string>
+    <string name="settings_audio_curation_toggle_1">Toggle 1</string>
+    <string name="settings_audio_curation_toggle_2">Toggle 2</string>
+    <string name="settings_audio_curation_toggle_3">Toggle 3</string>
+    <string name="settings_audio_curation_other_configurations">Other behaviours</string>
+    <string name="settings_audio_curation_idle_configuration">During idle</string>
+    <string name="settings_audio_curation_playback_configuration">During playback</string>
+    <string name="settings_audio_curation_calls_configuration">During calls</string>
+    <string name="settings_audio_curation_assistant_configuration">During assistant</string>
+    <string name="settings_audio_curation_voice_recording_configuration">During voice recording</string>
+    <string name="settings_audio_curation_enter_demo">Enter Demo</string>
+    <string name="settings_audio_curation_option_toggle_off">Audio curation off</string>
+    <string name="settings_audio_curation_option_change_to_off">Change to audio curation off</string>
+    <string name="settings_audio_curation_option_change_to_mode">Change to mode %1$d</string>
+    <string name="settings_audio_curation_option_disabled">Disable this toggle</string>
+    <string name="settings_audio_curation_option_no_change">Do not change current mode</string>
+    <string name="settings_audio_curation_option_param">Option %1$d</string>
+    <string name="settings_audio_curation_option_unknown">Unknown option</string>
+    <string name="settings_audio_curation_auto_transparency">Auto-transparency</string>
+    <string name="settings_audio_curation_auto_transparency_state">Enable auto-transparency</string>
+    <string name="settings_audio_curation_auto_transparency_release_time">Release time</string>
+    <string name="settings_audio_curation_auto_transparency_release_time_none">No action on release</string>
+    <string name="settings_audio_curation_auto_transparency_release_time_short">Short</string>
+    <string name="settings_audio_curation_auto_transparency_release_time_normal">Normal</string>
+    <string name="settings_audio_curation_auto_transparency_release_time_long">Long</string>
+    <string name="settings_audio_curation_auto_transparency_release_time_undefined">Undefined time</string>
+    <string name="settings_audio_curation_noise_id">Noise ID</string>
+    <string name="settings_audio_curation_noise_id_state">Enable noise ID</string>
+
+    <!-- Audio Curation Demo Settings -->
+    <string name="settings_audio_curation_demo_anc_state">Active noise cancellation</string>
+    <string name="settings_audio_curation_demo_media_playback">Media playback</string>
+    <string name="settings_audio_curation_demo_wind_nose_detection">Wind noise detection</string>
+    <string name="settings_audio_curation_demo_wind_nose_reduction">Wind noise reduction</string>
+    <string name="settings_audio_curation_demo_adaptation">Adaptation</string>
+    <string name="settings_audio_curation_demo_feed_forward_gain">Feed forward gain</string>
+    <string name="settings_audio_curation_demo_leakthrough_gain">Leakthrough gain</string>
+    <string name="settings_audio_curation_demo_leakthrough_gain_stepper">Leakthrough gain</string>
+    <string name="settings_audio_curation_demo_left_right_balance">Left right balance</string>
+    <string name="audio_curation_gain_alert_out_of_range_title">Gain out of range</string>
+    <string name="audio_curation_gain_alert_out_of_range_message">Gain must be from %1$d to %2$d.
+        \nValue: %3$d.</string>
+    <string name="audio_curation_gain_alert_out_of_range_positive_label">Set %1$d</string>
+    <string name="audio_curation_mode_label">Mode %1$d</string>
+    <string name="settings_audio_curation_left_earbud">LEFT</string>
+    <string name="settings_audio_curation_right_earbud">RIGHT</string>
+    <string name="audio_curation_gain_in_db">%1$d dB</string>
+    <string name="audio_curation_gain_in_db_decimal">%1$.1f dB</string>
+    <string name="audio_curation_balance_left">%1$d%% Left</string>
+    <string name="audio_curation_balance_right">%1$d%% Right</string>
+    <string name="settings_audio_curation_demo_howling_detection">Howling detection</string>
+    <string name="settings_audio_curation_demo_feedback_gain">Feedback gain</string>
+    <string name="settings_audio_curation_demo_noise_id_category">Noise ID</string>
+    <string name="settings_audio_curation_demo_noise_id_category_a">Category A</string>
+    <string name="settings_audio_curation_demo_noise_id_category_b">Category B</string>
+    <string name="settings_audio_curation_demo_noise_id_category_na">Not applicable</string>
+    <string name="settings_audio_curation_demo_noise_id_category_undefined">Undefined category: %1$d</string>
+    <string name="settings_audio_curation_demo_noise_id_category_empty">-</string>
+    <string name="settings_audio_curation_demo_adverse_acoustic_state">Adverse acoustic handler (AAH)</string>
+    <string name="settings_audio_curation_demo_adverse_acoustic_gain_reduction">AAH gain reduction</string>
+    <string name="settings_audio_curation_demo_howling_control_gain_reduction">Howling control gain reduction</string>
+
+    <!-- Audio Curation Demo - media player -->
+    <string name="settings_audio_curation_demo_volume">Volume</string>
+
+    <!-- Content Descriptions -->
+    <string name="cont_desc_audio_curation_media_play">Play media</string>
+    <string name="cont_desc_audio_curation_media_pause">Pause media</string>
+    <string name="cont_desc_audio_curation_media_previous">Previous track</string>
+    <string name="cont_desc_audio_curation_media_next">Next track</string>
+    <string name="cont_desc_audio_curation_media_volume_down">Volume down</string>
+    <string name="cont_desc_audio_curation_media_volume_up">Volume up</string>
+    <string name="cont_desc_audio_curation_detected_on_left">Detected on left</string>
+    <string name="cont_desc_audio_curation_not_detected_on_left">Not detected on left</string>
+    <string name="cont_desc_audio_curation_detected_on_right">Detected on right</string>
+    <string name="cont_desc_audio_curation_not_detected_on_right">Not detected on right</string>
+
+</resources>

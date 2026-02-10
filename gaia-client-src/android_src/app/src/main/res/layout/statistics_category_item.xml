@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ *************************************************************************************************
+  ~ * © 2021-2022 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.         *
+  ~ *************************************************************************************************
+  -->
+
+<layout xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <data>
+        <import type="android.view.View" />
+
+        <variable
+            name="data"
+            type="com.qualcomm.qti.gaiaclient.ui.settings.statistics.categories.CategoryViewData" />
+    </data>
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="@dimen/height_list_item_min"
+        android:padding="@dimen/default_margin_half">
+
+        <ImageView
+            android:id="@+id/recording_indicator"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/cont_desc_category_recording_icon"
+            android:visibility="invisible"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:srcCompat="@drawable/ic_recording_indicator" />
+
+        <TextView
+            android:id="@+id/category_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/no_margin"
+            android:layout_marginEnd="@dimen/default_margin_double"
+            android:text="@{data.label}"
+            android:textAppearance="?android:attr/textAppearanceListItem"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/recording_indicator"/>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</layout>

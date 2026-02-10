@@ -1,0 +1,24 @@
+<!--
+  ~ ************************************************************************************************
+  ~ * © 2020, 2022 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.       *
+  ~ ************************************************************************************************
+  -->
+
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="@dimen/device_icon_size"
+    android:height="@dimen/device_icon_size"
+    android:viewportWidth="40"
+    android:viewportHeight="40">
+    <path
+        android:pathData="M0,20C0,8.9543 8.9543,0 20,0C31.0457,0 40,8.9543 40,20C40,31.0457 31.0457,40 20,40C8.9543,40 0,31.0457 0,20Z"
+        android:strokeWidth="1"
+        android:fillColor="@color/drawable_discovery_device_paired_circle"
+        android:fillType="evenOdd"
+        android:strokeColor="#00000000" />
+    <path
+        android:pathData="M18.5389,7.9834L18.5389,16.8022L15.2011,13.4643L13.6858,14.9795L15.2011,16.494L18.0952,19.3889L15.2011,22.2822L13.6858,23.7976L15.2011,25.3129L18.5389,21.975L18.5389,30.793L19.6104,29.7214L20.6821,28.6498L21.1257,28.207L24.019,25.3129L25.5344,23.7976L21.1257,19.3889L24.0199,16.494L25.5344,14.9795L24.0199,13.4643L21.1249,10.5702L20.6821,10.1273L19.6104,9.0549L18.5389,7.9834ZM20.6821,13.1562L22.5046,14.9795L20.6821,16.8022L20.6821,13.1562ZM20.6821,21.975L22.5046,23.7976L20.6821,25.62L20.6821,21.975Z"
+        android:strokeWidth="1"
+        android:fillColor="@color/drawable_discovery_device_paired_icon"
+        android:fillType="evenOdd"
+        android:strokeColor="#00000000" />
+</vector>

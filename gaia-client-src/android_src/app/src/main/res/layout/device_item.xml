@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ *************************************************************************************************
+  ~ * © 2020-2021, 2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.   *
+  ~ *************************************************************************************************
+  -->
+
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <data>
+
+        <import type="android.view.View" />
+
+        <variable
+            name="device"
+            type="com.qualcomm.qti.gaiaclient.ui.discovery.viewdata.DeviceViewData" />
+
+    </data>
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginVertical="@dimen/default_margin_half"
+        android:layout_marginHorizontal="@dimen/default_margin"
+        android:contentDescription="@{String.format(@string/cont_desc_discovery_device, device.name, device.bluetoothAddress)}"
+        android:minHeight="@dimen/height_device_item_min" >
+
+        <androidx.constraintlayout.widget.Guideline
+            android:id="@+id/horizontal_guideline"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            app:layout_constraintGuide_percent="0.5" />
+
+        <ImageView
+            android:id="@+id/bluetooth_image"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@{device.image != null ? device.image.contentDescription : @string/cont_desc_not_paired}"
+            android:src="@drawable/ic_list_device_other"
+            app:imageResource="@{device.image.resourceId}"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/bluetooth_type"
+            style="@style/AppTheme.Text.Secondary"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@{device.bluetoothType}"
+            android:textSize="@dimen/text_caption"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/device_name"
+            style="@style/AppTheme.Text.List"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:text="@{device.name}"
+            android:visibility="@{device.name == null ? View.GONE : View.VISIBLE}"
+            android:layout_marginHorizontal="@dimen/default_margin"
+            app:layout_constraintBottom_toTopOf="@id/horizontal_guideline"
+            app:layout_constraintHorizontal_bias="0.0"
+            app:layout_constraintLeft_toRightOf="@id/bluetooth_image"
+            app:layout_constraintRight_toLeftOf="@id/bluetooth_type" />
+
+        <TextView
+            android:id="@+id/device_address"
+            style="@style/AppTheme.Text.List.Secondary"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="@dimen/default_margin"
+            android:text="@{device.bluetoothAddress}"
+            android:visibility="@{device.bluetoothAddress == null ? View.GONE : View.VISIBLE}"
+            app:layout_constraintHorizontal_bias="0.0"
+            app:layout_constraintLeft_toRightOf="@id/bluetooth_image"
+            app:layout_constraintRight_toLeftOf="@id/bluetooth_type"
+            app:layout_constraintTop_toBottomOf="@id/horizontal_guideline" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</layout>

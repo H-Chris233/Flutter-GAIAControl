@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ *************************************************************************************************
+  ~ * © 2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.              *
+  ~ *************************************************************************************************
+  -->
+
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <data>
+
+        <import type="android.view.View" />
+
+        <variable
+            name="viewModel"
+            type="com.qualcomm.qti.gaiaclient.ui.upgrade.download.DownloadViewModel" />
+
+    </data>
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/download_file_status_bar_background"
+        android:minHeight="@dimen/height_list_item_min"
+        android:paddingHorizontal="@dimen/default_margin_one_and_half"
+        android:paddingVertical="@dimen/default_margin_double"
+        android:visibility="@{viewModel.progress == null ? View.GONE : View.VISIBLE}">
+
+        <TextView
+            android:id="@+id/title"
+            style="@style/AppTheme.Text.Title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/no_margin"
+            android:layout_marginTop="@dimen/no_margin"
+            android:layout_marginEnd="@dimen/no_margin"
+            android:layout_marginBottom="@dimen/default_margin_one_and_half"
+            android:maxLines="2"
+            android:text="@{viewModel.progress.title}"
+            android:textSize="@dimen/text"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@+id/image"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <com.google.android.material.progressindicator.LinearProgressIndicator
+            android:id="@+id/progress"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="@dimen/no_margin"
+            android:layout_marginTop="@dimen/default_margin_double"
+            android:layout_marginBottom="@dimen/no_margin"
+            android:progress="@{viewModel.progress.progress}"
+            android:visibility="@{viewModel.progress.progress == null ? View.GONE : View.VISIBLE}"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="@id/title"
+            app:layout_constraintStart_toStartOf="@id/title"
+            app:layout_constraintTop_toBottomOf="@id/title" />
+
+        <TextView
+            android:id="@+id/content"
+            style="@style/AppTheme.Text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/no_margin"
+            android:layout_marginTop="@dimen/no_margin"
+            android:layout_marginEnd="@dimen/no_margin"
+            android:layout_marginBottom="@dimen/no_margin"
+            android:text="@{viewModel.progress.content}"
+            android:visibility="@{viewModel.progress.content == null || viewModel.progress.content.isEmpty() ? View.GONE : View.VISIBLE}"
+            app:layout_constraintEnd_toEndOf="@id/title"
+            app:layout_constraintStart_toStartOf="@id/title"
+            app:layout_constraintTop_toBottomOf="@id/title" />
+
+        <TextView
+            android:id="@+id/refs"
+            style="@style/AppTheme.Text.Refs"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/no_margin"
+            android:layout_marginTop="@dimen/default_margin_half"
+            android:layout_marginEnd="@dimen/no_margin"
+            android:layout_marginBottom="@dimen/no_margin"
+            android:text="@{String.format(@string/default_refs, viewModel.progress.refs)}"
+            android:visibility="@{viewModel.progress.refs == null || viewModel.progress.refs.isEmpty() ? View.GONE : View.VISIBLE}"
+            app:layout_constraintEnd_toEndOf="@id/title"
+            app:layout_constraintStart_toStartOf="@id/title"
+            app:layout_constraintTop_toBottomOf="@id/content" />
+
+        <Button
+            android:id="@+id/secondary_action"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/no_margin"
+            android:layout_marginTop="@dimen/default_margin"
+            android:layout_marginEnd="@dimen/no_margin"
+            android:layout_marginBottom="@dimen/no_margin"
+            android:onClick="@{() -> viewModel.onClick(viewModel.progress.actions.secondary)}"
+            android:text="@{viewModel.progress.actions.secondary.label}"
+            android:visibility="@{viewModel.progress.actions.secondary != null ? View.VISIBLE : View.GONE}"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0.0"
+            app:layout_constraintStart_toStartOf="@id/title"
+            app:layout_constraintTop_toBottomOf="@id/refs" />
+
+        <Button
+            android:id="@+id/primary_action"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/no_margin"
+            android:layout_marginTop="@dimen/default_margin"
+            android:layout_marginEnd="@dimen/no_margin"
+            android:layout_marginBottom="@dimen/no_margin"
+            android:onClick="@{() -> viewModel.onClick(viewModel.progress.actions.primary)}"
+            android:text="@{viewModel.progress.actions.primary.label}"
+            android:visibility="@{viewModel.progress.actions.primary != null ? View.VISIBLE : View.GONE}"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="@id/title"
+            app:layout_constraintHorizontal_bias="1.0"
+            app:layout_constraintStart_toStartOf="@id/title"
+            app:layout_constraintTop_toBottomOf="@id/refs" />
+
+        <!-- marginEnd not applied ==> workaround by using of a bigger width and paddingEnd -->
+        <ImageView
+            android:id="@+id/image"
+            android:layout_width="@dimen/download_file_progress_image_size_width"
+            android:layout_height="@dimen/download_file_progress_image_size_height"
+            android:layout_marginStart="@dimen/no_margin"
+            android:layout_marginTop="@dimen/no_margin"
+            android:layout_marginEnd="@dimen/no_margin"
+            android:layout_marginBottom="@dimen/no_margin"
+            android:contentDescription="@{viewModel.progress.error ? @string/cont_desc_feedback_progress_error : @string/cont_desc_feedback_progress_success}"
+            android:paddingStart="@dimen/no_margin"
+            android:paddingEnd="@dimen/default_margin_one_and_half"
+            android:src="@{viewModel.progress.error ? @drawable/ic_warning_40dp : @drawable/ic_check_32dp}"
+            android:visibility="@{viewModel.progress.success || viewModel.progress.error ? View.VISIBLE : View.GONE}"
+            app:layout_constraintBottom_toTopOf="@id/primary_action"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="@id/title"
+            app:layout_constraintVertical_bias="0.1" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</layout>

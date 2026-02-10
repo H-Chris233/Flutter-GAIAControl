@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ ************************************************************************************************
+  ~ * © 2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.             *
+  ~ ************************************************************************************************
+  -->
+<resources>
+
+    <!-- Form -->
+    <string name="feedback_form_helper_required">* Required</string>
+    <string name="feedback_form_title">Title *</string>
+    <string name="feedback_form_title_placeholder">e.g. \"Problem enabling ANC\"</string>
+    <string name="feedback_form_description">Description *</string>
+    <string name="feedback_form_description_placeholder">Add some details: context, steps, etc.</string>
+    <string name="feedback_form_reporter">Reporter</string>
+    <string name="feedback_form_reporter_placeholder">e.g. \"QCC5171 Product Manager\"</string>
+    <string name="feedback_form_hardware_version">Hardware build ID</string>
+    <string name="feedback_form_hardware_version_place_holder">e.g. \"17\"</string>
+
+    <string name="feedback_form_error_required">Required!</string>
+    <string name="feedback_form_error_too_long">Too long!</string>
+
+    <!-- Feedback -->
+    <string name="feedback_title">Title</string>
+    <string name="feedback_description">Description</string>
+    <string name="feedback_reporter">Reporter</string>
+    <string name="feedback_hardware_version">Hardware build ID</string>
+    <string name="feedback_client">GAIA Client application</string>
+    <string name="feedback_device">Audio device</string>
+    <string name="feedback_client_content">
+        GAIA Client version: %1$s
+        \nAndroid version: %2$s
+        \nAndroid device: %3$s</string>
+    <string name="feedback_device_content">
+        Application version: %1$s
+        \nApplication build ID: %2$s</string>
+    <string name="feedback_clipboard_content">
+        Title
+        \n\t%1$s
+        \nDescription
+        \n\t%2$s
+        \nReporter
+        \n\t%3$s
+        \nHardware ID
+        \n\t%4$s
+        \nClient
+        \n%5$s
+        \nAudio device
+        \n%6$s</string>
+
+    <!-- Sending feedback progress -->
+    <string name="feedback_sending">Uploading feedback</string>
+    <string name="feedback_sent">Feedback submitted</string>
+    <string name="feedback_issue_created">Issue %1$s created: \"%2$s\".</string>
+    <string name="feedback_no_value">(None)</string>
+
+    <!-- Sending feedback error -->
+    <string name="feedback_error_host_not_found_title">Server not found</string>
+    <string name="feedback_error_host_not_found_message">Check the internet connection, that the app runs in a work
+        profile and over a VPN.
+        \n Try again later if the server is unavailable.</string>
+    <string name="feedback_error_internal_title">Unable to send feedback</string>
+    <string name="feedback_error_internal_message">Check that you are using the latest version of GAIA Client,
+        version is %1$s.</string>
+    <string name="feedback_error_timeout_title">Server time out</string>
+    <string name="feedback_error_timeout_message">The server failed to respond in time.</string>
+    <string name="feedback_error_html_title">Server HTML error %1$s</string>
+    <string name="feedback_error_no_feedback_title">Title or description missing</string>
+    <string name="feedback_error_no_feedback_message">Please enter a title and a description in the previous screen.</string>
+    <string name="feedback_error_server_title">Server error</string>
+    <string name="feedback_error_server_message">An error occurred on the server.
+        \nCheck that you are using the latest version of GAIA Client, version is %1$s.</string>
+    <string name="feedback_error_tracking_system_unavailable_title">Service unavailable</string>
+    <string name="feedback_tracking_system_unavailable_message">The tracking system is unavailable.
+        \nTry again later.</string>
+    <string name="feedback_error_default_title">Uploading feedback failed</string>
+    <string name="feedback_error_default_message">An error occurred while sending the feedback.</string>
+
+    <!-- Content description -->
+    <string name="cont_desc_feedback_progress_success">Feedback submitted</string>
+    <string name="cont_desc_feedback_progress_error">Uploading feedback failed</string>
+</resources>

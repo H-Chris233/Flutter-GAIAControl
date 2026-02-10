@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ *************************************************************************************************
+  ~ * © 2020, 2022-2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.   *
+  ~ *************************************************************************************************
+  -->
+
+<resources>
+
+    <!-- Values -->
+    <string name="serial_number">Serial Number:</string>
+    <string name="battery_levels">Battery Level(s):</string>
+    <string name="application_version">Application version: %1$s</string>
+    <string name="application_build_id">Application build ID: %1$s</string>
+    <string name="gaia_version">GAIA version: %1$d</string>
+    <string name="bluetooth_address">Address: %1$s</string>
+    <string name="charging">Charging</string>
+    <string name="unknown_device">Unnamed device</string>
+    <string name="unknown_bluetooth_address">Unknown address</string>
+    <string name="battery_level_percent_device">Device</string>
+    <string name="battery_level_percent_left">Left</string>
+    <string name="battery_level_percent_right">Right</string>
+    <string name="battery_level_percent_case">Case</string>
+    <string name="battery_level_label">%1$s: %2$s%%</string>
+    <string name="battery_level_unknown">-</string>
+    <string name="serial_number_left">Left: %1$s</string>
+    <string name="serial_number_right">Right: %1$s</string>
+
+    <!-- Information errors -->
+    <string name="info_not_found">The information cannot be found.
+        \nPlease check that the device is compatible.</string>
+    <string name="info_not_available">The information is not available at the
+        moment.<br />Please check that the device is connected.</string>
+    <string name="info_failed">Getting the information failed.
+        \nCheck that the device is connected, available and compatible.</string>
+
+    <!-- Features errors -->
+    <string name="features_not_found">No features have been found.<br />Please
+        check that the device is compatible.</string>
+    <string name="features_not_available">The features are not available at the moment.
+        \nPlease check that the device is connected.</string>
+    <string name="features_notification_not_supported">The feature seems to be supported by the
+        device, but the device failed to register the application as a client.</string>
+    <string name="features_failed">Getting the features failed.
+        \nCheck that the device is connected, available and compatible.</string>
+
+    <!-- Content Descriptions -->
+    <string name="cont_desc_information_screen">Display device information</string>
+    <string name="cont_desc_information_image_earbuds">Earbuds image</string>
+    <string name="cont_desc_information_image_headphones">Headphones image</string>
+    <string name="cont_desc_information_name">Device name is %1$s</string>
+    <string name="cont_desc_information_variant_name">Variant name is %1$s</string>
+    <string name="cont_desc_information_serial_number">Serial number is %1$s</string>
+    <string name="cont_desc_information_serial_number_left">Left serial number is %1$s</string>
+    <string name="cont_desc_information_serial_number_right">Right serial number is %1$s</string>
+    <string name="cont_desc_information_application_version">Application version is %1$s</string>
+    <string name="cont_desc_information_application_build_id">Application build ID is %1$s</string>
+    <string name="cont_desc_information_gaia_version">Gaia Version is %1$d</string>
+    <string name="cont_desc_information_is_charging">Is charging</string>
+    <string name="cont_desc_information_address">Bluetooth address is %1$s</string>
+    <string name="cont_desc_information_state">Connection state is %1$s</string>
+
+
+</resources>

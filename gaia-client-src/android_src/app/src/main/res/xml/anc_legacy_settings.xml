@@ -1,0 +1,46 @@
+<!--
+  ~ ************************************************************************************************
+  ~ * © 2021 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.             *
+  ~ ************************************************************************************************
+  -->
+
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- Default visibility, enabled mode and summary are override by ANCSettingsViewData -->
+
+    <SwitchPreference
+        app:iconSpaceReserved="false"
+        app:key="@string/settings_id_anc_legacy_state"
+        app:title="@string/settings_legacy_anc_state" />
+
+    <PreferenceCategory
+        app:iconSpaceReserved="false"
+        app:key="@string/settings_id_anc_legacy_state_dependant_settings">
+
+        <Preference
+            app:iconSpaceReserved="false"
+            app:isPreferenceVisible="false"
+            app:key="@string/settings_id_anc_legacy_adaptive_state"
+            app:title="@string/settings_legacy_anc_adaptive_state" />
+
+        <ListPreference
+            app:iconSpaceReserved="false"
+            app:key="@string/settings_id_anc_legacy_mode"
+            app:summary="%s"
+            app:title="@string/settings_legacy_anc_mode" />
+
+        <Preference
+            app:iconSpaceReserved="false"
+            app:isPreferenceVisible="false"
+            app:key="@string/settings_id_anc_legacy_adapted_gain"
+            app:title="@string/settings_legacy_anc_adapted_gain" />
+
+        <EditTextPreference
+            app:iconSpaceReserved="false"
+            app:dialogTitle="@string/settings_legacy_anc_leakthrough_gain_dialog_title"
+            app:key="@string/settings_id_anc_legacy_leakthrough_gain"
+            app:title="@string/settings_legacy_anc_leakthrough_gain" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

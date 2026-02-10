@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ *************************************************************************************************
+  ~ * © 2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.              *
+  ~ *************************************************************************************************
+  -->
+
+<layout xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <data>
+
+        <variable
+            name="data"
+            type="com.qualcomm.qti.gaiaclient.ui.upgrade.tags.TagViewData" />
+
+    </data>
+
+    <TextView
+        android:id="@+id/content"
+        style="@style/AppTheme.Text.File.Tags"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="@dimen/default_margin_eighth"
+        android:layout_marginVertical="@dimen/default_margin_quarter"
+        android:background="@{data.backgroundColor}"
+        android:padding="@dimen/default_margin_eighth"
+        android:text="@{data.label}"
+        android:textColor="@{data.textColor}" />
+
+</layout>

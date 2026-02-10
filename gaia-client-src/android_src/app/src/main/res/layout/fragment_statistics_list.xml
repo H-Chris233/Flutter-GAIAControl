@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+~ *************************************************************************************************
+~ * © 2021-2022 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.         *
+~ *************************************************************************************************
+-->
+
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <data>
+
+        <import type="android.view.View" />
+
+        <variable
+            name="message"
+            type="com.qualcomm.qti.gaiaclient.ui.common.MessageData" />
+
+    </data>
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <Button
+            android:id="@+id/statistics_action_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="@dimen/default_margin"
+            android:backgroundTint="@color/statistics_action_button_background_color_selector"
+            android:text="@string/statistic_category_settings"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/statistic_list"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:clipToPadding="false"
+            android:nestedScrollingEnabled="false"
+            android:padding="@dimen/default_margin_half"
+            android:visibility="@{message.show ? View.INVISIBLE : View.VISIBLE}"
+            app:layout_constraintBottom_toTopOf="@id/statistics_action_button"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <include
+            android:id="@+id/empty_list_message_id"
+            layout="@layout/no_data_message"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:padding="@dimen/default_margin_half"
+            android:visibility="@{message.show ? View.VISIBLE : View.INVISIBLE}"
+            app:layout_constraintBottom_toBottomOf="@id/statistic_list"
+            app:layout_constraintEnd_toEndOf="@id/statistic_list"
+            app:layout_constraintStart_toStartOf="@id/statistic_list"
+            app:layout_constraintTop_toTopOf="@id/statistic_list"
+            app:message="@{message}" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</layout>

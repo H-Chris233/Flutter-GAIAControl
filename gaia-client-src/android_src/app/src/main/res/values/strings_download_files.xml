@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ ************************************************************************************************
+  ~ * © 2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.             *
+  ~ ************************************************************************************************
+  -->
+<resources>
+
+<!-- Settings -->
+    <string name="settings_download_category_device">Device</string>
+    <string name="settings_download_application_version_title">Application version</string>
+    <string name="settings_download_application_build_id_title">Application build ID</string>
+    <string name="settings_download_application_not_available">Not available</string>
+    <string name="settings_download_hardware_version_title">Hardware build ID</string>
+    <string name="settings_download_hardware_version_dialog_title">Enter hardware build ID</string>
+    <string name="settings_download_no_hardware_version">(none)</string>
+    <string name="settings_download_category_filters">Filters</string>
+    <string name="settings_download_filter_include_tags_title">Only include builds with</string>
+    <string name="settings_download_filter_include_tags_dialog_title">Select tags</string>
+    <string name="settings_download_filter_exclude_tags_title">Exclude builds with</string>
+    <string name="settings_download_filter_exclude_tags_dialog_title">Select tags</string>
+    <string name="settings_download_filter_tags_no_selection">(None)</string>
+    <string name="settings_download_created_after_title">Created after</string>
+    <string name="settings_download_created_after_dialog_title">Select date to filter from</string>
+    <string name="settings_download_created_after_no_selection">No selection</string>
+    <string name="settings_download_continue">Continue</string>
+
+<!-- Get files -->
+    <!-- File content -->
+    <string name="get_files_no_title">(No title)</string>
+    <string name="get_files_no_description">(No description)</string>
+    <!-- Empty list messages -->
+    <string name="get_files_in_progress_title">Looking for files</string>
+    <string name="get_files_in_progress_message">The application is fetching the files available for the
+        device.</string>
+    <string name="get_files_empty_title">No file available</string>
+    <string name="get_files_no_match">No builds were found. Try a different set of filters.</string>
+    <string name="get_files_error_host_not_found">The server is inaccessible: Check the internet connection, that the
+        app runs in a work profile and over a VPN.
+        \n Try again later if the server is unavailable.</string>
+    <string name="get_files_error_not_recoverable">The application and the server failed to communicate.
+        \nCheck that you are using the latest version of this application. The current version is %1$s.</string>
+    <string name="get_files_error_timeout">The request timed out. \nTry again by pulling down the list at its
+        top to refresh it.</string>
+    <string name="get_files_error_no_id">The server could not identify the chip. Try to add a hardware version.</string>
+    <string name="get_files_error_unable_to_resolve_id">The server could not identify the chip. Check the hardware
+        version or add one.</string>
+    <string name="get_files_error_server_error">The server encountered an error. Try again later or provide a different
+        set of parameters and filters.</string>
+    <string name="get_files_error_service_unavailable">The server could not access the resources. Try again
+        later.</string>
+    <string name="get_files_error_default">An error occurred when accessing the list. Try again later or change
+        the parameters in the previous screen.</string>
+
+<!-- Download file -->
+    <string name="download_content_no_title">(No title)</string>
+    <string name="download_content_no_description">(No description)</string>
+    <string name="download_content_no_chip_family">(No chip family)</string>
+    <string name="download_content_no_date">(No creation date)</string>
+    <string name="download_content_no_id">(No id)</string>
+    <string name="download_content_id">id: %1$s</string>
+    <string name="download_content_hardware_versions">Hardware build IDs: %1$s</string>
+    <string name="download_file_state_init">Initialising…</string>
+    <string name="download_file_state_downloading">Downloading…</string>
+    <string name="download_file_state_file_ready">File ready for device upgrade</string>
+    <!-- Errors -->
+    <string name="download_file_error_host_not_found_title">Server not found</string>
+    <string name="download_file_error_host_not_found_message">Check the internet connection, that the app runs in a work
+        profile and over a VPN.
+        \n Try again later if the server is unavailable.</string>
+    <string name="download_file_error_internal_title">Unable to download the file</string>
+    <string name="download_file_error_internal_message">Check that you are using the latest version of GAIA Client,
+        version is %1$s.</string>
+    <string name="download_file_error_timeout_title">Server time out</string>
+    <string name="download_file_error_timeout_message">The server failed to respond in time.</string>
+    <string name="download_file_error_html_title">Server HTML error %1$s</string>
+    <string name="download_file_error_no_id_title">Invalid file ID</string>
+    <string name="download_file__error_no_id_message">The ID of the selected file is invalid.
+        \nCheck that you are using the latest version of this application (this is %1$s) or select a different file.</string>
+    <string name="download_file_error_not_found_title">File not found</string>
+    <string name="download_file_error_not_found_message">The server could not find the file.
+        \nSelect a different file.</string>
+    <string name="download_file_error_server_title">Server error</string>
+    <string name="download_file_error_server_message">An error occurred on the server.
+        \nCheck that you are using the latest version of GAIA Client, version is %1$s.</string>
+    <string name="download_file_error_service_unavailable_title">Service unavailable</string>
+    <string name="download_file_error_service_unavailable_message">The server could not access the resource.
+        \nTry again later.</string>
+    <string name="download_file_error_default_title">Downloading the file failed.</string>
+    <string name="download_file_error_default_message">An error occurred while downloading the file.
+        \nTry again later or a different file.</string>
+
+</resources>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ ************************************************************************************************
+  ~ * © 2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.             *
+  ~ ************************************************************************************************
+  -->
+
+<resources>
+    <color name="feedback_status_bar_background">@color/qualcomm_light_blue_tint_1_alpha_12</color>
+    <color name="download_file_status_bar_background">@color/qualcomm_light_blue_tint_1_alpha_12</color>
+</resources>

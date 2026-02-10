@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ *************************************************************************************************
+  ~ * © 2022 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.              *
+  ~ *************************************************************************************************
+  -->
+
+<resources>
+
+    <style name="AppTheme.TabLayout" parent="Widget.MaterialComponents.TabLayout">
+        <item name="tabTextColor">@color/tab_text_color</item>
+        <item name="tabIndicatorColor">@color/colorPrimary</item>
+        <item name="android:soundEffectsEnabled">false</item>
+    </style>
+
+</resources>

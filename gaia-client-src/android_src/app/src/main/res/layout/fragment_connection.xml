@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ *************************************************************************************************
+  ~ * © 2020, 2022-2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.   *
+  ~ *************************************************************************************************
+  -->
+
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <data>
+
+        <import type="android.view.View" />
+
+        <variable
+            name="connection"
+            type="com.qualcomm.qti.gaiaclient.ui.connection.ConnectionViewData" />
+
+    </data>
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_margin="@dimen/default_margin_double"
+        android:padding="@dimen/default_margin">
+
+        <ProgressBar
+            android:id="@+id/connection_progress"
+            android:layout_width="@dimen/indeterminate_progress_message"
+            android:layout_height="@dimen/indeterminate_progress_message"
+            android:layout_gravity="center"
+            android:layout_margin="@dimen/default_margin_half"
+            android:background="@android:color/transparent"
+            android:indeterminate="true"
+            android:visibility="@{connection.inProgress ? View.VISIBLE : View.INVISIBLE}"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/connection_label"
+            style="@style/AppTheme.Text.Title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/default_margin_double"
+            android:layout_marginTop="@dimen/no_margin"
+            android:layout_marginEnd="@dimen/default_margin_double"
+            android:layout_marginBottom="@dimen/default_margin_one_and_half"
+            android:contentDescription="@{String.format(@string/cont_desc_connection_state, connection.state)}"
+            android:text="@{connection.state ?? @string/connection_state}"
+            android:textAlignment="center"
+            app:layout_constraintBottom_toTopOf="@id/connection_progress"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent" />
+
+        <ImageView
+            android:id="@+id/image_tick"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/cont_desc_connection_done"
+            android:src="@drawable/ic_check"
+            android:visibility="@{connection.connected ? View.VISIBLE : View.GONE}"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <Button
+            android:id="@+id/back"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/button_back"
+            android:visibility="@{connection.isError ? View.VISIBLE : View.GONE}"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent" />
+
+        <TextView
+            android:id="@+id/connection_reason"
+            style="@style/AppTheme.Text.Message"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/default_margin_double"
+            android:layout_marginTop="@dimen/default_margin_triple"
+            android:layout_marginEnd="@dimen/default_margin_double"
+            android:layout_marginBottom="@dimen/default_margin_one_and_half"
+            android:contentDescription="@{String.format(@string/cont_desc_connection_error, connection.reason)}"
+            android:text="@{connection.reason ?? @string/connection_reason}"
+            android:textAlignment="center"
+            android:visibility="@{connection.reason == null ? View.GONE : View.VISIBLE}"
+            app:layout_constraintBottom_toTopOf="@id/back"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/connection_label"
+            app:layout_constraintVertical_bias="0" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</layout>

@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ *************************************************************************************************
+  ~ * © 2020-2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.         *
+  ~ *************************************************************************************************
+  -->
+
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Titles -->
+    <string name="app_name">GAIA Client</string>
+    <string name="title_version">\t v%1$s</string>
+    <string name="title_discovery">Available Devices</string>
+    <string name="title_connection">Connecting…</string>
+    <string name="title_information">Device Information</string>
+    <string name="title_settings">Settings</string>
+    <string name="title_anc_legacy">Active Noise Cancellation</string>
+    <string name="title_audio_curation_settings">Audio Curation</string>
+    <string name="title_audio_curation_demo">Audio Curation Demo</string>
+    <string name="title_music_processing">Equalizer</string>
+    <string name="title_logs_settings">Logs Settings</string>
+    <string name="title_upgrade_settings">Software Updates</string>
+    <string name="title_download_settings">Filters and Settings</string>
+    <string name="title_get_files">Available Updates</string>
+    <string name="title_download_file">Download file</string>
+    <string name="title_upgrade">Updating Software</string>
+    <string name="title_download_logs">Downloading Device Logs</string>
+    <string name="title_earbud_fit">Earbud Fit</string>
+    <string name="title_handset_service">Handset</string>
+    <string name="title_voice_processing">Voice Processing</string>
+    <string name="title_gestures">Gesture Configuration</string>
+    <string name="title_gesture_configuration">Gesture</string>
+    <string name="title_feedback_form">Enter feedback</string>
+    <string name="title_send_feedback">Sending feedback</string>
+
+    <!-- Permissions -->
+    <string name="alert_permissions_title">Permissions required</string>
+    <string name="alert_bluetooth_discovery_location_permissions_message">The location permission is a requirement to
+        scan for Bluetooth devices, this application does not use the location of the user. Please grant the
+        permission to see more devices.</string>
+    <string name="alert_bluetooth_discovery_permissions_message">To see Bluetooth devices that are not paired with
+        this device, please grant this permission.</string>
+    <string name="alert_bluetooth_permissions_message">The purpose of this application is strictly to connect to
+        Bluetooth devices. Please allow this app to connect to Bluetooth devices.</string>
+    <string name="error_bluetooth_discovery_location_permissions_message">The device cannot discover new Bluetooth
+        devices without the location permission. Please grant the permission in the App Settings.</string>
+    <string name="error_bluetooth_discovery_permissions_message">The device cannot discover new Bluetooth
+        devices without being allowed to scan for devices. Please grant the permission in the App Settings to see
+        more devices.</string>
+    <string name="error_bluetooth_permissions_message">Please allow the app to use \'Nearby devices\'.</string>
+
+    <!-- Buttons -->
+    <string name="button_abort">ABORT</string>
+    <string name="button_cancel" tools:ignore="ButtonCase">CANCEL</string>
+    <string name="button_done">DONE</string>
+    <string name="button_confirm">CONFIRM</string>
+    <string name="button_share">SHARE</string>
+    <string name="button_ok">OK</string>
+    <string name="button_go_to_settings">GO TO SETTINGS</string>
+    <string name="button_dismiss">DISMISS</string>
+    <string name="button_enable">ENABLE</string>
+    <string name="button_start">START</string>
+    <string name="button_start_upgrade">START UPGRADE</string>
+    <string name="button_reconnect">RECONNECT</string>
+    <string name="button_back">BACK</string>
+    <string name="button_reset">RESET</string>
+    <string name="button_override">OVERRIDE</string>
+    <string name="button_send">SEND</string>
+    <string name="button_copy_link">COPY LINK</string>
+    <string name="button_copy_data">COPY DATA</string>
+    <string name="button_try_again">TRY AGAIN</string>
+    <string name="button_download">DOWNLOAD</string>
+    <string name="button_later">LATER</string>
+    <string name="button_now">NOW</string>
+
+    <!-- Bottom navigation menu -->
+    <string name="menu_info">Info</string>
+    <string name="menu_settings">Settings</string>
+    <string name="cont_desc_menu_info">Menu for info</string>
+    <string name="cont_desc_menu_settings">Menu for settings</string>
+
+    <!-- Settings -->
+    <string name="info_unknown">-</string>
+
+    <!-- Main Settings -->
+    <string name="settings_anc">Active noise cancellation</string>
+    <string name="settings_audio_curation">Audio curation</string>
+    <string name="settings_music_processing">Equalizer</string>
+    <string name="settings_voice_ui">Voice assistant</string>
+    <string name="settings_upgrade">Software updates</string>
+    <string name="settings_logs">Logs</string>
+    <string name="settings_earbud_fit">Earbud fit</string>
+    <string name="settings_handset_service">Handset</string>
+    <string name="settings_change_device">Change device</string>
+    <string name="settings_gaia_client_version">GAIA Client version</string>
+    <string name="settings_gaia_device_features">Device highlighted features</string>
+    <string name="settings_voice_processing">Voice processing</string>
+    <string name="settings_gestures">Gesture configuration</string>
+    <string name="settings_statistics">Statistics</string>
+    <string name="settings_feedback">Send feedback</string>
+
+    <!-- Progress -->
+    <string name="progress_label">Label</string>
+    <string name="progress_percent">%1$.1f %%</string>
+    <string name="cont_desc_progress">Progress is %1$s</string>
+    <string name="cont_desc_progress_step">Progress step is %1$s</string>
+    <string name="cont_desc_message">Message is %1$s</string>
+
+    <!-- Voice Assistants -->
+    <string name="assistant_none">None</string>
+    <string name="assistant_gaa">Google Assistant</string>
+    <string name="assistant_ama">Amazon Alexa</string>
+    <string name="assistant_reserved">Invalid assistant</string>
+    <string name="assistant_unknown_format">Assistant #%1$d</string>
+
+    <!-- global default values -->
+    <string name="default_no_data_title">No data</string>
+    <string name="default_no_data_message">No available data to display</string>
+    <string name="default_refs">Ref.: %1$s</string>
+
+</resources>

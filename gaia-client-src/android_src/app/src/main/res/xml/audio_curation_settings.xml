@@ -1,0 +1,106 @@
+<!--
+  ~ ************************************************************************************************
+  ~ * © 2021-2022 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.        *
+  ~ ************************************************************************************************
+  -->
+
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- Default visibility, enabled mode and summary are override by AudioCurationSettingsViewData -->
+
+    <SwitchPreference
+        app:iconSpaceReserved="false"
+        app:key="@string/settings_id_audio_curation_anc_state"
+        app:title="@string/settings_audio_curation_anc_state" />
+
+    <PreferenceCategory
+        app:iconSpaceReserved="false"
+        app:title="@string/settings_audio_curation_toggle_configuration">
+
+        <ListPreference
+            app:iconSpaceReserved="false"
+            app:key="@string/settings_id_audio_curation_toggle_1"
+            app:title="@string/settings_audio_curation_toggle_1" />
+
+        <ListPreference
+            app:iconSpaceReserved="false"
+            app:key="@string/settings_id_audio_curation_toggle_2"
+            app:title="@string/settings_audio_curation_toggle_2" />
+
+        <ListPreference
+            app:iconSpaceReserved="false"
+            app:key="@string/settings_id_audio_curation_toggle_3"
+            app:title="@string/settings_audio_curation_toggle_3" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:iconSpaceReserved="false"
+        app:title="@string/settings_audio_curation_other_configurations">
+
+        <ListPreference
+            app:iconSpaceReserved="false"
+            app:key="@string/settings_id_audio_curation_playback_configuration"
+            app:title="@string/settings_audio_curation_playback_configuration" />
+
+        <ListPreference
+            app:iconSpaceReserved="false"
+            app:key="@string/settings_id_audio_curation_idle_configuration"
+            app:title="@string/settings_audio_curation_idle_configuration" />
+
+        <ListPreference
+            app:iconSpaceReserved="false"
+            app:key="@string/settings_id_audio_curation_calls_configuration"
+            app:title="@string/settings_audio_curation_calls_configuration" />
+
+        <ListPreference
+            app:iconSpaceReserved="false"
+            app:key="@string/settings_id_audio_curation_assistant_configuration"
+            app:title="@string/settings_audio_curation_assistant_configuration" />
+
+        <ListPreference
+            app:iconSpaceReserved="false"
+            app:key="@string/settings_id_audio_curation_voice_recording_configuration"
+            app:title="@string/settings_audio_curation_voice_recording_configuration"
+            app:isPreferenceVisible="false" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:iconSpaceReserved="false"
+        app:isPreferenceVisible="false"
+        app:key="@string/settings_id_audio_curation_auto_transparency_category"
+        app:title="@string/settings_audio_curation_auto_transparency">
+
+        <SwitchPreference
+            app:iconSpaceReserved="false"
+            app:key="@string/settings_id_audio_curation_auto_transparency_state"
+            app:title="@string/settings_audio_curation_auto_transparency_state" />
+
+        <ListPreference
+            app:iconSpaceReserved="false"
+            app:key="@string/settings_id_audio_curation_auto_transparency_release_time"
+            app:title="@string/settings_audio_curation_auto_transparency_release_time" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:iconSpaceReserved="false"
+        app:isPreferenceVisible="false"
+        app:key="@string/settings_id_audio_curation_noise_id_pref_category"
+        app:title="@string/settings_audio_curation_noise_id">
+
+        <SwitchPreference
+            app:iconSpaceReserved="false"
+            app:key="@string/settings_id_audio_curation_noise_id_state"
+            app:title="@string/settings_audio_curation_noise_id_state" />
+
+    </PreferenceCategory>
+
+    <com.qualcomm.qti.gaiaclient.ui.settings.common.ButtonPreference
+        app:iconSpaceReserved="false"
+        app:isPreferenceVisible="false"
+        app:key="@string/settings_id_audio_curation_enter_demo"
+        app:title="@string/settings_audio_curation_enter_demo" />
+
+</PreferenceScreen>

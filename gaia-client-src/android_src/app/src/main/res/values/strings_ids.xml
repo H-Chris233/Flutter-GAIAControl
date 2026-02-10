@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ ************************************************************************************************
+  ~ * © 2020-2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.        *
+  ~ ************************************************************************************************
+  -->
+
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Main settings -->
+    <string name="settings_id_anc_legacy">settings_id_anc_legacy</string>
+    <string name="settings_id_audio_curation">settings_id_audio_curation</string>
+    <string name="settings_id_music_processing">settings_id_music_processing</string>
+    <string name="settings_id_voice_ui">settings_id_voice_ui</string>
+    <string name="settings_id_upgrade">settings_id_upgrade</string>
+    <string name="settings_id_logs">settings_id_logs</string>
+    <string name="settings_id_earbud_fit">settings_id_earbud_fit</string>
+    <string name="settings_id_handset_service">settings_id_handset_service</string>
+    <string name="settings_id_change_device">settings_id_change_device</string>
+    <string name="settings_id_gaia_client_version">settings_id_gaia_client_version</string>
+    <string name="settings_id_device_features">settings_id_device_features</string>
+    <string name="settings_id_voice_processing">settings_id_voice_processing</string>
+    <string name="settings_id_gestures">settings_id_gestures</string>
+    <string name="settings_id_statistics">settings_id_statistics</string>
+    <string name="settings_id_feedback">settings_id_feedback</string>
+
+    <!-- ANC (legacy) settings -->
+    <string name="settings_id_anc_legacy_state">settings_id_anc_legacy_state</string>
+    <string name="settings_id_anc_legacy_state_dependant_settings">settings_id_anc_legacy_state_dependant_settings</string>
+    <string name="settings_id_anc_legacy_adaptive_state">settings_id_anc_legacy_adaptive_state</string>
+    <string name="settings_id_anc_legacy_mode">settings_id_anc_legacy_mode</string>
+    <string name="settings_id_anc_legacy_adapted_gain">settings_id_anc_legacy_adapted_gain</string>
+    <string name="settings_id_anc_legacy_leakthrough_gain">settings_id_anc_legacy_leakthrough_gain</string>
+
+    <!-- Audio curation settings -->
+    <string name="settings_id_audio_curation_anc_state">settings_id_audio_curation_state</string>
+    <string name="settings_id_audio_curation_toggle_1" tools:ignore="Typos">settings_id_audio_curation_toggle_1</string>
+    <string name="settings_id_audio_curation_toggle_2" tools:ignore="Typos">settings_id_audio_curation_toggle_2</string>
+    <string name="settings_id_audio_curation_toggle_3" tools:ignore="Typos">settings_id_audio_curation_toggle_3</string>
+    <string name="settings_id_audio_curation_idle_configuration">settings_id_audio_curation_idle_configuration</string>
+    <string name="settings_id_audio_curation_playback_configuration">settings_id_audio_curation_playback_configuration</string>
+    <string name="settings_id_audio_curation_calls_configuration">settings_id_audio_curation_calls_configuration</string>
+    <string name="settings_id_audio_curation_assistant_configuration">settings_id_audio_curation_assistant_configuration</string>
+    <string name="settings_id_audio_curation_voice_recording_configuration">settings_id_audio_curation_voice_recording_configuration</string>
+    <string name="settings_id_audio_curation_enter_demo">settings_id_audio_curation_enter_demo</string>
+    <string name="settings_id_audio_curation_auto_transparency_category">settings_id_audio_curation_auto_transparency_category</string>
+    <string name="settings_id_audio_curation_auto_transparency_state">settings_id_audio_curation_auto_transparency_state</string>
+    <string name="settings_id_audio_curation_auto_transparency_release_time">settings_id_audio_curation_auto_transparency_release_time</string>
+    <string name="settings_id_audio_curation_noise_id_pref_category">settings_id_audio_curation_noise_id_pref_category</string>
+    <string name="settings_id_audio_curation_noise_id_state">settings_id_audio_curation_noise_id_state</string>
+
+    <!-- Audio curation demo settings -->
+    <string name="settings_id_audio_curation_demo_anc_state">settings_id_audio_curation_demo_anc_state</string>
+    <string name="settings_id_audio_curation_demo_mode">settings_id_audio_curation_demo_mode</string>
+    <string name="settings_id_audio_curation_demo_media">settings_id_audio_curation_demo_media</string>
+    <string name="settings_id_audio_curation_demo_leakthrough_gain">settings_id_audio_curation_demo_leakthrough_gain</string>
+    <string name="settings_id_audio_curation_demo_leakthrough_gain_stepper">settings_id_audio_curation_demo_leakthrough_gain_stepper</string>
+    <string name="settings_id_audio_curation_demo_left_right_balance">settings_id_audio_curation_demo_left_right_balance</string>
+    <string name="settings_id_audio_curation_demo_wind_noise_detection_state">settings_id_audio_curation_demo_wind_noise_detection_state</string>
+    <string name="settings_id_audio_curation_demo_wind_noise_reduction">settings_id_audio_curation_demo_wind_noise_reduction</string>
+    <string name="settings_id_audio_curation_demo_adaptation">settings_id_audio_curation_demo_adaptation</string>
+    <string name="settings_id_audio_curation_demo_feed_forward_gain">settings_id_audio_curation_demo_feed_forward_gain</string>
+    <string name="settings_id_audio_curation_demo_howling_detection_state">settings_id_audio_curation_demo_howling_detection_state</string>
+    <string name="settings_id_audio_curation_demo_feedback_gain">settings_id_audio_curation_demo_feedback_gain</string>
+    <string name="settings_id_audio_curation_demo_noise_id_category">settings_id_audio_curation_demo_noise_id_category</string>
+    <string name="settings_id_audio_curation_demo_adverse_acoustic_state">settings_id_audio_curation_demo_adverse_acoustic_state</string>
+    <string name="settings_id_audio_curation_demo_adverse_acoustic_gain_reduction">settings_id_audio_curation_demo_adverse_acoustic_gain_reduction</string>
+    <string name="settings_id_audio_curation_demo_howling_control_gain_reduction">settings_id_audio_curation_demo_howling_control_gain_reduction</string>
+
+    <!-- Download settings -->
+    <string name="settings_id_download_application_version">settings_id_download_application_version</string>
+    <string name="settings_id_download_application_build_id">settings_id_download_application_build_id</string>
+    <string name="settings_id_download_hardware_version">settings_id_download_hardware_version</string>
+    <string name="settings_id_download_include_tags">settings_id_download_include_tags</string>
+    <string name="settings_id_download_exclude_tags">settings_id_download_exclude_tags</string>
+    <string name="settings_id_download_created_after">settings_id_download_created_after</string>
+    <string name="settings_id_download_continue">settings_id_download_continue</string>
+
+    <!-- Upgrade settings -->
+    <string name="settings_id_upgrade_category_device_information">settings_id_upgrade_category_device_information</string>
+    <string name="settings_id_upgrade_application_version">settings_id_upgrade_application_version</string>
+    <string name="settings_id_upgrade_application_build_id">settings_id_upgrade_application_build_id</string>
+    <string name="settings_id_upgrade_gaia_and_protocol_versions">settings_id_upgrade_gaia_and_protocol_versions</string>
+    <string name="settings_id_upgrade_developer_options">settings_id_upgrade_developer_options</string>
+    <string name="settings_id_upgrade_transfer_default">settings_id_upgrade_transfer_default</string>
+    <string name="settings_id_upgrade_flush_data">settings_id_upgrade_flush_data</string>
+    <string name="settings_id_upgrade_upload_acknowledged">settings_id_upgrade_upload_acknowledged</string>
+    <string name="settings_id_upgrade_chunk_size">settings_id_upgrade_chunk_size</string>
+    <string name="settings_id_upgrade_logs">settings_id_upgrade_logs</string>
+    <string name="settings_id_upgrade_select_file">settings_id_upgrade_select_file</string>
+    <string name="settings_id_upgrade_check_for_updates">settings_id_upgrade_check_for_updates</string>
+
+    <!-- Logs settings -->
+    <string name="settings_id_logs_bug_report">settings_id_logs_bug_report</string>
+    <string name="settings_id_logs_device_logs">settings_id_logs_device_logs</string>
+    <string name="settings_id_logs_sizes">settings_id_logs_sizes</string>
+
+    <!-- Handset service settings -->
+    <string name="settings_id_multipoint_enable">settings_id_multipoint_enable</string>
+
+    <!-- Voice processing settings -->
+    <string name="settings_id_voice_processing_3mic_capability">settings_id_voice_processing_3mic_capability</string>
+    <string name="settings_id_voice_processing_operation_mode">settings_id_voice_processing_operation_mode</string>
+    <string name="settings_id_voice_processing_microphone_mode">settings_id_voice_processing_microphone_mode</string>
+    <string name="settings_id_voice_processing_bypass_mode">settings_id_voice_processing_bypass_mode</string>
+
+</resources>

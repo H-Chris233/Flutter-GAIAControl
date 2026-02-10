@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ *************************************************************************************************
+  ~ * © 2021-2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.         *
+  ~ *************************************************************************************************
+  -->
+
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <data>
+
+        <variable
+            name="data"
+            type="com.qualcomm.qti.gaiaclient.ui.settings.audiocuration.demo.GainPreferenceViewData" />
+
+    </data>
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:padding="@dimen/default_margin">
+
+        <androidx.constraintlayout.widget.Guideline
+            android:id="@+id/vertical_guideline"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            app:layout_constraintGuide_percent="0.5" />
+
+        <TextView
+            android:id="@android:id/title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceListItem"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:text="Feed forward gain"/>
+
+        <include
+            android:id="@+id/left_ring"
+            layout="@layout/ring_progress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:data="@{data.left}"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toLeftOf="@id/vertical_guideline"
+            app:layout_constraintTop_toBottomOf="@android:id/title"
+            app:title="@{String.format(@string/settings_audio_curation_left_earbud)}"/>
+
+        <include
+            android:id="@+id/right_ring"
+            layout="@layout/ring_progress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:data="@{data.right}"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintLeft_toRightOf="@id/vertical_guideline"
+            app:layout_constraintTop_toBottomOf="@android:id/title"
+            app:title="@{String.format(@string/settings_audio_curation_right_earbud)}" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</layout>

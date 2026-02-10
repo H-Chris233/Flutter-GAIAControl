@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ ***********************************************************************************************
+  ~ * © 2020-2021, 2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved. *
+  ~ ***********************************************************************************************
+  -->
+
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory
+        app:iconSpaceReserved="false"
+        app:isPreferenceVisible="true"
+        app:key="@string/settings_id_upgrade_category_device_information"
+        app:title="@string/settings_upgrade_device_information_title">
+
+        <Preference
+            app:iconSpaceReserved="false"
+            app:key="@string/settings_id_upgrade_application_version"
+            app:selectable="false"
+            app:summary="@string/settings_upgrade_not_available"
+            app:title="@string/settings_upgrade_application_version" />
+
+        <Preference
+            app:iconSpaceReserved="false"
+            app:key="@string/settings_id_upgrade_application_build_id"
+            app:selectable="false"
+            app:summary="@string/settings_upgrade_not_available"
+            app:title="@string/settings_upgrade_application_build_id" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        app:allowDividerAbove="true"
+        app:iconSpaceReserved="false"
+        app:isPreferenceVisible="false"
+        app:key="@string/settings_id_upgrade_developer_options"
+        app:title="@string/settings_upgrade_options_title">
+
+        <Preference
+            app:enabled="false"
+            app:iconSpaceReserved="false"
+            app:key="@string/settings_id_upgrade_gaia_and_protocol_versions"
+            app:selectable="false"
+            app:summary="@string/settings_upgrade_not_available"
+            app:title="@string/settings_upgrade_versions" />
+
+        <SwitchPreference
+            app:iconSpaceReserved="false"
+            app:key="@string/settings_id_upgrade_logs"
+            app:summary="@string/settings_upgrade_logs_details"
+            app:title="@string/settings_upgrade_logs" />
+
+        <!-- PERSISTENT OPTIONS -->
+
+        <SwitchPreference
+            app:iconSpaceReserved="false"
+            app:defaultValue="true"
+            app:key="@string/settings_id_upgrade_transfer_default"
+            app:summary="@string/settings_upgrade_transfer_default_details"
+            app:title="@string/settings_upgrade_transfer_default" />
+
+        <SwitchPreference
+            app:iconSpaceReserved="false"
+            app:defaultValue="false"
+            app:isPreferenceVisible="false"
+            app:key="@string/settings_id_upgrade_flush_data"
+            app:summary="@string/settings_upgrade_flush_data_details"
+            app:title="@string/settings_upgrade_flush_data" />
+
+        <SwitchPreference
+            app:iconSpaceReserved="false"
+            app:defaultValue="true"
+            app:isPreferenceVisible="false"
+            app:key="@string/settings_id_upgrade_upload_acknowledged"
+            app:summary="@string/settings_upgrade_acknowledgements_details"
+            app:title="@string/settings_upgrade_acknowledgements" />
+
+        <EditTextPreference
+            app:iconSpaceReserved="false"
+            app:defaultValue="250"
+            app:dialogMessage="@string/settings_upgrade_chunk_size_dialog_message"
+            app:dialogTitle="@string/settings_upgrade_chunk_size_dialog_title"
+            app:isPreferenceVisible="false"
+            app:key="@string/settings_id_upgrade_chunk_size"
+            app:title="@string/settings_upgrade_chunk_size" />
+
+        <!-- END OF PERSISTENT OPTIONS -->
+
+    </PreferenceCategory>
+
+    <com.qualcomm.qti.gaiaclient.ui.settings.common.SecondaryButtonPreference
+        app:allowDividerAbove="true"
+        app:iconSpaceReserved="false"
+        app:key="@string/settings_id_upgrade_select_file"
+        app:title="@string/settings_upgrade_select_file" />
+
+    <com.qualcomm.qti.gaiaclient.ui.settings.common.SecondaryButtonPreference
+        app:enabled="false"
+        app:iconSpaceReserved="false"
+        app:key="@string/settings_id_upgrade_check_for_updates"
+        app:title="@string/settings_upgrade_check_for_updates" />
+
+</PreferenceScreen>

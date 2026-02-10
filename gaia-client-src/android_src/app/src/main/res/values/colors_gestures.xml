@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ ************************************************************************************************
+  ~ * © 2022 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.             *
+  ~ ************************************************************************************************
+  -->
+
+<resources>
+
+    <color name="gesture_action_selected">@color/colorAccent</color>
+    <color name="gesture_action_not_selected">@color/qualcomm_light_grey_1</color>
+    <color name="gesture_action_disabled">@color/disabled_on_light</color>
+
+</resources>

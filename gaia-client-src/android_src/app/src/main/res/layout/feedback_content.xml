@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ *************************************************************************************************
+  ~ * © 2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.              *
+  ~ *************************************************************************************************
+  -->
+
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <data>
+        <variable
+            name="content"
+            type="com.qualcomm.qti.gaiaclient.ui.feedback.FeedbackContent" />
+    </data>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <include
+            android:id="@+id/title"
+            layout="@layout/feedback_item"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:content="@{content.title(@string/feedback_no_value)}"
+            app:title="@{@string/feedback_title}" />
+
+        <include
+            android:id="@+id/description"
+            layout="@layout/feedback_item"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:content="@{content.description(@string/feedback_no_value)}"
+            app:title="@{@string/feedback_description}" />
+
+        <include
+            android:id="@+id/reporter"
+            layout="@layout/feedback_item"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:content="@{content.reporter(@string/feedback_no_value)}"
+            app:title="@{@string/feedback_reporter}" />
+
+        <include
+            android:id="@+id/hardware_version"
+            layout="@layout/feedback_item"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:content="@{content.deviceHardwareVersion(@string/feedback_no_value)}"
+            app:title="@{@string/feedback_hardware_version}" />
+
+        <com.google.android.material.divider.MaterialDivider
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/default_margin_one_and_half"
+            android:layout_marginBottom="@dimen/default_margin" />
+
+        <include
+            android:id="@+id/client"
+            layout="@layout/feedback_item"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:content="@{@string/feedback_client_content(content.clientAppVersion(`-`), content.clientSystemVersion(`-`), content.clientDevice(`-`))}"
+            app:title="@{@string/feedback_client}" />
+
+        <com.google.android.material.divider.MaterialDivider
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/default_margin_one_and_half"
+            android:layout_marginBottom="@dimen/default_margin" />
+
+        <include
+            android:id="@+id/device"
+            layout="@layout/feedback_item"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:content="@{@string/feedback_device_content(content.deviceApplicationVersion(`-`), content.deviceApplicationBuildId(`-`))}"
+            app:title="@{@string/feedback_device}" />
+
+    </LinearLayout>
+
+</layout>

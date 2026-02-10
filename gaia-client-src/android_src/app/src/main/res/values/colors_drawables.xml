@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ ************************************************************************************************
+  ~ * © 2022 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.             *
+  ~ ************************************************************************************************
+  -->
+
+<resources>
+    <!-- ic_device_earbuds, ic_device_headphones, ic_left_earbud, ic_right_earbud -->
+    <color name="drawable_device_primary">@color/qualcomm_gunmetal</color>
+    <color name="drawable_device_secondary">@color/qualcomm_gunmetal_light</color>
+
+    <!-- ic_list_device_connected -->
+    <color name="drawable_discovery_device_connected_circle">@color/qualcomm_blue</color>
+    <color name="drawable_discovery_device_connected_icon">@color/qualcomm_light_blue_tint_2</color>
+
+    <!-- ic_list_device_paired -->
+    <color name="drawable_discovery_device_paired_circle">@color/qualcomm_light_blue_tint_2</color>
+    <color name="drawable_discovery_device_paired_icon">@color/qualcomm_blue</color>
+
+    <!-- ic_list_device_other -->
+    <color name="drawable_discovery_device_other_circle">@color/light_grey_2</color>
+    <color name="drawable_discovery_device_other_icon">@color/light_grey_1</color>
+
+    <!-- ic_add_circle, ic_fast_forward, ic_fast_rewind, ic_pause, ic_play_arrow, ic_remove_circle -->
+    <color name="media_button">@color/black_alpha_87</color>
+
+    <!-- ic_tap, ic_swipe_up, ic_swipe_down, ic_tap_and_swipe_up, ic_tap_and_swipe_down, ic_double_tap,
+         ic_long_press, ic_ext_long_press -->
+    <color name="drawable_gesture_primary">@color/qualcomm_gunmetal</color>
+
+</resources>

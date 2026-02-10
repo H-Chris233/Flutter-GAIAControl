@@ -1,0 +1,28 @@
+<!--
+  ~ ************************************************************************************************
+  ~ * © 2020-2021 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.        *
+  ~ ************************************************************************************************
+  -->
+
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <Preference
+        app:iconSpaceReserved="false"
+        app:isPreferenceVisible="false"
+        app:key="@string/settings_id_logs_sizes"
+        app:selectable="false"
+        app:title="@string/settings_logs_sizes" />
+
+    <com.qualcomm.qti.gaiaclient.ui.settings.common.SecondaryButtonPreference
+        app:iconSpaceReserved="false"
+        app:isPreferenceVisible="false"
+        app:key="@string/settings_id_logs_device_logs"
+        app:title="@string/settings_logs_device_logs" />
+
+    <com.qualcomm.qti.gaiaclient.ui.settings.common.SecondaryButtonPreference
+        app:iconSpaceReserved="false"
+        app:isPreferenceVisible="false"
+        app:key="@string/settings_id_logs_bug_report"
+        app:title="@string/settings_logs_bug_report" />
+
+</PreferenceScreen>

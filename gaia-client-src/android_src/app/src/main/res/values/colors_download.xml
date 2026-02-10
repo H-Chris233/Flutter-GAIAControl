@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ *************************************************************************************************
+  ~ * © 2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.              *
+  ~ *************************************************************************************************
+  -->
+
+<resources>
+
+    <!-- Download files -->
+    <color name="filter_not_selected">@color/black_alpha_12</color>
+
+    <!-- Tag colors -->
+    <color name="tag_1_background">@color/qualcomm_blue_100_alpha_88</color>
+    <color name="tag_1_text">@color/text_high_emphasis_on_dark</color>
+    <color name="tag_2_background">@color/qualcomm_blue_60_alpha_88</color>
+    <color name="tag_2_text">@color/text_high_emphasis_on_dark</color>
+    <color name="tag_3_background">@color/qualcomm_blue_20_alpha_88</color>
+    <color name="tag_3_text">@color/text_high_emphasis_on_light</color>
+    <color name="tag_4_background">@color/qualcomm_blue_120_alpha_88</color>
+    <color name="tag_4_text">@color/text_high_emphasis_on_dark</color>
+    <color name="tag_5_background">@color/qualcomm_blue_80_alpha_88</color>
+    <color name="tag_5_text">@color/text_high_emphasis_on_dark</color>
+    <color name="tag_6_background">@color/qualcomm_blue_40_alpha_88</color>
+    <color name="tag_6_text">@color/text_high_emphasis_on_light</color>
+    <color name="tag_7_background">@color/qualcomm_blue_10_alpha_88</color>
+    <color name="tag_7_text">@color/text_high_emphasis_on_light</color>
+
+</resources>

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ *************************************************************************************************
+  ~ * © 2021 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.              *
+  ~ *************************************************************************************************
+  -->
+
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <data>
+        <import type="android.view.View" />
+
+        <variable
+            name="viewData"
+            type="com.qualcomm.qti.gaiaclient.ui.gestures.configuration.ContextViewData" />
+    </data>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/context_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="@dimen/default_margin"
+            android:text="@{viewData.label}"
+            android:textAppearance="@android:style/TextAppearance.Material.Body2"
+            android:textColor="?android:attr/colorAccent" />
+
+        <androidx.appcompat.widget.SwitchCompat
+            android:id="@+id/selection_type_switch"
+            android:theme="@style/AppTheme.Switch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:checked="@{viewData.switchChecked}"
+            android:enabled="@{viewData.isSwitchEnabled}"
+            android:paddingHorizontal="@dimen/default_margin"
+            android:text="@string/gesture_configuration_switch"
+            android:textAppearance="?android:attr/textAppearanceListItem"
+            android:visibility="@{viewData.isSwitchVisible ? View.VISIBLE : View.GONE}" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/actions_list"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:nestedScrollingEnabled="false"
+            app:layoutManager="LinearLayoutManager" />
+
+    </LinearLayout>
+
+</layout>

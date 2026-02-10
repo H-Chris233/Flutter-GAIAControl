@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ ************************************************************************************************
+  ~ * © 2022 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.             *
+  ~ ************************************************************************************************
+  -->
+
+<resources>
+
+    <!-- Presets buttons -->
+    <color name="preset_selected">@color/colorAccent</color>
+    <color name="preset_not_selected">@color/qualcomm_light_blue_tint_1_alpha_12</color>
+    <color name="preset_disabled">@color/disabled_on_dark</color>
+    <color name="preset_text_selected">@color/text_high_emphasis_on_light</color>
+    <color name="preset_text_not_selected">@color/text_medium_emphasis_on_dark</color>
+    <color name="preset_text_disabled">@color/text_disabled_on_dark</color>
+
+    <!-- Plot -->
+    <color name="eq_graphview_grid">@color/white_alpha_38</color>
+    <color name="eq_graphview_axe_label">@color/text_medium_emphasis_on_dark</color>
+    <color name="eq_graphview_curve">@color/qualcomm_red_luminance_70</color>
+
+    <!-- Sliders -->
+    <color name="vertical_slider_thumb">@color/colorAccent</color>
+    <color name="vertical_slider_progress">@color/colorAccent</color>
+    <color name="vertical_slider_progress_notch">@color/black</color>
+    <color name="vertical_slider_progress_background">@color/qualcomm_light_blue_tint_1_alpha_25</color>
+    <color name="vertical_slider_progress_background_notch">@color/black</color>
+    <color name="vertical_slider_label">@color/text_medium_emphasis_on_dark</color>
+    <color name="vertical_slider_label_button_background">@color/qualcomm_light_blue_tint_1_alpha_12</color>
+
+</resources>

@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ *************************************************************************************************
+  ~ * © 2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.              *
+  ~ *************************************************************************************************
+  -->
+
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="@dimen/default_margin"
+            android:orientation="vertical">
+
+            <include
+                android:id="@+id/title"
+                layout="@layout/feedback_form_entry"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:helper="@{@string/feedback_form_helper_required}"
+                app:maximumLength="@{50}"
+                app:placeholder="@{@string/feedback_form_title_placeholder}"
+                app:title="@{@string/feedback_form_title}" />
+
+            <include
+                android:id="@+id/description"
+                layout="@layout/feedback_form_entry"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/default_margin_one_and_half"
+                app:helper="@{@string/feedback_form_helper_required}"
+                app:maximumLength="@{2000}"
+                app:placeholder="@{@string/feedback_form_description_placeholder}"
+                app:title="@{@string/feedback_form_description}" />
+
+            <include
+                android:id="@+id/reporter"
+                layout="@layout/feedback_form_entry"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/default_margin_one_and_half"
+                app:maximumLength="@{50}"
+                app:placeholder="@{@string/feedback_form_reporter_placeholder}"
+                app:title="@{@string/feedback_form_reporter}" />
+
+            <include
+                android:id="@+id/hardware_version"
+                layout="@layout/feedback_form_entry"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/default_margin_one_and_half"
+                app:maximumLength="@{50}"
+                app:placeholder="@{@string/feedback_form_hardware_version_place_holder}"
+                app:title="@{@string/feedback_form_hardware_version}" />
+
+            <Button
+                android:id="@+id/send"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/default_margin_double"
+                android:layout_marginBottom="@dimen/default_margin"
+                android:enabled="false"
+                android:text="@string/button_send" />
+
+        </LinearLayout>
+
+    </ScrollView>
+
+</layout>

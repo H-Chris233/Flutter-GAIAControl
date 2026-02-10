@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ ************************************************************************************************
+  ~ * © 2020-2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.        *
+  ~ ************************************************************************************************
+  -->
+
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <Preference
+        app:iconSpaceReserved="false"
+        app:isPreferenceVisible="false"
+        app:key="@string/settings_id_anc_legacy"
+        app:title="@string/settings_anc" />
+
+    <Preference
+        app:iconSpaceReserved="false"
+        app:isPreferenceVisible="false"
+        app:key="@string/settings_id_audio_curation"
+        app:title="@string/settings_audio_curation" />
+
+    <Preference
+        app:iconSpaceReserved="false"
+        app:isPreferenceVisible="false"
+        app:key="@string/settings_id_earbud_fit"
+        app:title="@string/settings_earbud_fit" />
+
+    <Preference
+        app:iconSpaceReserved="false"
+        app:isPreferenceVisible="false"
+        app:key="@string/settings_id_music_processing"
+        app:title="@string/settings_music_processing" />
+
+    <Preference
+        app:iconSpaceReserved="false"
+        app:isPreferenceVisible="false"
+        app:key="@string/settings_id_gestures"
+        app:title="@string/settings_gestures" />
+
+    <Preference
+        app:iconSpaceReserved="false"
+        app:isPreferenceVisible="false"
+        app:key="@string/settings_id_handset_service"
+        app:title="@string/settings_handset_service" />
+
+    <Preference
+        app:iconSpaceReserved="false"
+        app:isPreferenceVisible="false"
+        app:key="@string/settings_id_logs"
+        app:title="@string/settings_logs" />
+
+    <Preference
+        app:iconSpaceReserved="false"
+        app:isPreferenceVisible="false"
+        app:key="@string/settings_id_upgrade"
+        app:title="@string/settings_upgrade" />
+
+    <Preference
+        app:iconSpaceReserved="false"
+        app:isPreferenceVisible="false"
+        app:key="@string/settings_id_statistics"
+        app:title="@string/settings_statistics" />
+
+    <ListPreference
+        app:iconSpaceReserved="false"
+        app:isPreferenceVisible="false"
+        app:key="@string/settings_id_voice_ui"
+        app:title="@string/settings_voice_ui" />
+
+    <Preference
+        app:iconSpaceReserved="false"
+        app:isPreferenceVisible="false"
+        app:key="@string/settings_id_voice_processing"
+        app:title="@string/settings_voice_processing" />
+
+    <com.qualcomm.qti.gaiaclient.ui.settings.common.SecondaryButtonPreference
+        app:iconSpaceReserved="false"
+        app:isPreferenceVisible="true"
+        app:key="@string/settings_id_change_device"
+        app:title="@string/settings_change_device" />
+
+    <Preference
+        android:key="@string/settings_id_gaia_client_version"
+        app:allowDividerAbove="true"
+        app:iconSpaceReserved="false"
+        app:selectable="false"
+        app:title="@string/settings_gaia_client_version" />
+
+    <com.qualcomm.qti.gaiaclient.ui.settings.common.LongSummaryPreference
+        android:key="@string/settings_id_device_features"
+        app:iconSpaceReserved="false"
+        app:selectable="false"
+        app:title="@string/settings_gaia_device_features" />
+
+    <com.qualcomm.qti.gaiaclient.ui.settings.common.SecondaryButtonPreference
+        android:enabled="false"
+        app:iconSpaceReserved="false"
+        app:isPreferenceVisible="true"
+        app:key="@string/settings_id_feedback"
+        app:title="@string/settings_feedback" />
+
+</PreferenceScreen>

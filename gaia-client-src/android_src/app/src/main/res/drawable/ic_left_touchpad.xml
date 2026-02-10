@@ -1,0 +1,18 @@
+<!--
+  ~ ************************************************************************************************
+  ~ * © 2021-2022 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.        *
+  ~ ************************************************************************************************
+  -->
+
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="25dp"
+    android:height="24dp"
+    android:viewportWidth="25"
+    android:viewportHeight="24">
+  <path
+      android:pathData="M12.9367,0C19.5641,0 24.9367,5.3726 24.9367,12C24.9367,18.6274 19.5641,24 12.9367,24C6.3093,24 0.9367,18.6274 0.9367,12C0.9367,5.3726 6.3093,0 12.9367,0ZM12.9367,1.5C7.1377,1.5 2.4367,6.201 2.4367,12C2.4367,17.799 7.1377,22.5 12.9367,22.5C18.7357,22.5 23.4367,17.799 23.4367,12C23.4367,6.201 18.7357,1.5 12.9367,1.5ZM17.34,18L17.34,16.6201L11.2755,16.6201L11.2755,5.2031L9.5793,5.2031L9.5793,18L17.34,18Z"
+      android:strokeWidth="1"
+      android:fillColor="#FFFFFF"
+      android:fillType="evenOdd"
+      android:strokeColor="#00000000" />
+</vector>

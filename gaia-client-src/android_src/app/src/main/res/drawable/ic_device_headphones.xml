@@ -1,0 +1,30 @@
+<!--
+  ~ ************************************************************************************************
+  ~ * © 2020, 2022 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.       *
+  ~ ************************************************************************************************
+  -->
+
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="124dp"
+    android:height="114dp"
+    android:viewportWidth="124"
+    android:viewportHeight="114">
+    <path
+        android:pathData="M107.59,112L107.59,111.989C115.601,111.68 122,105.088 122,97.002L122,96.998L121.997,82.997C121.995,74.912 115.598,68.323 107.59,68.012L107.59,68L98.008,68C94.694,68 92.008,70.686 92.008,74L92.007,82.544C92.002,82.695 92,82.845 92,82.997L92,96.998C92,97.15 92.002,97.301 92.007,97.452L92.008,106C92.008,109.314 94.694,112 98.008,112L107.59,112Z"
+        android:strokeWidth="1"
+        android:fillColor="@color/drawable_device_primary"
+        android:fillType="evenOdd"
+        android:strokeColor="#00000000" />
+    <path
+        android:pathData="M16.41,112L16.41,111.989C8.399,111.68 2,105.088 2,97.002L2,96.998L2.003,82.997C2.005,74.912 8.402,68.323 16.41,68.012L16.41,68L25.992,68C29.306,68 31.992,70.686 31.992,74L31.993,82.544C31.998,82.695 32,82.845 32,82.997L32,96.998C32,97.15 31.998,97.301 31.993,97.452L31.992,106C31.992,109.314 29.306,112 25.992,112L16.41,112Z"
+        android:strokeWidth="1"
+        android:fillColor="@color/drawable_device_primary"
+        android:fillType="evenOdd"
+        android:strokeColor="#00000000" />
+    <path
+        android:pathData="M106,81L106,53C106,28.699 86.301,9 62,9C37.699,9 18,28.699 18,53L18,80.377L18,80.377"
+        android:strokeWidth="12"
+        android:fillColor="#00000000"
+        android:strokeColor="@color/drawable_device_primary"
+        android:fillType="evenOdd" />
+</vector>

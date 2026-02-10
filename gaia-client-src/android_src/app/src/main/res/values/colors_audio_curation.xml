@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ *************************************************************************************************
+  ~ * © 2022-2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.         *
+  ~ *************************************************************************************************
+  -->
+
+<resources>
+
+    <color name="left_right_balance_track_enabled">@color/qualcomm_blue_light_4</color>
+    <color name="left_right_balance_track_disabled">@color/disabled_on_light</color>
+
+    <color name="mode_circle_selected">@color/colorAccent</color>
+    <color name="mode_circle_not_selected">@color/light_grey_1</color>
+    <color name="mode_circle_disabled">@color/disabled_on_light</color>
+
+    <color name="mode_background_selected">@color/qualcomm_blue_light_1</color>
+    <color name="mode_background_not_selected">@color/qualcomm_nickel</color>
+    <color name="mode_background_disabled">@color/disabled_on_light</color>
+
+    <color name="mode_circle_text_selected">@color/text_high_emphasis_on_dark</color>
+    <color name="mode_circle_text_not_selected">@color/text_high_emphasis_on_dark</color>
+    <color name="mode_circle_text_disabled">@color/text_disabled_on_light</color>
+
+    <color name="mode_background_text_selected">@color/text_high_emphasis_on_light</color>
+    <color name="mode_background_text_not_selected">@color/text_high_emphasis_on_light</color>
+    <color name="mode_background_text_disabled">@color/text_disabled_on_light</color>
+
+    <color name="left_right_balance_touchpad">@color/text_medium_emphasis_on_light</color>
+    <color name="left_right_balance_touchpad_disabled">@color/disabled_on_light</color>
+
+    <color name="touchpad_indicator_selected">@color/colorAccent</color>
+    <color name="touchpad_indicator_not_selected">@color/qualcomm_light_grey_1</color>
+    <color name="touchpad_indicator_disabled">@color/disabled_on_light</color>
+
+    <color name="ring_progress_progress_tone_1_enabled">@color/colorAccent</color>
+    <color name="ring_progress_progress_tone_1_disabled">@color/disabled_on_light</color>
+    <color name="ring_progress_progress_tone_2_enabled">@color/qualcomm_blue_40_alpha_88</color>
+    <color name="ring_progress_progress_tone_2_disabled">@color/disabled_on_light</color>
+    <color name="ring_progress_label_enabled">@color/text_medium_emphasis_on_light</color>
+    <color name="ring_progress_label_disabled">@color/text_disabled_on_light</color>
+    <color name="ring_progress_value_enabled">@color/colorAccent</color>
+    <color name="ring_progress_value_disabled">@color/text_disabled_on_light</color>
+    <color name="ring_progress_background_enabled">@color/qualcomm_nickel</color>
+    <color name="ring_progress_background_disabled">@color/disabled_on_light</color>
+
+</resources>

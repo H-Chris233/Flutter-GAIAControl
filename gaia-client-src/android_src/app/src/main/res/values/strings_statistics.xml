@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ ************************************************************************************************
+  ~ * © 2022-2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.        *
+  ~ ************************************************************************************************
+  -->
+
+<resources>
+
+    <string name="statistic_categories_stop_recording">Stop all recording</string>
+    <string name="statistic_category_settings">Category settings</string>
+    <string name="statistic_start_recording">Start recording</string>
+    <string name="statistic_stop_recording">Stop recording</string>
+    <string name="statistic_refresh_rate_value">%1$.1f s</string>
+    <string name="statistic_refresh_rate_label">Refresh rate</string>
+    <string name="cont_desc_category_recording_icon">Is recording</string>
+    <string name="stats_share_intent_title">Share statistics</string>
+
+    <!-- Spatial audio -->
+    <string name="statistics_spatial_audio_category_title">Spatial audio</string>
+    <string name="statistics_spatial_audio_title_quaternion_w">Quaternion W</string>
+    <string name="statistics_spatial_audio_title_quaternion_x">Quaternion X</string>
+    <string name="statistics_spatial_audio_title_quaternion_y">Quaternion Y</string>
+    <string name="statistics_spatial_audio_title_quaternion_z">Quaternion Z</string>
+
+    <!-- Streaming -->
+    <string name="statistics_streaming_category_title">Streaming</string>
+    <string name="statistics_streaming_title_codec">Codec</string>
+    <string name="statistics_streaming_title_lossless_enabled">Lossless enabled</string>
+    <string name="statistics_streaming_title_bitrate">Bitrate</string>
+    <string name="statistics_streaming_title_bitrate_format">%1$.1f kbps</string>
+    <string name="statistics_streaming_title_primary_rssi">RSSI (Primary)</string>
+    <string name="statistics_streaming_title_wifi_rssi">RSSI (Handset WIFI)</string>
+    <string name="statistics_streaming_title_primary_link_quality">Link quality (primary)</string>
+    <string name="statistics_streaming_title_transport">Transport</string>
+    <string name="statistics_streaming_codec_sbc">SBC</string>
+    <string name="statistics_streaming_codec_aac">AAC</string>
+    <string name="statistics_streaming_codec_aptx">Qualcomm® aptX™</string>
+    <string name="statistics_streaming_codec_aptx_hd">Qualcomm® aptX™ HD</string>
+    <string name="statistics_streaming_codec_aptx_adaptive">Qualcomm® aptX™ Adaptive</string>
+    <string name="statistics_streaming_lossless_enabled_yes">Yes</string>
+    <string name="statistics_streaming_lossless_enabled_no">No</string>
+    <string name="statistics_streaming_transport_ble">LEA</string>
+    <string name="statistics_streaming_transport_p2p">P2P</string>
+    <string name="statistics_streaming_transport_ap">XPANoAP</string>
+
+    <!-- Xpan buttons -->
+    <string name="statistics_streaming_button_lea">LEA</string>
+    <string name="statistics_streaming_button_wifi">P2P</string>
+    <string name="statistics_streaming_button_ap">XPANoAP</string>
+    <string name="statistics_streaming_button_toggle">Toggle transport</string>
+    <string name="statistics_streaming_button_connect_ap">Connect AP</string>
+    <string name="statistics_streaming_button_disconnect_ap">Disconnect AP</string>
+
+    <!-- Empty categories or values list messages -->
+    <string name="statistics_none_title">No statistics available</string>
+    <string name="statistics_none_message">The device does not have any statistics available that can be displayed.</string>
+
+</resources>

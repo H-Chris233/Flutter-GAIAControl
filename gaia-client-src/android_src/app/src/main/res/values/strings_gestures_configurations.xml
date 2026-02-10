@@ -1,0 +1,90 @@
+<!--
+  ~ ************************************************************************************************
+  ~ * © 2021, 2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.       *
+  ~ ************************************************************************************************
+  -->
+
+<resources>
+
+    <string name="settings_gestures_reset_all">RESET ALL TO DEFAULTS</string>
+    <string name="gesture_configuration_title">Configure %1$s</string>
+    <string name="gesture_configuration_title_default">Configure gesture</string>
+    <string name="gesture_configuration_switch">Show left and right pads</string>
+
+    <!-- Warnings -->
+    <string name="gesture_override_warning_title">Override warning</string>
+    <string name="gesture_override_other_context_warning_message">This will override any context specific actions for
+        this touchpad. Do you want to proceed?</string>
+    <string name="gesture_override_global_warning_message">This will override the global actions for this
+        touchpad. Do you want to proceed?</string>
+    <string name="gesture_reset_warning_title">Reset all settings?</string>
+    <string name="gesture_reset_warning_message">This will reset all the settings to their default value.
+        Do you want to proceed?</string>
+
+    <!-- Gestures -->
+    <string name="gesture_unknown">Unidentified gesture %1$d</string>
+    <string name="gesture_tap">Single tap</string>
+    <string name="gesture_double_tap">Double tap</string>
+    <string name="gesture_long_press">Long press</string>
+    <string name="gesture_extended_long_press">Extended long press</string>
+    <string name="gesture_swipe_up">Swipe up</string>
+    <string name="gesture_swipe_down">Swipe down</string>
+    <string name="gesture_tap_and_swipe_up">Tap + swipe up</string>
+    <string name="gesture_tap_and_swipe_down">Tap + swipe down</string>
+
+    <!-- Tab contexts -->
+    <string name="gesture_tab_music">Music</string>
+    <string name="gesture_tab_voice_call">Voice call</string>
+    <string name="gesture_tab_handset">Handset</string>
+    <string name="gesture_tab_global">Global</string>
+
+    <!-- Actions -->
+    <string name="action_unknown">Unidentified action %1$d</string>
+    <string name="action_nothing">Do nothing</string>
+    <string name="action_media_play_pause_toggle">Play/Pause</string>
+    <string name="action_media_stop">Stop</string>
+    <string name="action_media_next_track">Next track</string>
+    <string name="action_media_previous_track">Previous track</string>
+    <string name="action_media_seek_forward">Seek forward</string>
+    <string name="action_media_seek_backward">Seek backward</string>
+    <string name="action_voice_accept_call">Accept call</string>
+    <string name="action_voice_reject_call">Reject call</string>
+    <string name="action_voice_hang_up_call">Hang up call</string>
+    <string name="action_voice_transfer_call">Transfer call</string>
+    <string name="action_voice_call_cycle">Cycle through calls</string>
+    <string name="action_voice_join_calls">Join calls</string>
+    <string name="action_voice_mic_mute_toggle">Mute toggle</string>
+    <string name="action_gaming_mode_toggle">Gaming mode toggle</string>
+    <string name="action_anc_enable_toggle">ANC toggle on/off</string>
+    <string name="action_anc_next_mode">ANC toggle mode</string>
+    <string name="action_volume_up">Volume up</string>
+    <string name="action_volume_down">Volume down</string>
+    <string name="action_reconnect_mru_handset">Reconnect last connected device</string>
+    <string name="action_va_privacy_toggle">VA privacy toggle</string>
+    <string name="action_va_fetch_query">VA fetch query</string>
+    <string name="action_va_ptt">VA push-to-talk</string>
+    <string name="action_va_cancel">VA cancel</string>
+    <string name="action_va_fetch">VA fetch</string>
+    <string name="action_va_query">VA query</string>
+    <string name="action_disconnect_lru_handset">Disconnect least recently used device</string>
+    <string name="action_voice_join_calls_hang_up">Join calls hang up</string>
+
+    <!-- Contexts -->
+    <string name="gesture_context_unknown">Unidentified context %1$d</string>
+    <string name="gesture_context_global">Global</string>
+    <string name="gesture_context_media_streaming">Media streaming</string>
+    <string name="gesture_context_media_idle">Media idle</string>
+    <string name="gesture_context_in_call">In call</string>
+    <string name="gesture_context_incoming_call">Incoming call</string>
+    <string name="gesture_context_outgoing_call">Outgoing call</string>
+    <string name="gesture_context_in_call_with_held">With a held call</string>
+    <string name="gesture_context_handset_connected">Handset Connected</string>
+    <string name="gesture_context_handset_disconnected">Handset Disconnected</string>
+
+    <!-- Content descriptions -->
+    <string name="cont_desc_gesture">Image for gesture %1$s</string>
+    <string name="cont_desc_gesture_action_left_touchpad">Select on left</string>
+    <string name="cont_desc_gesture_action_right_touchpad">Select on right</string>
+    <string name="cont_desc_gesture_action_tick_touchpad">Select the action</string>
+
+</resources>

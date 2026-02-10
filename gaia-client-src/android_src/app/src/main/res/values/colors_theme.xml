@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ *************************************************************************************************
+  ~ * © 2020-2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.         *
+  ~ *************************************************************************************************
+  -->
+
+<resources>
+
+    <!-- brand colours -->
+    <color name="qualcomm_blue">#3253DC</color> <!-- 50, 83, 220  -->
+    <color name="qualcomm_blue_120_alpha_88">#E00021A6</color>
+    <color name="qualcomm_blue_100_alpha_88">#E03254DC</color>
+    <color name="qualcomm_blue_80_alpha_88">#E0576FE3</color>
+    <color name="qualcomm_blue_60_alpha_88">#E0788AE8</color>
+    <color name="qualcomm_blue_40_alpha_88">#E0A0ABEE</color>
+    <color name="qualcomm_blue_20_alpha_88">#E0C7CCF5</color>
+    <color name="qualcomm_blue_10_alpha_88">#E0E9EBFB</color>
+
+    <color name="qualcomm_blue_dark_mode">#2F50D9</color>
+    <color name="qualcomm_blue_light_1">#D7DDF8</color>
+    <color name="qualcomm_blue_light_2">#DDE1FF</color>
+    <color name="qualcomm_blue_light_3">#E7EAF9</color>
+    <color name="qualcomm_blue_light_4">#CDD6F7</color>
+
+    <color name="qualcomm_light_blue">#7BA0FF</color>
+    <color name="qualcomm_light_blue_tint_1">#94B2FF</color>
+    <color name="qualcomm_light_blue_tint_1_alpha_12">#1F94B2FF</color>
+    <color name="qualcomm_light_blue_tint_1_alpha_25">#4094B2FF</color>
+    <color name="qualcomm_light_blue_tint_1_alpha_30">#4C94B2FF</color>
+    <color name="qualcomm_light_blue_tint_1_alpha_40">#6694B2FF</color>
+    <color name="qualcomm_light_blue_tint_1_alpha_60">#9994B2FF</color>
+    <color name="qualcomm_light_blue_tint_1_alpha_88">#E094B2FF</color>
+    <color name="qualcomm_light_blue_tint_1_100_alpha_88">#E0C1D0FF</color>
+    <color name="qualcomm_light_blue_tint_1_50_alpha_88">#E0E7EDFF</color>
+    <color name="qualcomm_light_blue_tint_2">#B0C7FF</color>
+    <color name="qualcomm_light_blue_tint_2_alpha_88">#E0B0C7FF</color>
+    <color name="qualcomm_light_blue_tint_3">#002B76</color>
+
+    <color name="qualcomm_gunmetal">#4A5A75</color>
+    <color name="qualcomm_gunmetal_light">#A5ACBA</color>
+
+    <color name="qualcomm_nickel">#E9EBEE</color>
+
+    <color name="qualcomm_light_grey_1">#BEC4CD</color>
+
+    <color name="qualcomm_red">#E71324</color>
+    <color name="qualcomm_red_luminance_70">#FF8980</color>
+
+    <!-- global colours -->
+    <color name="white">#FFFFFF</color>
+    <color name="white_alpha_12">#1FFFFFFF</color>
+    <color name="white_alpha_38">#61FFFFFF</color>
+    <color name="white_alpha_60">#99FFFFFF</color>
+    <color name="white_alpha_87">#DEFFFFFF</color>
+
+    <color name="black">#000000</color>
+    <color name="black_alpha_12">#1F000000</color>
+    <color name="black_alpha_38">#61000000</color>
+    <color name="black_alpha_60">#99000000</color>
+    <color name="black_alpha_87">#DE000000</color>
+
+    <color name="light_grey_1">#878787</color>
+    <color name="light_grey_2">#D7D7D7</color>
+    <color name="light_grey_3">#E2E2E2</color>
+    <color name="dark_grey_1">#323232</color>
+    <color name="dark_grey_2">#1F1F1F</color>
+
+    <color name="disabled_on_light">@color/black_alpha_12</color>
+    <color name="disabled_on_dark">@color/white_alpha_12</color>
+    <color name="text_high_emphasis_on_light">@color/black_alpha_87</color>
+    <color name="text_medium_emphasis_on_light">@color/black_alpha_60</color>
+    <color name="text_light_emphasis_on_light">@color/black_alpha_38</color>
+    <color name="text_disabled_on_light">@color/black_alpha_38</color>
+    <color name="text_high_emphasis_on_dark">@color/white_alpha_87</color>
+    <color name="text_medium_emphasis_on_dark">@color/white_alpha_60</color>
+    <color name="text_light_emphasis_on_dark">@color/white_alpha_38</color>
+    <color name="text_disabled_on_dark">@color/white_alpha_38</color>
+
+</resources>

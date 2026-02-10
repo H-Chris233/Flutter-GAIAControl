@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ ************************************************************************************************
+  ~ * © 2021-2022 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.        *
+  ~ ************************************************************************************************
+  -->
+
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <data>
+
+        <variable
+            name="data"
+            type="com.qualcomm.qti.gaiaclient.ui.settings.audiocuration.demo.ModeItemViewData" />
+
+    </data>
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="@dimen/default_margin_quarter"
+        android:background="@drawable/round_rectangle"
+        android:backgroundTint="@color/mode_background_color_selector"
+        android:backgroundTintMode="src_in">
+
+        <TextView
+            android:id="@+id/mode_id"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_margin="@dimen/default_margin_half"
+            android:layout_marginBottom="@dimen/default_margin_quarter"
+            android:background="@drawable/circle"
+            android:backgroundTint="@color/mode_circle_color_selector"
+            android:backgroundTintMode="src_in"
+            android:enabled="@{data.isEnabled}"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="center"
+            android:text="@{data.value}"
+            android:textColor="@color/mode_circle_text_color_selector"
+            android:textSize="20sp"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/mode_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="@dimen/default_margin_half"
+            android:layout_marginTop="@dimen/default_margin_quarter"
+            android:enabled="@{data.isEnabled}"
+            android:lines="2"
+            android:text="@{data.label}"
+            android:textAppearance="?android:attr/textAppearanceListItem"
+            android:textSize="14sp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintHorizontal_bias="0.0"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/mode_id"
+            app:layout_constraintVertical_bias="0.0"
+            android:textColor="@color/mode_background_text_color_selector" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</layout>

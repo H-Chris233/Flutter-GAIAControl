@@ -1,0 +1,117 @@
+<!--
+  ~ ************************************************************************************************
+  ~ * © 2021-2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.        *
+  ~ ************************************************************************************************
+  -->
+
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- Default visibility, enabled mode and summary are override by AudioCurationDemoSettingsViewData -->
+
+    <SwitchPreference
+        app:iconSpaceReserved="false"
+        app:key="@string/settings_id_audio_curation_demo_anc_state"
+        app:title="@string/settings_audio_curation_demo_anc_state" />
+
+    <com.qualcomm.qti.gaiaclient.ui.settings.audiocuration.demo.ModesPreference
+        app:allowDividerAbove="true"
+        app:iconSpaceReserved="false"
+        app:key="@string/settings_id_audio_curation_demo_mode"
+        app:selectable="false" />
+
+    <com.qualcomm.qti.gaiaclient.ui.settings.audiocuration.demo.MediaPreference
+        app:allowDividerAbove="true"
+        app:iconSpaceReserved="false"
+        app:key="@string/settings_id_audio_curation_demo_media"
+        app:title="@string/settings_audio_curation_demo_media_playback" />
+
+    <com.qualcomm.qti.gaiaclient.ui.settings.audiocuration.demo.SliderPreference
+        app:allowDividerAbove="true"
+        app:iconSpaceReserved="false"
+        app:key="@string/settings_id_audio_curation_demo_leakthrough_gain"
+        app:selectable="false"
+        app:title="@string/settings_audio_curation_demo_leakthrough_gain"
+        app:isPreferenceVisible="false"/>
+
+    <com.qualcomm.qti.gaiaclient.ui.settings.audiocuration.demo.DiscreteSliderPreference
+        app:allowDividerAbove="true"
+        app:iconSpaceReserved="false"
+        app:key="@string/settings_id_audio_curation_demo_leakthrough_gain_stepper"
+        app:selectable="false"
+        app:title="@string/settings_audio_curation_demo_leakthrough_gain_stepper" />
+
+    <com.qualcomm.qti.gaiaclient.ui.settings.audiocuration.demo.LeftRightBalancePreference
+        app:allowDividerAbove="true"
+        app:iconSpaceReserved="false"
+        app:key="@string/settings_id_audio_curation_demo_left_right_balance"
+        app:selectable="false"
+        app:title="@string/settings_audio_curation_demo_left_right_balance" />
+
+    <SwitchPreference
+        app:allowDividerAbove="true"
+        app:iconSpaceReserved="false"
+        app:key="@string/settings_id_audio_curation_demo_wind_noise_detection_state"
+        app:title="@string/settings_audio_curation_demo_wind_nose_detection" />
+
+    <com.qualcomm.qti.gaiaclient.ui.settings.audiocuration.demo.TouchpadIndicatorsPreference
+        app:allowDividerAbove="false"
+        app:iconSpaceReserved="false"
+        app:selectable="false"
+        app:key="@string/settings_id_audio_curation_demo_wind_noise_reduction"
+        app:title="@string/settings_audio_curation_demo_wind_nose_reduction" />
+
+    <SwitchPreference
+        app:allowDividerAbove="true"
+        app:iconSpaceReserved="false"
+        app:key="@string/settings_id_audio_curation_demo_adaptation"
+        app:title="@string/settings_audio_curation_demo_adaptation" />
+
+    <com.qualcomm.qti.gaiaclient.ui.settings.audiocuration.demo.GainPreference
+        app:allowDividerAbove="true"
+        app:iconSpaceReserved="false"
+        app:key="@string/settings_id_audio_curation_demo_feed_forward_gain"
+        app:layout="@layout/preference_gain"
+        app:selectable="false"
+        app:title="@string/settings_audio_curation_demo_feed_forward_gain" />
+
+    <com.qualcomm.qti.gaiaclient.ui.settings.audiocuration.demo.GainPreference
+        app:allowDividerAbove="true"
+        app:iconSpaceReserved="false"
+        app:key="@string/settings_id_audio_curation_demo_feedback_gain"
+        app:layout="@layout/preference_gain"
+        app:selectable="false"
+        app:title="@string/settings_audio_curation_demo_feedback_gain" />
+
+    <SwitchPreference
+        app:allowDividerAbove="true"
+        app:iconSpaceReserved="false"
+        app:key="@string/settings_id_audio_curation_demo_howling_detection_state"
+        app:title="@string/settings_audio_curation_demo_howling_detection" />
+
+    <com.qualcomm.qti.gaiaclient.ui.settings.audiocuration.demo.TouchpadIndicatorsPreference
+        app:allowDividerAbove="false"
+        app:iconSpaceReserved="false"
+        app:selectable="false"
+        app:key="@string/settings_id_audio_curation_demo_howling_control_gain_reduction"
+        app:title="@string/settings_audio_curation_demo_howling_control_gain_reduction" />
+
+    <Preference
+        app:allowDividerAbove="true"
+        app:iconSpaceReserved="false"
+        app:key="@string/settings_id_audio_curation_demo_noise_id_category"
+        app:title="@string/settings_audio_curation_demo_noise_id_category" />
+
+    <SwitchPreference
+        app:allowDividerAbove="true"
+        app:iconSpaceReserved="false"
+        app:key="@string/settings_id_audio_curation_demo_adverse_acoustic_state"
+        app:title="@string/settings_audio_curation_demo_adverse_acoustic_state" />
+
+    <com.qualcomm.qti.gaiaclient.ui.settings.audiocuration.demo.TouchpadIndicatorsPreference
+        app:allowDividerAbove="false"
+        app:iconSpaceReserved="false"
+        app:selectable="false"
+        app:key="@string/settings_id_audio_curation_demo_adverse_acoustic_gain_reduction"
+        app:title="@string/settings_audio_curation_demo_adverse_acoustic_gain_reduction" />
+
+</PreferenceScreen>

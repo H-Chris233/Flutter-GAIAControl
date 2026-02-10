@@ -1,0 +1,48 @@
+<!--
+  ~ ************************************************************************************************
+  ~ * © 2020, 2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.       *
+  ~ ************************************************************************************************
+  -->
+
+<resources>
+
+    <!-- default text view values -->
+    <string name="connection_state">Connection state</string>
+    <string name="connection_reason">Connection fail reason</string>
+
+    <!-- Connection states -->
+    <string name="connecting">Connecting…</string>
+    <string name="disconnecting">Disconnecting…</string>
+    <string name="connected">Connected</string>
+    <string name="disconnected">Disconnected</string>
+
+    <!-- Connection -->
+    <string name="device_disconnected">The device is disconnected.</string>
+    <string name="device_reconnected">The device was reconnected.</string>
+    <string name="connection_fail_device_not_found">Device could not be found, make sure
+        the device is nearby.</string>
+    <string name="connection_fail_lost">Connection with the device has been lost, make sure the
+        device is nearby, is on and in discovery mode.</string>
+    <string name="connection_fail_device_not_compatible">The Android system has not
+        recognised the device as compatible for Bluetooth classic connections. Please
+        remove the device from the system, make sure it advertises for classic connections
+    and pair it again using the system.</string>
+    <string name="connection_fail_transport_not_found">Device does not have the required services
+        in its service record. The device might not be compatible with this
+        application/feature.</string>
+    <string name="connection_fail_no_bluetooth">The connection to the device could not be
+        established, make sure the Bluetooth is on for this Android device.</string>
+    <string name="connection_fail_time_out">The connection to the device could not be
+        established: the device has failed to respond in time. Make sure that the device is
+        close enough to improve responses.</string>
+    <string name="connection_fail_pairing">The connection to the device could not be
+        established: pairing failed. Make sure that the device is in pairing mode and try again.</string>
+    <string name="connection_fail_failed">The connection to the device could not be
+        established, make sure the device can be connected.</string>
+
+    <!-- Content descriptions -->
+    <string name="cont_desc_connection_state">Connection state is %1$s</string>
+    <string name="cont_desc_connection_error">Connection error is %1$s</string>
+    <string name="cont_desc_connection_done">Success</string>
+
+</resources>

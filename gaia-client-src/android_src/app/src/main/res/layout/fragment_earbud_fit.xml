@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ *************************************************************************************************
+  ~ * © 2021, 2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.        *
+  ~ *************************************************************************************************
+  -->
+
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <data>
+
+        <import type="android.view.View" />
+
+        <import type="com.qualcomm.qti.gaiaclient.ui.earbudfit.EarbudFitState" />
+
+        <variable
+            name="data"
+            type="com.qualcomm.qti.gaiaclient.ui.earbudfit.EarbudFitViewData" />
+
+    </data>
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_margin="@dimen/default_margin_double"
+        android:padding="@dimen/default_margin">
+
+        <!-- Guidelines -->
+
+        <androidx.constraintlayout.widget.Guideline
+            android:id="@+id/horizontal_guideline_middle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            app:layout_constraintGuide_percent="0.5" />
+
+        <androidx.constraintlayout.widget.Guideline
+            android:id="@+id/horizontal_guideline_top"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            app:layout_constraintGuide_percent="0.30" />
+
+        <androidx.constraintlayout.widget.Guideline
+            android:id="@+id/horizontal_guideline_bottom"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            app:layout_constraintGuide_percent="0.95" />
+
+        <androidx.constraintlayout.widget.Guideline
+            android:id="@+id/vertical_guideline_left"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            app:layout_constraintGuide_percent="0.27" />
+
+        <androidx.constraintlayout.widget.Guideline
+            android:id="@+id/vertical_guideline_right"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            app:layout_constraintGuide_percent="0.73" />
+
+
+        <!-- Images -->
+
+        <ImageView
+            android:id="@+id/left_device_image"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginTop="@dimen/no_margin"
+            android:layout_marginBottom="@dimen/default_margin_half"
+            android:src="@drawable/ic_left_earbud"
+            app:layout_constraintLeft_toLeftOf="@id/vertical_guideline_left"
+            app:layout_constraintRight_toRightOf="@id/vertical_guideline_left"
+            app:layout_constraintBottom_toTopOf="@id/horizontal_guideline_top"/>
+
+        <ImageView
+            android:id="@+id/right_device_image"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginTop="@dimen/no_margin"
+            android:layout_marginBottom="@dimen/default_margin_half"
+            android:src="@drawable/ic_right_earbud"
+            app:layout_constraintLeft_toLeftOf="@id/vertical_guideline_right"
+            app:layout_constraintRight_toRightOf="@id/vertical_guideline_right"
+            app:layout_constraintBottom_toTopOf="@id/horizontal_guideline_top"/>
+
+
+        <!-- Result images -->
+
+        <ImageView
+            android:id="@+id/left_result_image"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginTop="@dimen/default_margin_half"
+            android:layout_marginBottom="@dimen/no_margin"
+            app:imageResource="@{data.results.leftResourceId}"
+            app:layout_constraintLeft_toLeftOf="@id/vertical_guideline_left"
+            app:layout_constraintRight_toRightOf="@id/vertical_guideline_left"
+            app:layout_constraintTop_toBottomOf="@id/horizontal_guideline_top"/>
+
+        <ImageView
+            android:id="@+id/right_result_image"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginTop="@dimen/default_margin_half"
+            android:layout_marginBottom="@dimen/no_margin"
+            app:imageResource="@{data.results.rightResourceId}"
+            app:layout_constraintLeft_toLeftOf="@id/vertical_guideline_right"
+            app:layout_constraintRight_toRightOf="@id/vertical_guideline_right"
+            app:layout_constraintTop_toBottomOf="@id/horizontal_guideline_top"/>
+
+
+        <!-- Title -->
+
+        <TextView
+            android:id="@+id/test_title"
+            style="@style/AppTheme.Text.Title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/default_margin_one_and_half"
+            android:layout_marginBottom="@dimen/default_margin_half"
+            android:text="@{data.title ?? @string/earbud_fit_initial_title}"
+            android:textAlignment="center"
+            app:layout_constraintBottom_toTopOf="@id/horizontal_guideline_middle"/>
+
+        <!-- Message -->
+
+        <TextView
+            android:id="@+id/test_message"
+            style="@style/AppTheme.Text.Subtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/default_margin_half"
+            android:layout_marginBottom="@dimen/default_margin_half"
+            android:text="@{data.message ?? @string/earbud_fit_initial_message}"
+            android:textAlignment="center"
+            app:layout_constraintTop_toBottomOf="@id/horizontal_guideline_middle"/>
+
+        <!-- Progress -->
+
+        <ProgressBar
+            android:id="@+id/progress_bar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/default_margin"
+            android:layout_marginStart="@dimen/default_margin_one_and_half"
+            android:layout_marginEnd="@dimen/default_margin_one_and_half"
+            android:indeterminateOnly="true"
+            android:visibility="@{data.state == EarbudFitState.PROGRESS ? View.VISIBLE : View.GONE}"
+            app:layout_constraintTop_toBottomOf="@id/test_message" />
+
+        <!-- Buttons -->
+
+        <Button
+            android:id="@+id/button_start"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/default_margin_one_and_half"
+            android:layout_marginEnd="@dimen/default_margin_one_and_half"
+            android:text="@string/button_start"
+            android:visibility="@{data == null || data.state != EarbudFitState.PROGRESS ? View.VISIBLE : View.GONE}"
+            app:layout_constraintBottom_toTopOf="@id/horizontal_guideline_bottom" />
+
+        <Button
+            android:id="@+id/button_cancel"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/default_margin_one_and_half"
+            android:layout_marginEnd="@dimen/default_margin_one_and_half"
+            android:text="@string/button_cancel"
+            android:visibility="@{data.state == EarbudFitState.PROGRESS ? View.VISIBLE : View.GONE}"
+            app:layout_constraintBottom_toTopOf="@id/horizontal_guideline_bottom" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</layout>

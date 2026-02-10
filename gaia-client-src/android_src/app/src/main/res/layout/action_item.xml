@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ *************************************************************************************************
+  ~ * © 2021-2022 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.         *
+  ~ *************************************************************************************************
+  -->
+
+<layout xmlns:tools="http://schemas.android.com/tools"
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <data>
+        <import type="android.view.View" />
+
+        <import type="com.qualcomm.qti.gaiaclient.core.gaia.qtil.data.gestures.Touchpad" />
+
+        <variable
+            name="data"
+            type="com.qualcomm.qti.gaiaclient.ui.gestures.configuration.ActionViewData" />
+    </data>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:minHeight="@dimen/height_list_item_min"
+        android:orientation="horizontal"
+        android:paddingLeft="@dimen/default_margin"
+        android:paddingRight="@dimen/default_margin_right_for_right_touchpad"
+        android:paddingVertical="@dimen/default_margin_quarter"
+        tools:ignore="RtlHardcoded">
+
+        <TextView
+            android:id="@+id/action_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginRight="@dimen/default_margin"
+            android:layout_weight="1"
+            android:text="@{data.label}"
+            android:textAppearance="?android:attr/textAppearanceListItem" />
+
+    <LinearLayout
+        android:id="@+id/tick_touchpad_touch_area"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:gravity="center"
+        android:orientation="vertical">
+
+        <ImageView
+            android:id="@+id/tick_touchpad"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/cont_desc_gesture_action_tick_touchpad"
+            android:src="@drawable/ic_tick_touchpad"
+            android:visibility="@{!data.tickData.isVisible ? View.GONE : data.tickData.isSelected ? View.VISIBLE : View.INVISIBLE}"
+            app:tint="@color/gesture_action_tick_selector" />
+    </LinearLayout>
+
+        <!-- data binding not working with image tint => use of different drawables -->
+
+        <LinearLayout
+            android:id="@+id/left_touchpad_touch_area"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:gravity="center"
+            android:visibility="@{data.leftTouchpad.isVisible ? View.VISIBLE : View.GONE}"
+            android:orientation="vertical">
+
+            <ImageView
+                android:id="@+id/left_touchpad"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/cont_desc_gesture_action_left_touchpad"
+                android:src="@drawable/ic_left_touchpad"
+                app:tint="@color/gesture_action_touchpad_selector" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/right_touchpad_touch_area"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:gravity="center"
+            android:visibility="@{data.rightTouchpad.isVisible ? View.VISIBLE : View.GONE}"
+            android:orientation="vertical">
+
+            <ImageView
+                android:id="@+id/right_touchpad"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/cont_desc_gesture_action_right_touchpad"
+                android:src="@drawable/ic_right_touchpad"
+                app:tint="@color/gesture_action_touchpad_selector" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</layout>

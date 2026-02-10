@@ -1,0 +1,45 @@
+<!--
+  ~ ************************************************************************************************
+  ~ * © 2020-2021, 2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.  *
+  ~ ************************************************************************************************
+  -->
+
+<resources>
+
+    <!-- List titles -->
+    <plurals name="discovery_connected_devices">
+        <item quantity="one">Connected device</item>
+        <item quantity="other">Connected devices</item>
+    </plurals>
+    <plurals name="discovery_paired_devices">
+        <item quantity="one">Paired device</item>
+        <item quantity="other">Paired devices</item>
+    </plurals>
+    <plurals name="discovery_other_devices">
+        <item quantity="one">Other device</item>
+        <item quantity="other">Other devices</item>
+    </plurals>
+
+    <!-- Bluetooth types -->
+    <string name="discovery_list_device_type_classic">CLASSIC</string>
+    <string name="discovery_list_device_type_low_energy">LE</string>
+
+    <!-- Error messages -->
+    <string name="discovery_list_empty_in_progress_title">Looking for devices</string>
+    <string name="discovery_list_empty_in_progress_message">The application is looking for compatible devices.</string>
+    <string name="discovery_list_empty_title">No devices</string>
+    <string name="discovery_list_empty_message">No compatible device could be found.
+        <br />Make sure that the Bluetooth device is on, in discovery mode and in range.
+        <br />Check that the Bluetooth is enabled on this Android device.</string>
+    <string name="discovery_failed">Failed to scan for new devices</string>
+    <string name="discovery_failed_no_bluetooth">Please enable the Bluetooth</string>
+    <string name="discovery_failed_no_location">Turn on location for new devices</string>
+    <string name="discovery_failed_no_permission">Enable permissions to scan for devices</string>
+
+    <!-- Content descriptions -->
+    <string name="cont_desc_discovery_device">Select device %1$s with address %2$s</string>
+    <string name="cont_desc_discovery_refresh">Refresh list of devices</string>
+    <string name="cont_desc_paired">Device is paired</string>
+    <string name="cont_desc_not_paired">Advertising device</string>
+
+</resources>

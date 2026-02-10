@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ ************************************************************************************************
+  ~ * © 2021-2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.        *
+  ~ ************************************************************************************************
+  -->
+
+<resources>
+
+    <!-- Theme -->
+    <color name="colorPrimary">@color/qualcomm_light_blue_tint_1</color>
+    <color name="colorOnPrimary">@color/black</color>
+    <color name="colorPrimaryDark">@color/black</color>
+    <color name="colorAccent">@color/qualcomm_light_blue_tint_1</color>
+    <color name="colorToolbar">@color/dark_grey_2</color>
+    <color name="colorOnToolbar">@color/white</color>
+
+    <color name="text_high_emphasis">@color/text_high_emphasis_on_dark</color>
+    <color name="text_medium_emphasis">@color/text_medium_emphasis_on_dark</color>
+    <color name="text_light_emphasis">@color/text_light_emphasis_on_dark</color>
+    <color name="title_high_emphasis">@color/text_high_emphasis_on_dark</color>
+    <color name="title_medium_emphasis">@color/text_medium_emphasis_on_dark</color>
+
+    <!-- Components -->
+    <color name="progress">@color/colorAccent</color>
+    <color name="progress_background">@color/qualcomm_light_blue_tint_1_alpha_25</color>
+
+</resources>

@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ *************************************************************************************************
+  ~ * © 2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.              *
+  ~ *************************************************************************************************
+  -->
+
+<layout xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <data>
+
+        <import type="android.view.View" />
+
+        <variable
+            name="file"
+            type="com.qualcomm.qti.gaiaclient.ui.upgrade.files.FileViewData" />
+
+    </data>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="@dimen/default_margin"
+        android:minHeight="@dimen/height_device_item_min"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/file_title"
+            style="@style/AppTheme.Text.File.Title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@{file.title(@string/download_content_no_title)}"
+            android:ellipsize="end"
+            android:maxLines="2" />
+
+        <TextView
+            android:id="@+id/file_created_on"
+            style="@style/AppTheme.Text.List.Secondary"
+            android:textColor="@color/text_light_emphasis"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="@{file.createdOn.isEmpty() ? View.GONE : View.VISIBLE}"
+            android:text="@{file.createdOn}" />
+
+        <TextView
+            android:id="@+id/file_description"
+            style="@style/AppTheme.Text.List.Secondary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@{file.description(@string/download_content_no_description)}"
+            android:ellipsize="end"
+            android:maxLines="3" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/file_tags"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:adapter="@{file.tagsAdapter}"
+            android:visibility="@{file.tags.length > 0 ? View.VISIBLE : View.GONE}" />
+
+    </LinearLayout>
+
+</layout>

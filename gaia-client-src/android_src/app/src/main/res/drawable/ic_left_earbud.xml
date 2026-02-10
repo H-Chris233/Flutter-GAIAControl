@@ -1,0 +1,60 @@
+<!--
+  ~ ************************************************************************************************
+  ~ * © 2021-2022 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.        *
+  ~ ************************************************************************************************
+  -->
+
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="140dp"
+    android:height="101dp"
+    android:viewportWidth="120"
+    android:viewportHeight="87">
+  <group>
+    <clip-path
+        android:pathData="M0,4.526l28.658,0l0,36.807l-28.658,0z"/>
+    <path
+        android:pathData="M28.658,7.385L7.331,41.333L1.493,34.557C-0.04,32.777 -0.433,30.634 0.502,29.147L14.943,6.159C15.877,4.672 17.95,4.14 20.178,4.815L28.658,7.385Z"
+        android:strokeWidth="1"
+        android:fillColor="@color/drawable_device_primary"
+        android:fillType="evenOdd"
+        android:strokeColor="#00000000"/>
+  </group>
+  <path
+      android:pathData="M90.091,37.19C102.441,35.629 116.374,43.039 119.4,56.076C122.638,70.039 112.357,83.936 98.794,86.576C92.452,87.809 82.228,86.189 78.248,80.539"
+      android:strokeWidth="1"
+      android:fillColor="@color/drawable_device_secondary"
+      android:fillType="evenOdd"
+      android:strokeColor="#00000000"/>
+  <group>
+    <clip-path
+        android:pathData="M90.091,37.191L78.248,80.539C82.228,86.189 92.452,87.809 98.794,86.576L98.794,86.576C112.356,83.936 122.638,70.039 119.399,56.076L119.399,56.076C116.641,44.191 104.822,36.984 93.398,36.985L93.398,36.985C92.29,36.985 91.183,37.053 90.091,37.191"/>
+    <path
+        android:pathData="M98.1,88.33C114.196,77.711 115.831,47.519 99.101,35.778"
+        android:strokeWidth="4"
+        android:fillColor="#00000000"
+        android:strokeColor="@color/drawable_device_primary"
+        android:fillType="evenOdd"/>
+  </group>
+  <group>
+    <clip-path
+        android:pathData="M5.756,0.964l91.651,0l0,85.797l-91.651,0z"/>
+    <path
+        android:pathData="M90.457,40.211C89.162,25.053 79.913,11.068 65.152,4.555C43.681,-4.919 18.679,4.999 9.309,26.707C-0.063,48.416 9.747,73.695 31.218,83.17C39.816,86.964 48.98,87.648 57.48,85.71L64.046,83.863C69.14,82.229 74.677,80.995 79.958,80.295C85.025,79.623 89.982,79.645 93.612,75.473C97.384,71.136 97.919,64.814 97.04,59.345C96.563,56.385 95.38,53.948 93.572,51.576C91.633,49.029 91.121,48.234 90.627,44.857L90.457,40.211Z"
+        android:strokeWidth="1"
+        android:fillColor="@color/drawable_device_primary"
+        android:fillType="evenOdd"
+        android:strokeColor="#00000000"/>
+  </group>
+  <path
+      android:pathData="M81.064,59.109C73.025,77.733 51.576,86.242 33.157,78.114C14.736,69.986 6.321,48.299 14.361,29.675C22.399,11.051 43.848,2.543 62.269,10.671C80.688,18.798 89.104,40.485 81.064,59.109"
+      android:strokeWidth="1"
+      android:fillColor="@color/drawable_device_secondary"
+      android:fillType="evenOdd"
+      android:strokeColor="#00000000"/>
+  <path
+      android:pathData="M74.517,56.221C68.056,71.189 50.819,78.027 36.015,71.494C21.211,64.962 14.448,47.533 20.909,32.565C27.37,17.598 44.608,10.759 59.412,17.291C74.215,23.824 80.978,41.253 74.517,56.221"
+      android:strokeWidth="1"
+      android:fillColor="@color/drawable_device_primary"
+      android:fillType="evenOdd"
+      android:strokeColor="#00000000"/>
+</vector>

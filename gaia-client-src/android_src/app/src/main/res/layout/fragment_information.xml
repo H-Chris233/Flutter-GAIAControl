@@ -1,0 +1,289 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ *************************************************************************************************
+  ~ * © 2020-2023 Qualcomm Technologies, Inc. and/or its subsidiaries. All rights reserved.         *
+  ~ *************************************************************************************************
+  -->
+
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <data>
+
+        <import type="android.view.View" />
+
+        <import type="com.qualcomm.qti.gaiaclient.core.gaia.qtil.data.battery.Battery" />
+
+        <variable
+            name="information"
+            type="com.qualcomm.qti.gaiaclient.ui.information.InformationViewData" />
+
+    </data>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/cont_desc_information_screen"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:padding="@dimen/default_margin">
+
+            <ImageView
+                android:id="@+id/device_image"
+                android:layout_gravity="center"
+                android:layout_width="wrap_content"
+                android:layout_height="114dp"
+                android:layout_marginTop="@dimen/default_margin_one_and_half"
+                android:layout_marginBottom="@dimen/no_margin"
+                android:contentDescription="@{information.deviceImage != null ? information.deviceImage.contentDescription : @string/cont_desc_information_image_headphones}"
+                android:src="@drawable/ic_device_headphones"
+                app:imageResource="@{information.deviceImage.resourceId}"/>
+
+            <TextView
+                android:id="@+id/device_name"
+                style="@style/AppTheme.Text.Title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/default_margin_one_and_half"
+                android:layout_marginBottom="@dimen/no_margin"
+                android:contentDescription="@{String.format(@string/cont_desc_information_name, information.name)}"
+                android:text="@{information.name}"
+                android:textAlignment="center"
+                android:visibility="@{information.name != null ? View.VISIBLE : View.GONE}" />
+
+            <TextView
+                android:id="@+id/device_variant_name"
+                style="@style/AppTheme.Text.Subtitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/default_margin"
+                android:layout_marginBottom="@dimen/no_margin"
+                android:contentDescription="@{String.format(@string/cont_desc_information_variant_name, information.variantName)}"
+                android:text="@{information.variantName}"
+                android:textAlignment="center"
+                android:visibility="@{information.variantName != null ? View.VISIBLE : View.GONE}" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/default_margin"
+                android:layout_marginBottom="@dimen/no_margin"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:visibility="@{information.hasBatteryLevels() ? View.VISIBLE : View.GONE}">
+
+                <TextView
+                    android:id="@+id/device_battery_level_title"
+                    style="@style/AppTheme.Text.Subtitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/no_margin"
+                    android:layout_marginBottom="@dimen/no_margin"
+                    android:text="@string/battery_levels"
+                    android:textAlignment="center" />
+
+                <TextView
+                    android:id="@+id/device_battery_level_device"
+                    style="@style/AppTheme.Text.Subtitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/no_margin"
+                    android:layout_marginBottom="@dimen/no_margin"
+                    android:text="@{information.getBatteryLevel(Battery.SINGLE_DEVICE)}"
+                    android:textAlignment="center"
+                    android:visibility="@{information.getBatteryLevel(Battery.SINGLE_DEVICE) != null ? View.VISIBLE : View.GONE}" />
+
+                <TextView
+                    android:id="@+id/device_battery_level_left"
+                    style="@style/AppTheme.Text.Subtitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/no_margin"
+                    android:layout_marginBottom="@dimen/no_margin"
+                    android:text="@{information.getBatteryLevel(Battery.LEFT_DEVICE)}"
+                    android:textAlignment="center"
+                    android:visibility="@{information.getBatteryLevel(Battery.LEFT_DEVICE) != null ? View.VISIBLE : View.GONE}" />
+
+                <TextView
+                    android:id="@+id/device_battery_level_right"
+                    style="@style/AppTheme.Text.Subtitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/no_margin"
+                    android:layout_marginBottom="@dimen/no_margin"
+                    android:text="@{information.getBatteryLevel(Battery.RIGHT_DEVICE)}"
+                    android:textAlignment="center"
+                    android:visibility="@{information.getBatteryLevel(Battery.RIGHT_DEVICE) != null ? View.VISIBLE : View.GONE}" />
+
+                <TextView
+                    android:id="@+id/device_battery_level_case"
+                    style="@style/AppTheme.Text.Subtitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/no_margin"
+                    android:layout_marginBottom="@dimen/no_margin"
+                    android:text="@{information.getBatteryLevel(Battery.CHARGER_CASE)}"
+                    android:textAlignment="center"
+                    android:visibility="@{information.getBatteryLevel(Battery.CHARGER_CASE) != null ? View.VISIBLE : View.GONE}" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/default_margin"
+                android:layout_marginBottom="@dimen/no_margin"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:visibility="@{information.hasSerialNumbers() ? View.VISIBLE : View.GONE}">
+
+                <TextView
+                    android:id="@+id/device_serial_number_title"
+                    style="@style/AppTheme.Text.Subtitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/no_margin"
+                    android:layout_marginBottom="@dimen/no_margin"
+                    android:text="@string/serial_number"
+                    android:textAlignment="center" />
+
+                <TextView
+                    android:id="@+id/device_serial_number"
+                    style="@style/AppTheme.Text.Subtitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/no_margin"
+                    android:layout_marginBottom="@dimen/no_margin"
+                    android:contentDescription="@{String.format(@string/cont_desc_information_serial_number, information.serialNumber)}"
+                    android:text="@{information.serialNumber}"
+                    android:textAlignment="center"
+                    android:visibility="@{information.showSingleSerialNumber() ? View.VISIBLE : View.GONE}" />
+
+                <TextView
+                    android:id="@+id/device_serial_number_earbud_left"
+                    style="@style/AppTheme.Text.Subtitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/no_margin"
+                    android:layout_marginBottom="@dimen/no_margin"
+                    android:contentDescription="@{String.format(@string/cont_desc_information_serial_number_left, information.serialNumberLeft)}"
+                    android:text="@{String.format(@string/serial_number_left, information.serialNumberLeft)}"
+                    android:textAlignment="center"
+                    android:visibility="@{information.serialNumberLeft != null ? View.VISIBLE : View.GONE}" />
+
+                <TextView
+                    android:id="@+id/device_serial_number_earbud_right"
+                    style="@style/AppTheme.Text.Subtitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/no_margin"
+                    android:layout_marginBottom="@dimen/no_margin"
+                    android:contentDescription="@{String.format(@string/cont_desc_information_serial_number_right, information.serialNumberRight)}"
+                    android:text="@{String.format(@string/serial_number_right, information.serialNumberRight)}"
+                    android:textAlignment="center"
+                    android:visibility="@{information.serialNumberRight != null ? View.VISIBLE : View.GONE}" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/default_margin_double"
+                android:layout_marginBottom="@dimen/no_margin"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:visibility="@{information.hasVersions() || information.bluetoothAddress != null ? View.VISIBLE : View.GONE}">
+
+                <TextView
+                    android:id="@+id/device_address"
+                    style="@style/AppTheme.Text.Message"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/no_margin"
+                    android:layout_marginBottom="@dimen/no_margin"
+                    android:contentDescription="@{String.format(@string/cont_desc_information_address, information.bluetoothAddress)}"
+                    android:text="@{String.format(@string/bluetooth_address, information.bluetoothAddress)}"
+                    android:textAlignment="center"
+                    android:visibility="@{information.bluetoothAddress != null ? View.VISIBLE : View.GONE}" />
+
+                <TextView
+                    android:id="@+id/device_application_version"
+                    style="@style/AppTheme.Text.Message"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/default_margin_half"
+                    android:layout_marginBottom="@dimen/no_margin"
+                    android:contentDescription="@{String.format(@string/cont_desc_information_application_version, information.applicationVersion)}"
+                    android:text="@{String.format(@string/application_version, information.applicationVersion)}"
+                    android:textAlignment="center"
+                    android:visibility="@{information.applicationVersion != null ? View.VISIBLE : View.GONE}" />
+
+                <TextView
+                    android:id="@+id/device_application_build_id"
+                    style="@style/AppTheme.Text.Message"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/default_margin_half"
+                    android:layout_marginBottom="@dimen/no_margin"
+                    android:contentDescription="@{String.format(@string/cont_desc_information_application_build_id, information.applicationBuildId)}"
+                    android:text="@{String.format(@string/application_build_id, information.applicationBuildId)}"
+                    android:textAlignment="center"
+                    android:visibility="@{information.applicationBuildId != null ? View.VISIBLE : View.GONE}" />
+
+                <TextView
+                    android:id="@+id/device_gaia_version"
+                    style="@style/AppTheme.Text.Message"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/default_margin_half"
+                    android:layout_marginBottom="@dimen/no_margin"
+                    android:contentDescription="@{String.format(@string/cont_desc_information_gaia_version, information.gaiaVersion)}"
+                    android:text="@{String.format(@string/gaia_version, information.gaiaVersion)}"
+                    android:textAlignment="center"
+                    android:visibility="@{information.gaiaVersion != null ? View.VISIBLE : View.GONE}" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/default_margin_double"
+                android:layout_marginBottom="@dimen/no_margin"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:visibility="@{information.hasStates() ? View.VISIBLE : View.GONE}">
+
+                <TextView
+                    android:id="@+id/connection_state"
+                    style="@style/AppTheme.Text.Message"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/no_margin"
+                    android:layout_marginBottom="@dimen/no_margin"
+                    android:contentDescription="@{String.format(@string/cont_desc_information_state, information.state)}"
+                    android:text="@{information.state}"
+                    android:textAlignment="center"
+                    android:visibility="@{information.state != null ? View.VISIBLE : View.GONE}" />
+
+                <TextView
+                    android:id="@+id/device_charging"
+                    style="@style/AppTheme.Text.Message"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/default_margin_half"
+                    android:layout_marginBottom="@dimen/no_margin"
+                    android:contentDescription="@string/cont_desc_information_is_charging"
+                    android:text="@string/charging"
+                    android:textAlignment="center"
+                    android:visibility="@{information.isCharging ? View.VISIBLE : View.GONE}" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </ScrollView>
+
+</layout>
