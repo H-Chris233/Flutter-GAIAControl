@@ -53,7 +53,7 @@ graph TD
         Q["http.dart<br/>HTTP 封装 (Dio)"]
     end
 
-    A -->|"GetX 注入"| C
+    A -->|"Get.put 注册"| C
     B -->|"Obx 绑定"| C
     C -->|"构建/解析数据包"| E
     C -->|"发送VMU指令"| G
@@ -117,10 +117,52 @@ graph TD
 
 | 模块路径 | 说明 | 语言 | 模块 CLAUDE.md |
 |----------|------|------|----------------|
-| `lib/controlller/` | OTA 服务核心 -- BLE 连接管理、升级状态机、分包传输编排 | Dart | [controlller/CLAUDE.md](./lib/controlller/CLAUDE.md) |
+| `lib/controlller/` | OTA 服务核心 -- BLE 连接管理、升级状态机、分包传输编排（当前仅 V3 协议） | Dart | [controlller/CLAUDE.md](./lib/controlller/CLAUDE.md) |
 | `lib/utils/gaia/` | GAIA 协议实现 -- Qualcomm CSR 蓝牙协议命令、数据包、操作码 | Dart | [gaia/CLAUDE.md](./lib/utils/gaia/CLAUDE.md) |
 | `lib/utils/gaia/rwcp/` | RWCP 可靠传输协议 -- 滑动窗口、序列号管理、数据分段 | Dart | [rwcp/CLAUDE.md](./lib/utils/gaia/rwcp/CLAUDE.md) |
-| `lib/utils/` (根工具) | 通用工具 -- 日志、字符串/字节处理、HTTP 封装 | Dart | 无（文件较少，已在根文档覆盖） |
+| `lib/utils/` (根工具) | 通用工具 -- 日志、字符串/字节处理、HTTP 封装 | Dart | 无（文件较少，接口见下方） |
+
+### 工具文件接口速查
+
+#### Log.dart
+
+```dart
+class Log {
+  static bool isLog = false;           // 全局日志开关（默认关闭）
+  static void i(String tag, String msg); // Info 级别
+  static void d(String tag, String msg); // Debug 级别
+  static void e(String tag, String msg); // Error 级别
+  static void w(String tag, String msg); // Warning 级别
+}
+```
+
+#### StringUtils.dart
+
+```dart
+class StringUtils {
+  static String byteToString(List<int> list);     // UTF-8 字节 → 字符串
+  static String byteToHexString(List<int> bytes);  // 字节 → 十六进制字符串
+  static List<int> hexStringToBytes(String hex);    // 十六进制字符串 → 字节
+  static String file2md5(List<int> input);          // 计算 MD5 哈希
+  static List<int> encode(String s);                // 字符串 → UTF-8 字节
+  static int extractIntFromByteArray(               // 从字节数组提取 int（支持大/小端）
+      List<int> source, int offset, int length, bool reverse);
+  static String intTo2HexString(int value);         // int → 2字节十六进制字符串
+  static List<int> intTo2List(int value);           // int → 2字节 List
+  static int byteListToInt(List<int> hex);          // 2字节 List → int
+}
+```
+
+#### http.dart
+
+```dart
+class HttpUtil {
+  factory HttpUtil();                               // 单例工厂
+  // 基于 Dio 封装，提供 RESTful 方法:
+  // get / post / download / put / patch / delete
+  // 默认超时 3000ms，JSON 编解码
+}
+```
 
 ---
 
@@ -214,10 +256,10 @@ dart format lib test
 ## AI 使用指引
 
 - 本项目从 Qualcomm GAIA Control Android 版 Java 代码移植而来，`gaia-client-src/` 目录保留了原始参考源码
-- OtaServer.dart 是整个项目的核心枢纽（约 2060 行），修改时需理解其状态机流程
+- OtaServer.dart 是整个项目的核心枢纽（约 1999 行），修改时需理解其状态机流程
 - GAIA 协议相关常量定义在 `GAIA.dart`（约 36KB），操作码定义在 `OpCodes.dart`
 - BLE 特征值 UUID 在 OtaServer 中硬编码，分别用于 OTA 服务发现、通知订阅、写入和无响应写入
-- 支持 V1/V2（Vendor 0x000A）和 V3（Vendor 0x001D）两种协议模式，可通过 Auto 模式自动探测
+- 支持 V1/V2（Vendor 0x000A）和 V3（Vendor 0x001D）两种协议模式的常量定义，但**当前实现仅使用 V3**（`_vendorCandidates` 仅含 `[0x001D]`）
 - RWCP 传输使用滑动窗口机制，窗口默认 15、最大 32
 
 ---

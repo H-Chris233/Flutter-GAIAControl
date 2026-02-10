@@ -1,4 +1,4 @@
-[根目录](../../../CLAUDE.md) > [lib](../../) > [utils](../) > **gaia**
+[根目录](../../../CLAUDE.md) > lib > utils > **gaia**
 
 # gaia 模块 -- GAIA 协议实现
 

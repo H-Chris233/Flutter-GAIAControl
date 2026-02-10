@@ -1,4 +1,4 @@
-[根目录](../../../../CLAUDE.md) > [lib](../../../) > [gaia](../CLAUDE.md) > **rwcp**
+[根目录](../../../../CLAUDE.md) > lib > utils > [gaia](../CLAUDE.md) > **rwcp**
 
 # rwcp 模块 -- RWCP 可靠传输协议
 
