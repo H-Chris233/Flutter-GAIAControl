@@ -1,9 +1,8 @@
 import 'dart:async';
+import 'dart:developer';
 import 'dart:io';
 
-
 import 'package:dio/dio.dart';
-
 
 /*
   * http 操作类
@@ -55,14 +54,16 @@ class HttpUtil {
 
     dio = Dio(options);
 
-    dio.interceptors.add(LogInterceptor(responseBody: true,request: false,requestBody: false,requestHeader: false,responseHeader: false)); //开启请求日志
+    dio.interceptors.add(LogInterceptor(
+        responseBody: true,
+        request: false,
+        requestBody: false,
+        requestHeader: false,
+        responseHeader: false)); //开启请求日志
     // 添加拦截器
     dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) {
         Map<String, dynamic> commonArgs = {
-          'userId': 0,
-          'pubId': 100,
-          'sn': "ble",
           'projectType': Platform.isIOS ? 6001 : 6000
         };
         options.queryParameters.addAll(commonArgs);
@@ -93,7 +94,7 @@ class HttpUtil {
   }
 
   void _printKV(String key, Object? v) {
-    print('args $key: $v');
+    log('args $key: $v', name: 'HttpUtil');
   }
 
   /*
@@ -102,7 +103,8 @@ class HttpUtil {
 
   // 错误处理
   void onError(ErrorEntity eInfo) {
-    print('error.code -> ' + eInfo.code.toString() + ', error.message -> ' + eInfo.message);
+    log('error.code -> ${eInfo.code}, error.message -> ${eInfo.message}',
+        name: 'HttpUtil');
     switch (eInfo.code) {
       case 401:
         break;
@@ -125,7 +127,7 @@ class HttpUtil {
       case DioExceptionType.badResponse:
         {
           try {
-            int errCode = error.response != null ? error.response!.statusCode! : -1;
+            final errCode = error.response?.statusCode ?? -1;
             // String errMsg = error.response.statusMessage;
             // return ErrorEntity(code: errCode, message: errMsg);
             switch (errCode) {
@@ -251,7 +253,8 @@ class HttpUtil {
     required String savePath,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final response = await dio.download(path, savePath, onReceiveProgress: onReceiveProgress);
+    final response = await dio.download(path, savePath,
+        onReceiveProgress: onReceiveProgress);
     return response.statusCode;
   }
 

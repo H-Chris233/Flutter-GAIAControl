@@ -245,8 +245,8 @@ class OtaServer extends GetxService implements RWCPListener {
                   "Vendor探测失败，继续使用默认Vendor ${_vendorToHex(_activeVendorId)}");
             },
           );
-          //IOS BUG
-          await flutterReactiveBle.discoverServices(id);
+          // IOS 需要先发现服务，否则订阅可能失败
+          await _discoverServicesIfNeeded(id);
           Future.delayed(const Duration(seconds: 1)).then((_) {
             if (isDeviceConnected) registerNotice();
           });
@@ -284,6 +284,11 @@ class OtaServer extends GetxService implements RWCPListener {
     } catch (e) {
       addLog('开始连接失败$e');
     }
+  }
+
+  Future<void> _discoverServicesIfNeeded(String deviceId) async {
+    await flutterReactiveBle.discoverAllServices(deviceId);
+    await flutterReactiveBle.getDiscoveredServices(deviceId);
   }
 
   void writeMsg(List<int> data) {
@@ -410,8 +415,8 @@ class OtaServer extends GetxService implements RWCPListener {
     }
     rwcpStatusText.value = "建立通道中";
     await _subscribeConnectionRWCP?.cancel();
-    //IOS BUG
-    await flutterReactiveBle.discoverServices(connectDeviceId);
+    // IOS 需要先发现服务，否则订阅可能失败
+    await _discoverServicesIfNeeded(connectDeviceId);
     await Future.delayed(const Duration(seconds: 1));
     final characteristic = QualifiedCharacteristic(
         serviceId: otaUUID,
@@ -444,8 +449,8 @@ class OtaServer extends GetxService implements RWCPListener {
   //注册通知
   void registerNotice() async {
     await _subscribeConnection?.cancel();
-    //IOS需要先发现否则订阅失败
-    await flutterReactiveBle.discoverServices(connectDeviceId);
+    // IOS 需要先发现服务，否则订阅可能失败
+    await _discoverServicesIfNeeded(connectDeviceId);
     await Future.delayed(const Duration(seconds: 1));
     final characteristic = QualifiedCharacteristic(
         serviceId: otaUUID,
@@ -839,12 +844,13 @@ class OtaServer extends GetxService implements RWCPListener {
       usePath = "${filePath.path}/1.bin";
       firmwarePath.value = usePath;
     }
-    file = File(usePath);
-    if (!await file!.exists()) {
+    final selectedFile = File(usePath);
+    file = selectedFile;
+    if (!await selectedFile.exists()) {
       addLog("升级文件不存在：$usePath");
       return false;
     }
-    mBytesFile = await file!.readAsBytes();
+    mBytesFile = await selectedFile.readAsBytes();
     if ((mBytesFile ?? []).isEmpty) {
       addLog("升级文件为空：$usePath");
       return false;
@@ -1243,7 +1249,8 @@ class OtaServer extends GetxService implements RWCPListener {
   void sendVMUPacket(VMUPacket packet, bool isTransferringData) {
     List<int> bytes = packet.getBytes();
     if (isTransferringData && mIsRWCPEnabled.value) {
-      final gaiaPacket = _buildGaiaPacket(_upgradeControlCommand(), payload: bytes);
+      final gaiaPacket =
+          _buildGaiaPacket(_upgradeControlCommand(), payload: bytes);
       try {
         List<int> gaiaBytes = gaiaPacket.getBytes();
         if (mTransferStartTime <= 0) {
@@ -1266,7 +1273,12 @@ class OtaServer extends GetxService implements RWCPListener {
   void receiveVMUPacket(List<int> data) {
     try {
       final packet = VMUPacket.getPackageFromByte(data);
-      if (isUpgrading || packet!.mOpCode == OpCodes.UPGRADE_ABORT_CFM) {
+      if (packet == null) {
+        addLog(
+            "receiveVMUPacket 无法解析VMU包: ${StringUtils.byteToHexString(data)}");
+        return;
+      }
+      if (isUpgrading || packet.mOpCode == OpCodes.UPGRADE_ABORT_CFM) {
         handleVMUPacket(packet);
       } else {
         addLog(
@@ -1683,9 +1695,8 @@ class OtaServer extends GetxService implements RWCPListener {
   Future<void> writeData(List<int> data) async {
     try {
       if (_enableWriteTraceLog) {
-        addLog("wenDataWrite start>${StringUtils.byteToHexString(data)}");
+        addLog("writeData start>${StringUtils.byteToHexString(data)}");
       }
-      await Future.delayed(const Duration(milliseconds: 100));
       final characteristic = QualifiedCharacteristic(
           serviceId: otaUUID,
           characteristicId: writeUUID,
@@ -1694,7 +1705,7 @@ class OtaServer extends GetxService implements RWCPListener {
           value: data);
       _touchUpgradeWatchdog();
       if (_enableWriteTraceLog) {
-        addLog("wenDataWrite end>${StringUtils.byteToHexString(data)}");
+        addLog("writeData end>${StringUtils.byteToHexString(data)}");
       }
     } catch (e) {
       addLog("写入失败(writeWithResponse): $e");
@@ -1708,7 +1719,6 @@ class OtaServer extends GetxService implements RWCPListener {
   //RWCP写入通道
   void writeMsgRWCP(List<int> data) async {
     try {
-      await Future.delayed(const Duration(milliseconds: 100));
       final characteristic = QualifiedCharacteristic(
           serviceId: otaUUID,
           characteristicId: writeNoResUUID,
@@ -1745,7 +1755,7 @@ class OtaServer extends GetxService implements RWCPListener {
   }
 
   void addLog(String s) {
-    debugPrint("wenTest " + s);
+    debugPrint(s);
     final dedupKey = _normalizeLogKey(s);
     if (_lastLogDedupKey.isEmpty) {
       _lastLogDedupKey = dedupKey;
@@ -1945,16 +1955,18 @@ class OtaServer extends GetxService implements RWCPListener {
   void startScan() async {
     devices.clear();
     if (Platform.isAndroid) {
-      Map<Permission, PermissionStatus> statuses = await [
+      final statuses = await [
         Permission.location,
         Permission.bluetooth,
         Permission.bluetoothScan,
         Permission.bluetoothConnect,
       ].request();
-      var location = await Permission.location.status;
-      var bluetooth = await Permission.bluetooth.status;
-      var bluetoothScan = await Permission.bluetoothScan.status;
-      var bluetoothConnect = await Permission.bluetoothConnect.status;
+      final location =
+          statuses[Permission.location] ?? await Permission.location.status;
+      final bluetoothScan = statuses[Permission.bluetoothScan] ??
+          await Permission.bluetoothScan.status;
+      final bluetoothConnect = statuses[Permission.bluetoothConnect] ??
+          await Permission.bluetoothConnect.status;
       if (location.isDenied) {
         addLog("location deny");
         return;
@@ -1981,7 +1993,7 @@ class OtaServer extends GetxService implements RWCPListener {
     }
     // Start scannin
     _scanConnection = flutterReactiveBle.scanForDevices(
-        withServices: [],
+        withServices: [otaUUID],
         scanMode: ScanMode.lowLatency,
         requireLocationServicesEnabled: true).listen((device) {
       if (device.name.isNotEmpty) {

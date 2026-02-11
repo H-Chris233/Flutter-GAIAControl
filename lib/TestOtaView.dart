@@ -153,8 +153,8 @@ class _TestOtaState extends State<TestOtaView> {
 
   @override
   void dispose() {
-    super.dispose();
     OtaServer.to.disconnect();
+    super.dispose();
   }
 
   Future<void> _chooseFirmwareFile() async {

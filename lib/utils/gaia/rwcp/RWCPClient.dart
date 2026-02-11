@@ -100,7 +100,8 @@ class RWCPClient {
 
   void showDebugLogs(bool show) {
     mShowDebugLogs = show;
-    Log.i(TAG, "Debug logs are now " + (show ? "activated" : "deactivated") + ".");
+    Log.i(TAG,
+        "Debug logs are now " + (show ? "activated" : "deactivated") + ".");
   }
 
   bool sendData(List<int> bytes) {
@@ -139,7 +140,8 @@ class RWCPClient {
 
     if (bytes.length < RWCPSegment.REQUIRED_INFORMATION_LENGTH) {
       String message =
-          "Analyse of RWCP Segment failed: the byte array does not contain the minimum " + "required information.";
+          "Analyse of RWCP Segment failed: the byte array does not contain the minimum " +
+              "required information.";
       if (mShowDebugLogs) {
         message += "\n\tbytes=" + StringUtils.byteToHexString(bytes);
       }
@@ -184,7 +186,10 @@ class RWCPClient {
     logState("set initial window size to $size");
 
     if (mState != RWCPState.LISTEN) {
-      Log.w(TAG, "FAIL to set initial window size to $size: not possible when there is an ongoing " + "session.");
+      Log.w(
+          TAG,
+          "FAIL to set initial window size to $size: not possible when there is an ongoing " +
+              "session.");
       return false;
     }
 
@@ -194,7 +199,8 @@ class RWCPClient {
     }
 
     mInitialWindow = size;
-    mWindow = mInitialWindow; // not in an ongoing session, window is set up to the initial value
+    mWindow =
+        mInitialWindow; // not in an ongoing session, window is set up to the initial value
     return true;
   }
 
@@ -206,7 +212,10 @@ class RWCPClient {
     logState("set maximum window size to $size");
 
     if (mState != RWCPState.LISTEN) {
-      Log.w(TAG, "FAIL to set maximum window size to $size: not possible when there is an ongoing " + "session.");
+      Log.w(
+          TAG,
+          "FAIL to set maximum window size to $size: not possible when there is an ongoing " +
+              "session.");
       return false;
     }
 
@@ -215,14 +224,16 @@ class RWCPClient {
       return false;
     }
 
-    if (mInitialWindow > mMaximumWindow) {
-      Log.w(TAG, "FAIL to set maximum window to $size: initial window is $mInitialWindow.");
+    if (mInitialWindow > size) {
+      Log.w(TAG,
+          "FAIL to set maximum window to $size: initial window is $mInitialWindow.");
       return false;
     }
 
     mMaximumWindow = size;
     if (mWindow > mMaximumWindow) {
-      Log.i(TAG, "window is updated to be less than the maximum window size ( $mInitialWindow).");
+      Log.i(TAG,
+          "window is updated to be less than the maximum window size ( $mInitialWindow).");
       mWindow = mMaximumWindow;
     }
     return true;
@@ -230,12 +241,16 @@ class RWCPClient {
 
   bool receiveRST(Segment segment) {
     if (mShowDebugLogs) {
-      Log.d(TAG, "Receive RST or RST_ACK for sequence ${segment.getSequenceNumber()}");
+      Log.d(TAG,
+          "Receive RST or RST_ACK for sequence ${segment.getSequenceNumber()}");
     }
 
     switch (mState) {
       case RWCPState.SYN_SENT:
-        Log.i(TAG, "Received RST (sequence ${segment.getSequenceNumber()}) in SYN_SENT state, ignoring " + "segment.");
+        Log.i(
+            TAG,
+            "Received RST (sequence ${segment.getSequenceNumber()}) in SYN_SENT state, ignoring " +
+                "segment.");
         return true;
 
       case RWCPState.ESTABLISHED:
@@ -256,7 +271,8 @@ class RWCPClient {
         if (mPendingData.isNotEmpty) {
           // expected when starting a session: RST sent prior SYN, sending SYN to start the session
           if (!sendSYNSegment()) {
-            Log.w(TAG, "Start session of RWCP data transfer failed: sending of SYN failed.");
+            Log.w(TAG,
+                "Start session of RWCP data transfer failed: sending of SYN failed.");
             terminateSession();
             mListener.onTransferFailed();
           }
@@ -408,7 +424,8 @@ class RWCPClient {
 
   void resendSegment() {
     if (mState == RWCPState.ESTABLISHED) {
-      Log.w(TAG, "Trying to resend non data segment while in ESTABLISHED state.");
+      Log.w(
+          TAG, "Trying to resend non data segment while in ESTABLISHED state.");
       return;
     }
 
@@ -432,7 +449,8 @@ class RWCPClient {
 
   void resendDataSegment() {
     if (mState != RWCPState.ESTABLISHED) {
-      Log.w(TAG, "Trying to resend data segment while not in ESTABLISHED state.");
+      Log.w(
+          TAG, "Trying to resend data segment while not in ESTABLISHED state.");
       return;
     }
 
@@ -450,7 +468,11 @@ class RWCPClient {
         mPendingData.addFirst(segment.getPayload());
         moved++;
       } else {
-        Log.w(TAG, "Segment " + segment.toString() + " in pending segments but not a DATA segment.");
+        Log.w(
+            TAG,
+            "Segment " +
+                segment.toString() +
+                " in pending segments but not a DATA segment.");
         break;
       }
     }
@@ -475,9 +497,13 @@ class RWCPClient {
   }
 
   void sendDataSegment() {
-    while (mCredits > 0 && mPendingData.isNotEmpty && !mIsResendingSegments && mState == RWCPState.ESTABLISHED) {
+    while (mCredits > 0 &&
+        mPendingData.isNotEmpty &&
+        !mIsResendingSegments &&
+        mState == RWCPState.ESTABLISHED) {
       List<int> data = mPendingData.removeFirst();
-      Segment segment = Segment.get(RWCPOpCodeClient.DATA, mNextSequence, payload: data);
+      Segment segment =
+          Segment.get(RWCPOpCodeClient.DATA, mNextSequence, payload: data);
       sendSegment(segment, mDataTimeOutMs);
       mUnacknowledgedSegments.add(segment);
       mNextSequence = increaseSequenceNumber(mNextSequence);
@@ -491,7 +517,8 @@ class RWCPClient {
   }
 
   int decreaseSequenceNumber(int sequence, int decrease) {
-    return (sequence - decrease + RWCP.SEQUENCE_NUMBER_MAX + 1) % (RWCP.SEQUENCE_NUMBER_MAX + 1);
+    return (sequence - decrease + RWCP.SEQUENCE_NUMBER_MAX + 1) %
+        (RWCP.SEQUENCE_NUMBER_MAX + 1);
   }
 
   void reset(bool complete) {
@@ -525,14 +552,16 @@ class RWCPClient {
       case RWCPState.SYN_SENT:
         // expected behavior: start to send the data
         cancelTimeOut();
-        int validated = validateAckSequence(RWCPOpCodeClient.SYN, segment.getSequenceNumber());
+        int validated = validateAckSequence(
+            RWCPOpCodeClient.SYN, segment.getSequenceNumber());
         if (validated >= 0) {
           mState = RWCPState.ESTABLISHED;
           if (mPendingData.isNotEmpty) {
             sendDataSegment();
           }
         } else {
-          Log.w(TAG, "Receive SYN_ACK with unexpected sequence number: ${segment.getSequenceNumber()}");
+          Log.w(TAG,
+              "Receive SYN_ACK with unexpected sequence number: ${segment.getSequenceNumber()}");
           terminateSession();
           mListener.onTransferFailed();
           sendRSTSegment();
@@ -577,7 +606,8 @@ class RWCPClient {
       return NOT_VALIDATED;
     }
 
-    if (mLastAckSequence < mNextSequence && (sequence < mLastAckSequence || sequence > mNextSequence)) {
+    if (mLastAckSequence < mNextSequence &&
+        (sequence < mLastAckSequence || sequence > mNextSequence)) {
       Log.w(
           TAG,
           "Received ACK sequence ($sequence) is out of interval: last received is " +
@@ -587,7 +617,9 @@ class RWCPClient {
       return NOT_VALIDATED;
     }
 
-    if (mLastAckSequence > mNextSequence && sequence > mNextSequence && sequence < mLastAckSequence) {
+    if (mLastAckSequence > mNextSequence &&
+        sequence > mNextSequence &&
+        sequence < mLastAckSequence) {
       Log.w(
           TAG,
           "Received ACK sequence ($sequence) is out of interval: last received is " +
@@ -608,12 +640,17 @@ class RWCPClient {
         }
         acknowledged++;
       } else {
-        Log.w(TAG,
-            "Error validating sequence " + "$nextAckSequence" + ": no corresponding segment in " + "pending segments.");
+        Log.w(
+            TAG,
+            "Error validating sequence " +
+                "$nextAckSequence" +
+                ": no corresponding segment in " +
+                "pending segments.");
       }
     }
 
-    logState("$acknowledged" + " segment(s) validated with ACK sequence(code=$code seq=$sequence");
+    logState("$acknowledged" +
+        " segment(s) validated with ACK sequence(code=$code seq=$sequence");
 
     // increase the window size if qualified.
     increaseWindow(acknowledged);
@@ -633,7 +670,8 @@ class RWCPClient {
       mUnacknowledgedSegments.remove(target);
       return true;
     }
-    Log.w(TAG, "Pending segments does not contain acknowledged segment: code=$code \tsequence=$sequence");
+    Log.w(TAG,
+        "Pending segments does not contain acknowledged segment: code=$code \tsequence=$sequence");
     return false;
   }
 
@@ -649,7 +687,8 @@ class RWCPClient {
 
   bool receiveDataAck(Segment segment) {
     if (mShowDebugLogs) {
-      Log.d(TAG, "Receive DATA_ACK for sequence ${segment.getSequenceNumber()}");
+      Log.d(
+          TAG, "Receive DATA_ACK for sequence ${segment.getSequenceNumber()}");
     }
 
     switch (mState) {
@@ -663,7 +702,8 @@ class RWCPClient {
           } else if (mPendingData.isEmpty && mUnacknowledgedSegments.isEmpty) {
             // no more data to send: close session
             sendRSTSegment();
-          } else if (mPendingData.isEmpty /*&& !mUnacknowledgedSegments.isEmpty()*/
+          } else if (mPendingData
+                  .isEmpty /*&& !mUnacknowledgedSegments.isEmpty()*/
               ||
               mCredits == 0 /*&& !mPendingData.isEmpty()*/) {
             // no more data to send but still some waiting to be acknowledged
@@ -702,7 +742,8 @@ class RWCPClient {
     switch (mState) {
       case RWCPState.ESTABLISHED:
         if (mLastAckSequence > segment.getSequenceNumber()) {
-          Log.i(TAG, "Ignoring GAP (${segment.getSequenceNumber()}) as last ack sequence is $mLastAckSequence.");
+          Log.i(TAG,
+              "Ignoring GAP (${segment.getSequenceNumber()}) as last ack sequence is $mLastAckSequence.");
           return true;
         }
         if (mLastAckSequence <= segment.getSequenceNumber()) {
@@ -710,7 +751,8 @@ class RWCPClient {
           // adjust window
           decreaseWindow();
           // validate the acknowledged segments if not known.
-          validateAckSequence(RWCPOpCodeClient.DATA, segment.getSequenceNumber());
+          validateAckSequence(
+              RWCPOpCodeClient.DATA, segment.getSequenceNumber());
         }
 
         cancelTimeOut();
@@ -720,7 +762,8 @@ class RWCPClient {
       case RWCPState.CLOSING:
         // RST had been sent, wait for the RST time out or RST ACK
         if (mShowDebugLogs) {
-          Log.i(TAG, "Received GAP(${segment.getSequenceNumber()}) segment while in state CLOSING: segment discarded.");
+          Log.i(TAG,
+              "Received GAP(${segment.getSequenceNumber()}) segment while in state CLOSING: segment discarded.");
         }
         return true;
 

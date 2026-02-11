@@ -1,30 +1,42 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility that Flutter provides. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gaia/utils/gaia/rwcp/RWCP.dart';
+import 'package:gaia/utils/gaia/rwcp/RWCPClient.dart';
+import 'package:gaia/utils/gaia/rwcp/RWCPListener.dart';
 
-import 'package:gaia/main.dart';
+class _FakeRWCPListener implements RWCPListener {
+  @override
+  void onTransferFailed() {}
+
+  @override
+  void onTransferFinished() {}
+
+  @override
+  void onTransferProgress(int acknowledged) {}
+
+  @override
+  bool sendRWCPSegment(List<int> bytes) => true;
+}
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  group('RWCPClient setMaximumWindowSize', () {
+    test('rejects maximum window smaller than initial window', () {
+      final client = RWCPClient(_FakeRWCPListener());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+      final setInitial = client.setInitialWindowSize(10);
+      final setMaximum = client.setMaximumWindowSize(9);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+      expect(setInitial, isTrue);
+      expect(setMaximum, isFalse);
+      expect(client.getMaximumWindowSize(), RWCP.WINDOW_MAX);
+    });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    test('accepts valid maximum window and updates value', () {
+      final client = RWCPClient(_FakeRWCPListener());
+
+      final result = client.setMaximumWindowSize(20);
+
+      expect(result, isTrue);
+      expect(client.getMaximumWindowSize(), 20);
+    });
   });
 }
