@@ -152,7 +152,7 @@ class HttpUtil {
                   // return ErrorEntity(code: errCode, message: "未知错误");
                   return ErrorEntity(
                     code: errCode,
-                    message: error.response != null ? error.response!.statusMessage! : "",
+                    message: error.response?.statusMessage ?? "",
                   );
                 }
             }

@@ -1,6 +1,5 @@
 
-import 'package:flutter/cupertino.dart';
-
+import '../Log.dart';
 import '../StringUtils.dart';
 
 
@@ -64,16 +63,15 @@ class VMUPacket {
     int opCode = -1;
     if (bytes.length >= REQUIRED_INFORMATION_LENGTH) {
       opCode = bytes[0];
-      //14000600BB08ADE403
       int length = StringUtils.byteListToInt([bytes[1], bytes[2]]);
       int dataLength = bytes.length - REQUIRED_INFORMATION_LENGTH;
-      debugPrint("$length getPackageFromByte $dataLength");
       if (length > dataLength) {
-        debugPrint("getPackageFromByte length > dataLength");
+        Log.w("VMUPacket", "getPackageFromByte: declared length ($length) > actual data ($dataLength), packet incomplete");
+        return null;
       } else if (length < dataLength) {
-        debugPrint("getPackageFromByte length < dataLength");
+        Log.w("VMUPacket", "getPackageFromByte: declared length ($length) < actual data ($dataLength), trailing bytes will be ignored");
       }
-      List<int> data = bytes.sublist(3);
+      List<int> data = bytes.sublist(REQUIRED_INFORMATION_LENGTH, REQUIRED_INFORMATION_LENGTH + length);
       return VMUPacket.get(opCode, data: data);
     }
     return null;

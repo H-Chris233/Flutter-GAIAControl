@@ -148,11 +148,7 @@ class Segment {
 
   @override
   String toString() {
-    var res = "";
-    res += "mOperationCode $mOperationCode";
-    res += "mSequenceNumber $mSequenceNumber";
-    res += "mPayload ${StringUtils.byteToHexString(mPayload ?? [])}";
-    return res;
+    return "Segment{opCode=$mOperationCode, seq=$mSequenceNumber, payload=${StringUtils.byteToHexString(mPayload ?? [])}}";
   }
 
   int getOperationCode() {

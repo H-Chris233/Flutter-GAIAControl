@@ -460,6 +460,7 @@ class RWCPClient {
 
     // resend the unacknowledged segments corresponding to the window
     for (var segment in mUnacknowledgedSegments) {
+      if (mCredits <= 0) break;
       sendSegment(segment, mDataTimeOutMs);
       mCredits--;
     }
@@ -586,7 +587,7 @@ class RWCPClient {
       return NOT_VALIDATED;
     }
 
-    if (mLastAckSequence > mNextSequence && sequence < mLastAckSequence && sequence > mNextSequence) {
+    if (mLastAckSequence > mNextSequence && sequence > mNextSequence && sequence < mLastAckSequence) {
       Log.w(
           TAG,
           "Received ACK sequence ($sequence) is out of interval: last received is " +
@@ -638,7 +639,7 @@ class RWCPClient {
 
   void increaseWindow(int acknowledged) {
     mAcknowledgedSegments += acknowledged;
-    if (mAcknowledgedSegments > mWindow && mWindow < mMaximumWindow) {
+    if (mAcknowledgedSegments >= mWindow && mWindow < mMaximumWindow) {
       mAcknowledgedSegments = 0;
       mWindow++;
       mCredits++;

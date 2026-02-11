@@ -1,13 +1,10 @@
 import 'dart:convert';
 import 'dart:developer';
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 
 class StringUtils {
-  final hexDigits = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
-
   static String byteToString(List<int> list) {
     try {
       String string = const Utf8Decoder().convert(list);
@@ -104,7 +101,6 @@ class StringUtils {
   }
 
   static int byteListToInt(List<int> hex) {
-    return hex[1] & 0xff | hex[0] << 8 & 0xff;
-    //return int.parse(byteToHexString(hex), radix: 16);
+    return ((hex[0] & 0xFF) << 8) | (hex[1] & 0xFF);
   }
 }

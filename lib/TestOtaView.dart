@@ -181,7 +181,8 @@ class _TestOtaState extends State<TestOtaView> {
   Future<bool> _ensureFirmwareReady() async {
     String usePath = OtaServer.to.firmwarePath.value.trim();
     if (usePath.isEmpty) {
-      usePath = OtaServer.to.firmwarePath.value.trim();
+      OtaServer.to.addLog("固件路径未设置");
+      return false;
     }
     final error = await _validateFirmwareFile(usePath);
     if (error != null) {

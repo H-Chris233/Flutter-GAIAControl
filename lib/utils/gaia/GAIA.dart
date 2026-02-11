@@ -868,48 +868,48 @@ class GAIA{
    */
   static const int COMMAND_EVENT_NOTIFICATION = 0x4003;
 
-  static int NOT_STATUS = -1;
+  static const int NOT_STATUS = -1;
   /**
    * <p>The request completed successfully.</p>
    */
-  static int SUCCESS = 0;
+  static const int SUCCESS = 0;
   /**
    * <p>An invalid COMMAND ID has been sent or is not supported by the device.</p>
    */
-  static int NOT_SUPPORTED = 1;
+  static const int NOT_SUPPORTED = 1;
   /**
    * <p>The host is not authenticated to use a Command ID or to control a feature type.</p>
    */
-  static int NOT_AUTHENTICATED = 2;
+  static const int NOT_AUTHENTICATED = 2;
   /**
    * <p>The COMMAND ID used is valid but the GAIA device could not complete it successfully.</p>
    */
-  static int INSUFFICIENT_RESOURCES = 3;
+  static const int INSUFFICIENT_RESOURCES = 3;
   /**
    * <p>The GAIA device is in the process of authenticating the host.</p>
    */
-  static int AUTHENTICATING = 4;
+  static const int AUTHENTICATING = 4;
   /**
    * <p>The parameters sent were invalid: missing parameters, too much parameters, range, etc.</p>
    */
-  static int INVALID_PARAMETER = 5;
+  static const int INVALID_PARAMETER = 5;
   /**
    * <p>The GAIA device is not in the correct state to process the command: needs to stream music, use a certain
    * source, etc.</p>
    */
-  static int INCORRECT_STATE = 6;
+  static const int INCORRECT_STATE = 6;
   /**
    * <p>The command is in progress.</p> <p>Acknowledgements with <code>IN_PROGRESS</code> status may be sent once
    * or periodically during the processing of a time-consuming operation to indicate that the operation has not
    * stalled.</p>
    */
-  static int IN_PROGRESS = 7;
+  static const int IN_PROGRESS = 7;
 
 
   /**
    * <p>This is not a notification - <code>0x00</code></p>
    */
-  static int NOT_NOTIFICATION = 0;
+  static const int NOT_NOTIFICATION = 0;
   /**
    * <p>This event provides a way for hosts to receive notification of changes in the RSSI of a device's Bluetooth
    * link with the host - <code>0x01</code></p>

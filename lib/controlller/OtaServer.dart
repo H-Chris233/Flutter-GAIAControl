@@ -102,8 +102,6 @@ class OtaServer extends GetxService implements RWCPListener {
    */
   bool hasToAbort = false;
 
-  final writeQueue = Queue<List<int>>();
-
   StreamSubscription<List<int>>? _subscribeConnection;
 
   StreamSubscription<List<int>>? _subscribeConnectionRWCP;
@@ -249,8 +247,9 @@ class OtaServer extends GetxService implements RWCPListener {
           );
           //IOS BUG
           await flutterReactiveBle.discoverServices(id);
-          Future.delayed(const Duration(seconds: 1))
-              .then((value) => registerNotice());
+          Future.delayed(const Duration(seconds: 1)).then((_) {
+            if (isDeviceConnected) registerNotice();
+          });
           if (!isUpgrading) {
             Get.to(() => const TestOtaView());
           }
@@ -264,8 +263,11 @@ class OtaServer extends GetxService implements RWCPListener {
             return;
           }
           if (_autoReconnectEnabled && connectDeviceId.isNotEmpty) {
-            Future.delayed(const Duration(seconds: 5))
-                .then((value) => connectDevice(connectDeviceId));
+            Future.delayed(const Duration(seconds: 5)).then((_) {
+              if (!isDeviceConnected && connectDeviceId.isNotEmpty) {
+                connectDevice(connectDeviceId);
+              }
+            });
           } else {
             addLog("自动重连已关闭，等待手动重连");
           }
@@ -496,7 +498,6 @@ class OtaServer extends GetxService implements RWCPListener {
     _autoReconnectEnabled = true;
     mIsRWCPEnabled.value = true;
     rwcpStatusText.value = "启用中";
-    writeQueue.clear();
     resetUpload();
     _armUpgradeWatchdog();
     if (!useDfuOnly) {
@@ -1242,20 +1243,19 @@ class OtaServer extends GetxService implements RWCPListener {
   void sendVMUPacket(VMUPacket packet, bool isTransferringData) {
     List<int> bytes = packet.getBytes();
     if (isTransferringData && mIsRWCPEnabled.value) {
-      final packet = _buildGaiaPacket(_upgradeControlCommand(), payload: bytes);
+      final gaiaPacket = _buildGaiaPacket(_upgradeControlCommand(), payload: bytes);
       try {
-        List<int> bytes = packet.getBytes();
+        List<int> gaiaBytes = gaiaPacket.getBytes();
         if (mTransferStartTime <= 0) {
           mTransferStartTime = DateTime.now().millisecondsSinceEpoch;
         }
-        bool success = mRWCPClient.sendData(bytes);
+        bool success = mRWCPClient.sendData(gaiaBytes);
         if (!success) {
           addLog(
-              "Fail to send GAIA packet for GAIA command: ${packet.getCommandId()}");
+              "Fail to send GAIA packet for GAIA command: ${gaiaPacket.getCommandId()}");
         }
       } catch (e) {
-        addLog(
-            "Exception when attempting to create GAIA packet: " + e.toString());
+        addLog("Exception when attempting to create GAIA packet: $e");
       }
     } else {
       final pkg = _buildGaiaPacket(_upgradeControlCommand(), payload: bytes);
@@ -1928,6 +1928,12 @@ class OtaServer extends GetxService implements RWCPListener {
   @override
   void onClose() {
     _bleStatusSubscription?.cancel();
+    _scanConnection?.cancel();
+    _connection?.cancel();
+    _subscribeConnection?.cancel();
+    _subscribeConnectionRWCP?.cancel();
+    _timer?.cancel();
+    _dfuResultTimer?.cancel();
     _logFlushTimer?.cancel();
     _upgradeWatchdogTimer?.cancel();
     _versionQueryTimer?.cancel();
@@ -1970,7 +1976,9 @@ class OtaServer extends GetxService implements RWCPListener {
     try {
       await _scanConnection?.cancel();
       await _connection?.cancel();
-    } catch (e) {}
+    } catch (e) {
+      addLog("清理旧连接时出错: $e");
+    }
     // Start scannin
     _scanConnection = flutterReactiveBle.scanForDevices(
         withServices: [],

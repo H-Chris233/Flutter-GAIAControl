@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 import '../StringUtils.dart';
 import 'GAIA.dart';
 
@@ -35,10 +33,10 @@ class GaiaPacketBLE {
 
     if (!isAcknowledgement() ||
         mPayload == null ||
-        (mPayload ?? []).length < STATUS_LENGTH) {
+        mPayload!.length < STATUS_LENGTH) {
       return GAIA.NOT_STATUS;
     } else {
-      return (mPayload ?? [0])[STATUS_OFFSET];
+      return mPayload![STATUS_OFFSET];
     }
   }
 
@@ -62,10 +60,10 @@ class GaiaPacketBLE {
 
     if ((mCommandId & GAIA.COMMANDS_NOTIFICATION_MASK) < 1 ||
         mPayload == null ||
-        (mPayload?.length ?? 0) < EVENT_LENGTH) {
+        mPayload!.length < EVENT_LENGTH) {
       return GAIA.NOT_NOTIFICATION;
     } else {
-      return (mPayload ?? [0])[EVENT_OFFSET];
+      return mPayload![EVENT_OFFSET];
     }
   }
 
@@ -146,16 +144,12 @@ class GaiaPacketBLE {
   static GaiaPacketBLE? fromByte(List<int> source) {
     int payloadLength = source.length - PACKET_INFORMATION_LENGTH;
     if (payloadLength < 0) {
-      debugPrint("GaiaPacketBLE fromByte error");
       return null;
     }
     int mVendorId = StringUtils.extractIntFromByteArray(
         source, OFFSET_VENDOR_ID, LENGTH_VENDOR_ID, false);
     int mCommandId = StringUtils.extractIntFromByteArray(
         source, OFFSET_COMMAND_ID, LENGTH_COMMAND_ID, false);
-    var mCommandIdStr = StringUtils.intTo2HexString(mCommandId);
-    debugPrint(
-        "GaiaPacketBLE ${StringUtils.byteToHexString(source)} vendorId $mVendorId payloadLength$payloadLength mCommandId$mCommandId mCommandIdStr $mCommandIdStr");
     List<int> mPayload = [];
     if (payloadLength > 0) {
       mPayload.addAll(source.sublist(PACKET_INFORMATION_LENGTH));
@@ -169,7 +163,7 @@ class GaiaPacketBLE {
   List<int> buildBytes(int commandId, List<int>? payload) {
     List<int> bytes = [];
     bytes.addAll(StringUtils.intTo2List(mVendorId));
-    bytes.addAll(StringUtils.intTo2List(mCommandId));
+    bytes.addAll(StringUtils.intTo2List(commandId));
     if (payload != null) {
       bytes.addAll(payload);
     }
