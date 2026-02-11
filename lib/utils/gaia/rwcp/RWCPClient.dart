@@ -621,11 +621,16 @@ class RWCPClient {
   }
 
   bool removeSegmentFromQueue(int code, int sequence) {
-    for (Segment segment in mUnacknowledgedSegments) {
-      if (segment.getOperationCode() == code && segment.getSequenceNumber() == sequence) {
-        mUnacknowledgedSegments.remove(segment);
-        return true;
+    Segment? target;
+    for (final s in mUnacknowledgedSegments) {
+      if (s.getOperationCode() == code && s.getSequenceNumber() == sequence) {
+        target = s;
+        break;
       }
+    }
+    if (target != null) {
+      mUnacknowledgedSegments.remove(target);
+      return true;
     }
     Log.w(TAG, "Pending segments does not contain acknowledged segment: code=$code \tsequence=$sequence");
     return false;

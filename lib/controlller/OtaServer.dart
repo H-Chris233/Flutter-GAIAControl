@@ -783,13 +783,9 @@ class OtaServer extends GetxService implements RWCPListener {
       isUpgrading = true;
       resetUpload();
       sendSyncReq();
-    } else if (isUpgrading) {
-      stopUpgrade();
-      addLog("正在升级");
     } else {
-      stopUpgrade();
-      // mBytesFile == null
-      addLog("升级文件不存在");
+      addLog("正在升级");
+      return;
     }
   }
 
@@ -1250,7 +1246,7 @@ class OtaServer extends GetxService implements RWCPListener {
       try {
         List<int> bytes = packet.getBytes();
         if (mTransferStartTime <= 0) {
-          mTransferStartTime = DateTime.now().millisecond;
+          mTransferStartTime = DateTime.now().millisecondsSinceEpoch;
         }
         bool success = mRWCPClient.sendData(bytes);
         if (!success) {
@@ -1279,18 +1275,6 @@ class OtaServer extends GetxService implements RWCPListener {
     } catch (e) {
       addLog("receiveVMUPacket $e");
     }
-  }
-
-  ///创建回包
-  void createAcknowledgmentRequest() {
-    if (_isV3VendorActive()) {
-      return;
-    }
-    final packet = _buildGaiaPacket(
-      GAIA.COMMAND_EVENT_NOTIFICATION | GAIA.ACKNOWLEDGMENT_MASK,
-      payload: [GAIA.SUCCESS],
-    );
-    writeMsg(packet.getBytes());
   }
 
   void handleVMUPacket(VMUPacket? packet) {
@@ -1500,7 +1484,7 @@ class OtaServer extends GetxService implements RWCPListener {
       // if the asked length doesn't fit with possibilities we use the maximum length we can use.
       mBytesToSend = (mBytesToSend > 0) ? mBytesToSend : 0;
       // if the requested length will look for bytes out of the array we reduce it to the remaining length.
-      int remainingLength = mBytesFile?.length ?? 0 - mStartOffset;
+      int remainingLength = (mBytesFile?.length ?? 0) - mStartOffset;
       mBytesToSend =
           (mBytesToSend < remainingLength) ? mBytesToSend : remainingLength;
       if (mIsRWCPEnabled.value) {
@@ -1566,7 +1550,9 @@ class OtaServer extends GetxService implements RWCPListener {
 
   //计算进度
   void onFileUploadProgress() {
-    double percentage = (mStartOffset * 100.0 / (mBytesFile ?? []).length);
+    final fileLength = (mBytesFile ?? []).length;
+    if (fileLength <= 0) return;
+    double percentage = (mStartOffset * 100.0 / fileLength);
     percentage = (percentage < 0)
         ? 0
         : (percentage > 100)
