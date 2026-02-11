@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import 'controlller/OtaServer.dart';
+import 'controller/ota_server.dart';
 
 void main() {
   runApp(const MyApp());
@@ -62,7 +62,8 @@ class _MyHomePageState extends State<MyHomePage> {
                     OtaServer.to.connectDevice(device.id);
                   },
                   child: Container(
-                    margin: const EdgeInsets.only(left: 10, right: 10, bottom: 5),
+                    margin:
+                        const EdgeInsets.only(left: 10, right: 10, bottom: 5),
                     padding: const EdgeInsets.only(top: 8, bottom: 8, left: 20),
                     decoration: const BoxDecoration(
                       color: Colors.white,
@@ -71,11 +72,14 @@ class _MyHomePageState extends State<MyHomePage> {
                     child: Column(
                       children: [
                         Text(device.name,
-                            style:
-                                const TextStyle(color: Color(0xff373F50), fontSize: 20, fontWeight: FontWeight.bold)),
+                            style: const TextStyle(
+                                color: Color(0xff373F50),
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold)),
                         Text(
                           device.id,
-                          style: const TextStyle(color: Color(0xff373F50), fontSize: 12),
+                          style: const TextStyle(
+                              color: Color(0xff373F50), fontSize: 12),
                         )
                       ],
                       mainAxisAlignment: MainAxisAlignment.start,

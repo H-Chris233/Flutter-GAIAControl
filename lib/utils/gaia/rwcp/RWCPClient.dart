@@ -90,6 +90,8 @@ class RWCPClient {
    * To know the number of segments which had been acknowledged in a row with DATA_ACK.
    */
   int mAcknowledgedSegments = 0;
+  int mSuccessfulAckStreak = 0;
+  static const int _timeoutRecoveryAckThreshold = 8;
   Timer? _timer;
 
   RWCPClient(this.mListener);
@@ -402,6 +404,7 @@ class RWCPClient {
       isTimeOutRunning = false;
       mIsResendingSegments = true;
       mAcknowledgedSegments = 0;
+      mSuccessfulAckStreak = 0;
 
       if (mShowDebugLogs) {
         Log.i(TAG, "TIME OUT > re sending segments");
@@ -528,6 +531,8 @@ class RWCPClient {
     mUnacknowledgedSegments.clear();
     mWindow = mInitialWindow;
     mAcknowledgedSegments = 0;
+    mSuccessfulAckStreak = 0;
+    mDataTimeOutMs = RWCP.DATA_TIMEOUT_MS_DEFAULT;
     mCredits = mWindow;
     cancelTimeOut();
     if (complete) {
@@ -606,20 +611,7 @@ class RWCPClient {
       return NOT_VALIDATED;
     }
 
-    if (mLastAckSequence < mNextSequence &&
-        (sequence < mLastAckSequence || sequence > mNextSequence)) {
-      Log.w(
-          TAG,
-          "Received ACK sequence ($sequence) is out of interval: last received is " +
-              "$mLastAckSequence" +
-              " and next will be " +
-              "$mNextSequence");
-      return NOT_VALIDATED;
-    }
-
-    if (mLastAckSequence > mNextSequence &&
-        sequence > mNextSequence &&
-        sequence < mLastAckSequence) {
+    if (!_isSequenceWithinAckWindow(sequence)) {
       Log.w(
           TAG,
           "Received ACK sequence ($sequence) is out of interval: last received is " +
@@ -656,6 +648,36 @@ class RWCPClient {
     increaseWindow(acknowledged);
 
     return acknowledged;
+  }
+
+  bool _isSequenceWithinAckWindow(int sequence) {
+    if (mLastAckSequence < 0) {
+      return sequence <= mNextSequence;
+    }
+    final mod = RWCP.SEQUENCE_NUMBER_MAX + 1;
+    final forwardToNext = (mNextSequence - mLastAckSequence + mod) % mod;
+    final forwardToSequence = (sequence - mLastAckSequence + mod) % mod;
+    return forwardToSequence <= forwardToNext;
+  }
+
+  void _recoverTimeoutAfterSuccess(int acknowledged) {
+    if (acknowledged <= 0) {
+      return;
+    }
+    if (mDataTimeOutMs <= RWCP.DATA_TIMEOUT_MS_DEFAULT) {
+      mDataTimeOutMs = RWCP.DATA_TIMEOUT_MS_DEFAULT;
+      mSuccessfulAckStreak = 0;
+      return;
+    }
+    mSuccessfulAckStreak += acknowledged;
+    while (mSuccessfulAckStreak >= _timeoutRecoveryAckThreshold &&
+        mDataTimeOutMs > RWCP.DATA_TIMEOUT_MS_DEFAULT) {
+      mSuccessfulAckStreak -= _timeoutRecoveryAckThreshold;
+      mDataTimeOutMs -= RWCP.DATA_TIMEOUT_MS_DEFAULT;
+      if (mDataTimeOutMs < RWCP.DATA_TIMEOUT_MS_DEFAULT) {
+        mDataTimeOutMs = RWCP.DATA_TIMEOUT_MS_DEFAULT;
+      }
+    }
   }
 
   bool removeSegmentFromQueue(int code, int sequence) {
@@ -697,6 +719,7 @@ class RWCPClient {
         int sequence = segment.getSequenceNumber();
         int validated = validateAckSequence(RWCPOpCodeClient.DATA, sequence);
         if (validated >= 0) {
+          _recoverTimeoutAfterSuccess(validated);
           if (mCredits > 0 && !mPendingData.isEmpty) {
             sendDataSegment();
           } else if (mPendingData.isEmpty && mUnacknowledgedSegments.isEmpty) {
