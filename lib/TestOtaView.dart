@@ -65,15 +65,18 @@ class _TestOtaState extends State<TestOtaView> {
           }),
           Obx(() {
             final time = OtaServer.to.timeCount.value;
+            final upgrading = OtaServer.to.isUpgrading;
             return MaterialButton(
               color: Colors.blue,
-              onPressed: () async {
-                if (!await _ensureFirmwareReady()) {
-                  return;
-                }
-                OtaServer.to.startUpdateWithVersionCheck();
-              },
-              child: Text('开始升级 $time'),
+              onPressed: upgrading
+                  ? null
+                  : () async {
+                      if (!await _ensureFirmwareReady()) {
+                        return;
+                      }
+                      OtaServer.to.startUpdateWithVersionCheck();
+                    },
+              child: Text(upgrading ? '升级中... $time' : '开始升级 $time'),
             );
           }),
           Obx(() {
@@ -100,20 +103,35 @@ class _TestOtaState extends State<TestOtaView> {
               ),
             );
           }),
-          MaterialButton(
-            color: Colors.blue,
-            onPressed: () {
-              OtaServer.to.stopUpgrade();
-            },
-            child: const Text('取消升级'),
-          ),
-          MaterialButton(
-            color: Colors.orange,
-            onPressed: () {
-              OtaServer.to.quickRecoverNow();
-            },
-            child: const Text('快速恢复'),
-          ),
+          Obx(() {
+            final upgrading = OtaServer.to.isUpgrading;
+            return MaterialButton(
+              color: Colors.blue,
+              onPressed: upgrading
+                  ? () {
+                      OtaServer.to.stopUpgrade();
+                    }
+                  : null,
+              child: const Text('取消升级'),
+            );
+          }),
+          Obx(() {
+            final upgrading = OtaServer.to.isUpgrading;
+            final rwcpStatus = OtaServer.to.rwcpStatusText.value;
+            final recoveryStatus = OtaServer.to.recoveryStatusText.value;
+            final canRecover = upgrading ||
+                rwcpStatus.contains("错误") ||
+                recoveryStatus != "空闲";
+            return MaterialButton(
+              color: Colors.orange,
+              onPressed: canRecover
+                  ? () {
+                      OtaServer.to.quickRecoverNow();
+                    }
+                  : null,
+              child: const Text('快速恢复'),
+            );
+          }),
           MaterialButton(
               color: Colors.blue,
               onPressed: () {
