@@ -1405,24 +1405,22 @@ class OtaServer extends GetxService implements RWCPListener {
     List<int> data = packet?.mData ?? [];
     if (data.length < 2) {
       addLog("receiveErrorWarnIND 升级失败，设备返回异常：错误码长度不足");
-      _reportDeviceError("升级错误包长度异常", triggerRecovery: true);
       stopUpgrade();
+      _reportDeviceError("升级错误包长度异常", triggerRecovery: true);
       return;
     }
-    sendErrorConfirmation(data); //
+    sendErrorConfirmation(data);
     int returnCode = StringUtils.extractIntFromByteArray(data, 0, 2, false);
-    //A2305C3A9059C15171BD33F3BB08ADE4
     addLog(
         "receiveErrorWarnIND 升级失败 错误码0x${returnCode.toRadixString(16)} ${_upgradeErrorText(returnCode)} fileMd5$fileMd5");
-    _reportDeviceError("升级错误码0x${returnCode.toRadixString(16)}",
-        triggerRecovery: true);
-    //noinspection IfCanBeSwitch
     if (returnCode == 0x81) {
-      addLog("包不通过");
+      addLog("包不通过，固件文件与设备不匹配");
+      _reportDeviceError("升级错误码0x${returnCode.toRadixString(16)}");
       askForConfirmation(ConfirmationType.WARNING_FILE_IS_DIFFERENT);
     } else if (returnCode == 0x21) {
-      addLog("电量过低");
-      askForConfirmation(ConfirmationType.BATTERY_LOW_ON_DEVICE);
+      addLog("设备电量过低，停止升级");
+      stopUpgrade();
+      _reportDeviceError("设备电量过低");
     } else {
       _enterFatalUpgradeState("设备返回升级错误码0x${returnCode.toRadixString(16)}");
     }
@@ -1635,7 +1633,8 @@ class OtaServer extends GetxService implements RWCPListener {
         break;
       case ConfirmationType.BATTERY_LOW_ON_DEVICE:
         {
-          sendSyncReq();
+          addLog("设备电量过低，停止升级");
+          stopUpgrade();
         }
         return;
       case ConfirmationType.WARNING_FILE_IS_DIFFERENT:
@@ -1858,12 +1857,14 @@ class OtaServer extends GetxService implements RWCPListener {
     _autoReconnectEnabled = false;
     rwcpStatusText.value = "错误已退出";
     addLog("致命错误：$reason，已自动退出升级并关闭自动重连");
+    final wasUpgrading = isUpgrading;
     if (isUpgrading) {
       stopUpgrade(sendAbort: false);
     } else {
       _clearUpgradeWatchdog();
     }
-    _reportDeviceError(reason, triggerRecovery: true);
+    // stopUpgrade 已将 isUpgrading 置 false，恢复流程中无需再次 stopUpgrade
+    _reportDeviceError(reason, triggerRecovery: wasUpgrading);
   }
 
   void _reportDeviceError(String reason, {bool triggerRecovery = false}) {
@@ -1910,7 +1911,9 @@ class OtaServer extends GetxService implements RWCPListener {
     rwcpStatusText.value = "恢复中";
     addLog("执行快速恢复(${_recoveryAttempts}/3): $reason");
     try {
-      stopUpgrade(sendAbort: false);
+      if (isUpgrading) {
+        stopUpgrade(sendAbort: false);
+      }
       await _subscribeConnection?.cancel();
       await _subscribeConnectionRWCP?.cancel();
       await _connection?.cancel();
@@ -1919,13 +1922,15 @@ class OtaServer extends GetxService implements RWCPListener {
       _connection = null;
       isDeviceConnected = false;
       if (connectDeviceId.isNotEmpty) {
+        recoveryStatusText.value = "重连中";
+        rwcpStatusText.value = "重连中";
         await Future.delayed(const Duration(seconds: 2));
         connectDevice(connectDeviceId);
       } else {
         addLog("无连接设备ID，无法自动重连");
+        recoveryStatusText.value = "恢复失败";
+        rwcpStatusText.value = "未连接";
       }
-      recoveryStatusText.value = "已恢复";
-      rwcpStatusText.value = "待启用";
     } catch (e) {
       recoveryStatusText.value = "恢复失败";
       addLog("快速恢复失败: $e");
