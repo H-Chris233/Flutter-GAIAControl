@@ -531,7 +531,7 @@ class GAIA {
   /// Control and VM Upgrade Data commands.</p>
   static const int commandVmUpgradeConnect = 0x0640;
 
-  /// <p>Ends a VM Upgrade session over GAIA.</p>R
+  /// <p>Ends a VM Upgrade session over GAIA.</p>
   static const int commandVmUpgradeDisconnect = 0x0641;
 
   /// <p>Tunnels a VM Upgrade Protocol packet.</p>
