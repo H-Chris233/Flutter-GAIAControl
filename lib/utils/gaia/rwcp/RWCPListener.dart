@@ -1,4 +1,4 @@
-abstract class RWCPListener{
+abstract class RWCPListener {
   /**
    * <p>To send the bytes of a RWCP segment to a connected Server.</p>
    *

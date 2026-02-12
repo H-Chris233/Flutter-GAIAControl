@@ -1,4 +1,4 @@
-class UpgradeStartCFMStatus{
+class UpgradeStartCFMStatus {
   /**
    * Value for an {@link Enum#UPGRADE_START_CFM UPGRADE_START_CFM} message when the device is ready to start
    * the upgrade process.

@@ -64,12 +64,14 @@ class Segment {
    * @param payload
    *          The data which is transferred using this segment.
    */
-  static Segment get(int operationCode, int sequenceNumber, {List<int>? payload}) {
+  static Segment get(int operationCode, int sequenceNumber,
+      {List<int>? payload}) {
     final seg = Segment();
     seg.mOperationCode = operationCode;
     seg.mSequenceNumber = sequenceNumber;
     seg.mPayload = payload ?? [];
-    seg.mHeader = (operationCode << SegmentHeader.SEQUENCE_NUMBER_BITS_LENGTH) | sequenceNumber;
+    seg.mHeader = (operationCode << SegmentHeader.SEQUENCE_NUMBER_BITS_LENGTH) |
+        sequenceNumber;
     return seg;
   }
 
@@ -79,17 +81,20 @@ class Segment {
     int mHeader = -1;
     List<int> mPayload = [];
 
-    if (bytes == null || bytes.length < RWCPSegment.REQUIRED_INFORMATION_LENGTH) {
+    if (bytes == null ||
+        bytes.length < RWCPSegment.REQUIRED_INFORMATION_LENGTH) {
       mOperationCode = -1;
       mSequenceNumber = -1;
       mHeader = -1;
       mPayload = bytes ?? [];
     } else {
       mHeader = bytes[RWCPSegment.HEADER_OFFSET];
-      mOperationCode =
-          getBits(mHeader, SegmentHeader.OPERATION_CODE_BIT_OFFSET, SegmentHeader.OPERATION_CODE_BITS_LENGTH);
-      mSequenceNumber =
-          getBits(mHeader, SegmentHeader.SEQUENCE_NUMBER_BIT_OFFSET, SegmentHeader.SEQUENCE_NUMBER_BITS_LENGTH);
+      mOperationCode = getBits(mHeader, SegmentHeader.OPERATION_CODE_BIT_OFFSET,
+          SegmentHeader.OPERATION_CODE_BITS_LENGTH);
+      mSequenceNumber = getBits(
+          mHeader,
+          SegmentHeader.SEQUENCE_NUMBER_BIT_OFFSET,
+          SegmentHeader.SEQUENCE_NUMBER_BITS_LENGTH);
       mPayload = bytes.sublist(1);
     }
     final seg = Segment();

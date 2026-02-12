@@ -204,11 +204,10 @@ class OpCodes {
   /// <dt><b>Next message</b></dt><dd>Depends on the received {@link ReturnCodes ReturnCodes} value.</dd> </dl>
   static const UPGRADE_ERROR_WARN_RES = 0x1F;
 
-
   /**
    * <p>The number of bytes which contains the number of bytes of the uploading file to send.</p>
    */
-   static const NB_BYTES_LENGTH = 4;
+  static const NB_BYTES_LENGTH = 4;
   /**
    * <p>The offset in the {@link Enum#UPGRADE_DATA_BYTES_REQ UPGRADE_DATA_BYTES_REQ} bytes data where the "number
    * of bytes to send" information starts.</p>

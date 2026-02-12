@@ -1,8 +1,5 @@
-
 import '../Log.dart';
 import '../StringUtils.dart';
-
-
 
 class VMUPacket {
   /**
@@ -66,12 +63,15 @@ class VMUPacket {
       int length = StringUtils.byteListToInt([bytes[1], bytes[2]]);
       int dataLength = bytes.length - REQUIRED_INFORMATION_LENGTH;
       if (length > dataLength) {
-        Log.w("VMUPacket", "getPackageFromByte: declared length ($length) > actual data ($dataLength), packet incomplete");
+        Log.w("VMUPacket",
+            "getPackageFromByte: declared length ($length) > actual data ($dataLength), packet incomplete");
         return null;
       } else if (length < dataLength) {
-        Log.w("VMUPacket", "getPackageFromByte: declared length ($length) < actual data ($dataLength), trailing bytes will be ignored");
+        Log.w("VMUPacket",
+            "getPackageFromByte: declared length ($length) < actual data ($dataLength), trailing bytes will be ignored");
       }
-      List<int> data = bytes.sublist(REQUIRED_INFORMATION_LENGTH, REQUIRED_INFORMATION_LENGTH + length);
+      List<int> data = bytes.sublist(
+          REQUIRED_INFORMATION_LENGTH, REQUIRED_INFORMATION_LENGTH + length);
       return VMUPacket.get(opCode, data: data);
     }
     return null;

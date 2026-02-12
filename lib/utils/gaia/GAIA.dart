@@ -1,4 +1,4 @@
-class GAIA{
+class GAIA {
   /**
    * <p>The mask which represents a command.</p>
    * <p>Mask used to retrieve the command from the packet.</p>
@@ -25,7 +25,6 @@ class GAIA{
    * <p>The vendor default value defined by the protocol for Qualcomm vendor.</p>
    */
   static const int VENDOR_QUALCOMM = 0x000A;
-
 
   // -------------------------------------------------------------------
   // |                  CONFIGURATION COMMANDS 0x01nn                  |
@@ -203,7 +202,6 @@ class GAIA{
    * <p>Retrieves the index and size of the configured DFU partition.</p>
    */
   static const int COMMAND_GET_DFU_PARTITION = 0x01A1;
-
 
   // --------------------------------------------------------------
   // |                  CONTROLS COMMANDS 0x02nn                  |
@@ -504,8 +502,6 @@ class GAIA{
    */
   static const int COMMAND_GET_DATA_ENDPOINT_MODE = 0x02AE;
 
-
-
   // -------------------------------------------------------------------
   // |                  POLLED STATUS COMMANDS 0x03nn                  |
   // -------------------------------------------------------------------
@@ -562,7 +558,6 @@ class GAIA{
    */
   static const int COMMAND_GET_HOST_FEATURE_INFORMATION = 0x0320;
 
-
   // ---------------------------------------------------------------------
   // |                  FEATURE CONTROL COMMANDS 0x05nn                  |
   // ---------------------------------------------------------------------
@@ -599,7 +594,6 @@ class GAIA{
    * <p>Retrieves the session enabled state.</p>
    */
   static const int COMMAND_GET_SESSION_ENABLE = 0x0584;
-
 
   // -------------------------------------------------------------------
   // |                  DATA TRANSFER COMMANDS 0x06nn                  |
@@ -713,7 +707,6 @@ class GAIA{
    */
   static const int COMMAND_VM_UPGRADE_DATA = 0x0643;
 
-
   // ---------------------------------------------------------------
   // |                  DEBUGGING COMMANDS 0x07nn                  |
   // ---------------------------------------------------------------
@@ -787,7 +780,6 @@ class GAIA{
    */
   static const int COMMAND_SET_BLE_CONNECTION_PARAMETERS = 0x0752;
 
-
   // ------------------------------------------------------------------
   // |                      IVOR COMMANDS 0x10nn                      |
   // ------------------------------------------------------------------
@@ -833,7 +825,6 @@ class GAIA{
    * <p></p>
    */
   static const int COMMAND_IVOR_PING = 0x10F0;
-
 
   // ------------------------------------------------------------------
   // |                  NOTIFICATION COMMANDS 0x40nn                  |
@@ -904,7 +895,6 @@ class GAIA{
    * stalled.</p>
    */
   static const int IN_PROGRESS = 7;
-
 
   /**
    * <p>This is not a notification - <code>0x00</code></p>
@@ -991,14 +981,14 @@ class GAIA{
   /**
    * <p>This notification event encapsulates all system notification from the Host, such has an incoming call.</p>
    */
-  static int HOST_NOTIFICATION =0x13;
+  static int HOST_NOTIFICATION = 0x13;
 
   /**
    * Bluetooth Low Energy.
    */
-  static int  BLE = 0;
+  static int BLE = 0;
   /**
    * Bluetooth Classic.
    */
-  static int  BR_EDR = 1;
+  static int BR_EDR = 1;
 }

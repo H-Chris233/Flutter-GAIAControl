@@ -1,4 +1,4 @@
-class ConfirmationType{
+class ConfirmationType {
   /**
    * <p>When the manager receives the
    * {@link OpCodes.Enum#UPGRADE_TRANSFER_COMPLETE_IND

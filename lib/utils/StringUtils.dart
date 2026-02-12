@@ -66,7 +66,8 @@ class StringUtils {
    *
    * @return The extracted <code>int</code>.
    */
-  static int extractIntFromByteArray(List<int> source, int offset, int length, bool reverse) {
+  static int extractIntFromByteArray(
+      List<int> source, int offset, int length, bool reverse) {
     if (length < 0 || length > 8) {
       return 0;
     }
@@ -86,7 +87,6 @@ class StringUtils {
     }
     return result;
   }
-
 
   static String intTo2HexString(int mVendorId) {
     var high = mVendorId >> 8 & 0xff;

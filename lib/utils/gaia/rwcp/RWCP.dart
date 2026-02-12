@@ -176,7 +176,8 @@ class SegmentHeader {
   /**
    * The bit offset for the operation code.
    */
-  static const int OPERATION_CODE_BIT_OFFSET = SEQUENCE_NUMBER_BIT_OFFSET + SEQUENCE_NUMBER_BITS_LENGTH;
+  static const int OPERATION_CODE_BIT_OFFSET =
+      SEQUENCE_NUMBER_BIT_OFFSET + SEQUENCE_NUMBER_BITS_LENGTH;
 
   /**
    * The number of bits which contain the operation code.

@@ -238,8 +238,7 @@ void main() {
       test('receiveGAP returns false in LISTEN state', () {
         client.mState = RWCPState.LISTEN;
 
-        final handled =
-            client.receiveGAP(Segment.get(RWCPOpCodeServer.GAP, 0));
+        final handled = client.receiveGAP(Segment.get(RWCPOpCodeServer.GAP, 0));
 
         expect(handled, isFalse);
       });
@@ -420,6 +419,5 @@ void main() {
         expect(listener.transferFailed, isTrue);
       });
     });
-
   });
 }
