@@ -27,7 +27,7 @@ graph TD
     end
 
     subgraph BIZ["业务逻辑层"]
-        C["controlller/OtaServer.dart<br/>OTA 服务核心 (GetxService)<br/>状态机 / BLE连接 / 升级编排"]
+        C["controller/ota_server.dart<br/>OTA 服务核心 (GetxService)<br/>状态机 / BLE连接 / 升级编排"]
     end
 
     subgraph PROTO["协议层 (GAIA)"]
@@ -70,7 +70,7 @@ graph TD
     N --> K
     N --> P
 
-    click C "./lib/controlller/CLAUDE.md" "查看 controlller 模块文档"
+    click C "./lib/controller/CLAUDE.md" "查看 controller 模块文档"
     click D "./lib/utils/gaia/CLAUDE.md" "查看 gaia 模块文档"
     click K "./lib/utils/gaia/rwcp/CLAUDE.md" "查看 rwcp 模块文档"
 ```
@@ -82,10 +82,10 @@ graph TD
     ROOT["(根) GAIA Control"] --> LIB["lib/"]
     LIB --> MAIN["main.dart"]
     LIB --> OTAVIEW["TestOtaView.dart"]
-    LIB --> CTRL["controlller/"]
+    LIB --> CTRL["controller/"]
     LIB --> UTILS_DIR["utils/"]
 
-    CTRL --> OTASERVER["OtaServer.dart"]
+    CTRL --> OTASERVER["ota_server.dart"]
 
     UTILS_DIR --> LOG["Log.dart"]
     UTILS_DIR --> STRUTILS["StringUtils.dart"]
@@ -106,7 +106,7 @@ graph TD
     RWCP_DIR --> RWCP_LISTENER["RWCPListener.dart"]
     RWCP_DIR --> SEGMENT["Segment.dart"]
 
-    click CTRL "./lib/controlller/CLAUDE.md" "查看 controlller 模块文档"
+    click CTRL "./lib/controller/CLAUDE.md" "查看 controller 模块文档"
     click GAIA_DIR "./lib/utils/gaia/CLAUDE.md" "查看 gaia 模块文档"
     click RWCP_DIR "./lib/utils/gaia/rwcp/CLAUDE.md" "查看 rwcp 模块文档"
 ```
@@ -117,7 +117,7 @@ graph TD
 
 | 模块路径 | 说明 | 语言 | 模块 CLAUDE.md |
 |----------|------|------|----------------|
-| `lib/controlller/` | OTA 服务核心 -- BLE 连接管理、升级状态机、分包传输编排（当前仅 V3 协议） | Dart | [controlller/CLAUDE.md](./lib/controlller/CLAUDE.md) |
+| `lib/controller/` | OTA 服务核心 -- BLE 连接管理、升级状态机、分包传输编排（当前仅 V3 协议） | Dart | [controller/CLAUDE.md](./lib/controller/CLAUDE.md) |
 | `lib/utils/gaia/` | GAIA 协议实现 -- Qualcomm CSR 蓝牙协议命令、数据包、操作码 | Dart | [gaia/CLAUDE.md](./lib/utils/gaia/CLAUDE.md) |
 | `lib/utils/gaia/rwcp/` | RWCP 可靠传输协议 -- 滑动窗口、序列号管理、数据分段 | Dart | [rwcp/CLAUDE.md](./lib/utils/gaia/rwcp/CLAUDE.md) |
 | `lib/utils/` (根工具) | 通用工具 -- 日志、字符串/字节处理、HTTP 封装 | Dart | 无（文件较少，接口见下方） |

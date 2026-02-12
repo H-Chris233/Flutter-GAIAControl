@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 - `lib/` 是核心业务代码：`main.dart` 为入口，`TestOtaView.dart` 为 OTA 页面，`utils/gaia/` 与 `utils/gaia/rwcp/` 实现 GAIA/RWCP 协议细节。
-- `lib/controlller/OtaServer.dart`（现有目录名含三连 `l`，保持兼容）承载 BLE OTA 主要流程与状态管理。
+- `lib/controller/ota_server.dart` 承载 BLE OTA 主要流程与状态管理。
 - `test/` 放置测试代码；当前包含 `widget_test.dart`，新增测试请按功能模块拆分。
 - `img/` 存放 README 展示图片；平台壳工程分别位于 `android/` 与 `ios/`。
 - 根目录关键配置：`pubspec.yaml`（依赖与版本）、`analysis_options.yaml`（lint 规则）。

@@ -1,6 +1,6 @@
-[根目录](../../CLAUDE.md) > lib > **controlller**
+[根目录](../../CLAUDE.md) > lib > **controller**
 
-# controlller 模块 -- OTA 服务核心
+# controller 模块 -- OTA 服务核心
 
 ## 模块职责
 
@@ -197,9 +197,6 @@ receiveCompleteIND()  --> 升级完成 --> 断开连接
 
 ## 常见问题 (FAQ)
 
-**Q: 目录名 `controlller` 有三个 `l`，是拼写错误吗？**
-A: 是的，这是历史遗留的拼写错误，为保持向后兼容而未修改。
-
 **Q: V3 和 V1/V2 的区别是什么？**
 A: V3 使用 Vendor ID 0x001D，命令格式包含 Feature + PacketType + CommandId 三段；V1/V2 使用 Vendor ID 0x000A (Qualcomm)，命令格式为标准 GAIA 命令。
 
@@ -210,7 +207,7 @@ A: OtaServer 连接设备后会尝试注册 RWCP 写入特征。如果注册成�
 
 ## 相关文件清单
 
-- `lib/controlller/OtaServer.dart`
+- `lib/controller/ota_server.dart`
 - `lib/TestOtaView.dart` (UI 页面，依赖 OtaServer)
 - `lib/main.dart` (GetX 注入 OtaServer)
 
