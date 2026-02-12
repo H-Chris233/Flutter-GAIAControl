@@ -1,5 +1,5 @@
-import '../../StringUtils.dart';
-import 'RWCP.dart';
+import '../../string_utils.dart';
+import 'rwcp.dart';
 
 /// <p>This class represents the data structure of the messages sent over RWCP. These messages are
 /// called segments and their structure is as follows:</p>
@@ -23,7 +23,7 @@ class Segment {
 // ====== FIELDS ====================================================================
 
   /// <p>The tag to display for logs.</p>
-  final String TAG = "Segment";
+  final String tag = "Segment";
 
   /// <p>The operation code which defines the type of segment.</p>
   int mOperationCode = -1;
@@ -54,7 +54,7 @@ class Segment {
     seg.mOperationCode = operationCode;
     seg.mSequenceNumber = sequenceNumber;
     seg.mPayload = payload ?? [];
-    seg.mHeader = (operationCode << SegmentHeader.SEQUENCE_NUMBER_BITS_LENGTH) |
+    seg.mHeader = (operationCode << SegmentHeader.sequenceNumberBitsLength) |
         sequenceNumber;
     return seg;
   }
@@ -65,20 +65,17 @@ class Segment {
     int mHeader = -1;
     List<int> mPayload = [];
 
-    if (bytes == null ||
-        bytes.length < RWCPSegment.REQUIRED_INFORMATION_LENGTH) {
+    if (bytes == null || bytes.length < RWCPSegment.requiredInformationLength) {
       mOperationCode = -1;
       mSequenceNumber = -1;
       mHeader = -1;
       mPayload = bytes ?? [];
     } else {
-      mHeader = bytes[RWCPSegment.HEADER_OFFSET];
-      mOperationCode = getBits(mHeader, SegmentHeader.OPERATION_CODE_BIT_OFFSET,
-          SegmentHeader.OPERATION_CODE_BITS_LENGTH);
-      mSequenceNumber = getBits(
-          mHeader,
-          SegmentHeader.SEQUENCE_NUMBER_BIT_OFFSET,
-          SegmentHeader.SEQUENCE_NUMBER_BITS_LENGTH);
+      mHeader = bytes[RWCPSegment.headerOffset];
+      mOperationCode = getBits(mHeader, SegmentHeader.operationCodeBitOffset,
+          SegmentHeader.operationCodeBitsLength);
+      mSequenceNumber = getBits(mHeader, SegmentHeader.sequenceNumberBitOffset,
+          SegmentHeader.sequenceNumberBitsLength);
       mPayload = bytes.sublist(1);
     }
     final seg = Segment();

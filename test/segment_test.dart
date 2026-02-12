@@ -1,46 +1,46 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gaia/utils/gaia/rwcp/RWCP.dart';
-import 'package:gaia/utils/gaia/rwcp/Segment.dart';
+import 'package:gaia/utils/gaia/rwcp/rwcp.dart';
+import 'package:gaia/utils/gaia/rwcp/segment.dart';
 
 void main() {
   group('Segment', () {
     group('get factory method', () {
       test('builds segment with correct header format', () {
-        // DATA opcode = 0, sequence = 5
-        final segment = Segment.get(RWCPOpCodeClient.DATA, 5);
+        // data opcode = 0, sequence = 5
+        final segment = Segment.get(RWCPOpCodeClient.data, 5);
         final bytes = segment.getBytes();
 
         // Header: (opcode << 6) | sequence = (0 << 6) | 5 = 5
         expect(bytes[0], 5);
-        expect(segment.getOperationCode(), RWCPOpCodeClient.DATA);
+        expect(segment.getOperationCode(), RWCPOpCodeClient.data);
         expect(segment.getSequenceNumber(), 5);
       });
 
-      test('builds SYN segment correctly', () {
-        // SYN opcode = 1, sequence = 0
-        final segment = Segment.get(RWCPOpCodeClient.SYN, 0);
+      test('builds syn segment correctly', () {
+        // syn opcode = 1, sequence = 0
+        final segment = Segment.get(RWCPOpCodeClient.syn, 0);
         final bytes = segment.getBytes();
 
         // Header: (1 << 6) | 0 = 64
         expect(bytes[0], 64);
-        expect(segment.getOperationCode(), RWCPOpCodeClient.SYN);
+        expect(segment.getOperationCode(), RWCPOpCodeClient.syn);
         expect(segment.getSequenceNumber(), 0);
       });
 
-      test('builds RST segment correctly', () {
-        // RST opcode = 2, sequence = 10
-        final segment = Segment.get(RWCPOpCodeClient.RST, 10);
+      test('builds rst segment correctly', () {
+        // rst opcode = 2, sequence = 10
+        final segment = Segment.get(RWCPOpCodeClient.rst, 10);
         final bytes = segment.getBytes();
 
         // Header: (2 << 6) | 10 = 138
         expect(bytes[0], 138);
-        expect(segment.getOperationCode(), RWCPOpCodeClient.RST);
+        expect(segment.getOperationCode(), RWCPOpCodeClient.rst);
         expect(segment.getSequenceNumber(), 10);
       });
 
       test('builds segment with payload', () {
         final segment = Segment.get(
-          RWCPOpCodeClient.DATA,
+          RWCPOpCodeClient.data,
           3,
           payload: [0xAA, 0xBB, 0xCC],
         );
@@ -52,7 +52,7 @@ void main() {
       });
 
       test('builds segment with empty payload', () {
-        final segment = Segment.get(RWCPOpCodeClient.DATA, 0, payload: []);
+        final segment = Segment.get(RWCPOpCodeClient.data, 0, payload: []);
 
         expect(segment.getPayload(), isEmpty);
         expect(segment.getBytes().length, 1);
@@ -60,7 +60,7 @@ void main() {
 
       test('builds segment with max sequence number', () {
         // Max sequence = 63 (6 bits)
-        final segment = Segment.get(RWCPOpCodeClient.DATA, 63);
+        final segment = Segment.get(RWCPOpCodeClient.data, 63);
 
         expect(segment.getSequenceNumber(), 63);
         // Header: (0 << 6) | 63 = 63
@@ -70,36 +70,36 @@ void main() {
 
     group('parse', () {
       test('parses segment from bytes', () {
-        // DATA_ACK with sequence 7: (0 << 6) | 7 = 7
+        // dataAck with sequence 7: (0 << 6) | 7 = 7
         final segment = Segment.parse([7, 0xAA, 0xBB]);
 
-        expect(segment.getOperationCode(), RWCPOpCodeServer.DATA_ACK);
+        expect(segment.getOperationCode(), RWCPOpCodeServer.dataAck);
         expect(segment.getSequenceNumber(), 7);
         expect(segment.getPayload(), [0xAA, 0xBB]);
       });
 
-      test('parses SYN_ACK segment', () {
-        // SYN_ACK opcode = 1, sequence = 0: (1 << 6) | 0 = 64
+      test('parses synAck segment', () {
+        // synAck opcode = 1, sequence = 0: (1 << 6) | 0 = 64
         final segment = Segment.parse([64]);
 
-        expect(segment.getOperationCode(), RWCPOpCodeServer.SYN_ACK);
+        expect(segment.getOperationCode(), RWCPOpCodeServer.synAck);
         expect(segment.getSequenceNumber(), 0);
         expect(segment.getPayload(), isEmpty);
       });
 
-      test('parses RST_ACK segment', () {
-        // RST_ACK opcode = 2, sequence = 5: (2 << 6) | 5 = 133
+      test('parses rstAck segment', () {
+        // rstAck opcode = 2, sequence = 5: (2 << 6) | 5 = 133
         final segment = Segment.parse([133]);
 
-        expect(segment.getOperationCode(), RWCPOpCodeServer.RST_ACK);
+        expect(segment.getOperationCode(), RWCPOpCodeServer.rstAck);
         expect(segment.getSequenceNumber(), 5);
       });
 
-      test('parses GAP segment', () {
-        // GAP opcode = 3, sequence = 10: (3 << 6) | 10 = 202
+      test('parses gap segment', () {
+        // gap opcode = 3, sequence = 10: (3 << 6) | 10 = 202
         final segment = Segment.parse([202]);
 
-        expect(segment.getOperationCode(), RWCPOpCodeServer.GAP);
+        expect(segment.getOperationCode(), RWCPOpCodeServer.gap);
         expect(segment.getSequenceNumber(), 10);
       });
 
@@ -128,7 +128,7 @@ void main() {
 
     group('getHeader', () {
       test('returns correct header value', () {
-        final segment = Segment.get(RWCPOpCodeClient.RST, 15);
+        final segment = Segment.get(RWCPOpCodeClient.rst, 15);
 
         // Header: (2 << 6) | 15 = 143
         expect(segment.getHeader(), 143);
@@ -144,7 +144,7 @@ void main() {
     group('round-trip', () {
       test('segment survives build-parse cycle', () {
         final original = Segment.get(
-          RWCPOpCodeClient.DATA,
+          RWCPOpCodeClient.data,
           42,
           payload: [0x01, 0x02, 0x03],
         );
@@ -157,10 +157,10 @@ void main() {
       });
 
       test('header-only segment survives round-trip', () {
-        final original = Segment.get(RWCPOpCodeClient.SYN, 0);
+        final original = Segment.get(RWCPOpCodeClient.syn, 0);
         final restored = Segment.parse(original.getBytes());
 
-        expect(restored.getOperationCode(), RWCPOpCodeClient.SYN);
+        expect(restored.getOperationCode(), RWCPOpCodeClient.syn);
         expect(restored.getSequenceNumber(), 0);
       });
     });

@@ -10,16 +10,16 @@ import 'package:permission_handler/permission_handler.dart';
 
 import 'package:gaia/test_ota_view.dart';
 import 'package:gaia/utils/ble_constants.dart';
-import 'package:gaia/utils/StringUtils.dart';
-import 'package:gaia/utils/gaia/ConfirmationType.dart';
-import 'package:gaia/utils/gaia/GAIA.dart';
-import 'package:gaia/utils/gaia/GaiaPacketBLE.dart';
-import 'package:gaia/utils/gaia/OpCodes.dart';
-import 'package:gaia/utils/gaia/ResumePoints.dart';
-import 'package:gaia/utils/gaia/UpgradeStartCFMStatus.dart';
-import 'package:gaia/utils/gaia/VMUPacket.dart';
-import 'package:gaia/utils/gaia/rwcp/RWCPClient.dart';
-import 'package:gaia/utils/gaia/rwcp/RWCPListener.dart';
+import 'package:gaia/utils/string_utils.dart';
+import 'package:gaia/utils/gaia/confirmation_type.dart';
+import 'package:gaia/utils/gaia/gaia.dart';
+import 'package:gaia/utils/gaia/gaia_packet_ble.dart';
+import 'package:gaia/utils/gaia/op_codes.dart';
+import 'package:gaia/utils/gaia/resume_points.dart';
+import 'package:gaia/utils/gaia/upgrade_start_cfm_status.dart';
+import 'package:gaia/utils/gaia/vmu_packet.dart';
+import 'package:gaia/utils/gaia/rwcp/rwcp_client.dart';
+import 'package:gaia/utils/gaia/rwcp/rwcp_listener.dart';
 
 class OtaServer extends GetxService implements RWCPListener {
   static const int _v3FeatureFramework = 0x00;
@@ -39,7 +39,7 @@ class OtaServer extends GetxService implements RWCPListener {
 
   final flutterReactiveBle = FlutterReactiveBle();
   var logText = "".obs;
-  final String TAG = "OtaServer";
+  final String tag = "OtaServer";
   var devices = <DiscoveredDevice>[].obs;
   StreamSubscription<DiscoveredDevice>? _scanConnection;
 
@@ -72,7 +72,7 @@ class OtaServer extends GetxService implements RWCPListener {
 
   var mPayloadSizeMax = 16;
 
-  /// To know if the packet with the operation code "UPGRADE_DATA" which was sent was the last packet to send.
+  /// To know if the packet with the operation code "upgradeData" which was sent was the last packet to send.
   bool wasLastPacket = false;
 
   int mBytesToSend = 0;
@@ -355,37 +355,37 @@ class OtaServer extends GetxService implements RWCPListener {
   int _upgradeConnectCommand() => _isV3VendorActive()
       ? _buildV3Command(
           _v3FeatureUpgrade, _v3PacketTypeCommand, _v3CmdUpgradeConnect)
-      : GAIA.COMMAND_VM_UPGRADE_CONNECT;
+      : GAIA.commandVmUpgradeConnect;
 
   int _upgradeDisconnectCommand() => _isV3VendorActive()
       ? _buildV3Command(
           _v3FeatureUpgrade, _v3PacketTypeCommand, _v3CmdUpgradeDisconnect)
-      : GAIA.COMMAND_VM_UPGRADE_DISCONNECT;
+      : GAIA.commandVmUpgradeDisconnect;
 
   int _upgradeControlCommand() => _isV3VendorActive()
       ? _buildV3Command(
           _v3FeatureUpgrade, _v3PacketTypeCommand, _v3CmdUpgradeControl)
-      : GAIA.COMMAND_VM_UPGRADE_CONTROL;
+      : GAIA.commandVmUpgradeControl;
 
   int _setDataEndpointModeCommand() => _isV3VendorActive()
       ? _buildV3Command(
           _v3FeatureUpgrade, _v3PacketTypeCommand, _v3CmdSetDataEndpointMode)
-      : GAIA.COMMAND_SET_DATA_ENDPOINT_MODE;
+      : GAIA.commandSetDataEndpointMode;
 
   int _getApplicationVersionCommand() => _isV3VendorActive()
       ? _buildV3Command(
           _v3FeatureFramework, _v3PacketTypeCommand, _v3CmdAppVersion)
-      : GAIA.COMMAND_GET_APPLICATION_VERSION;
+      : GAIA.commandGetApplicationVersion;
 
   int _registerNotificationCommand() => _isV3VendorActive()
       ? _buildV3Command(
           _v3FeatureFramework, _v3PacketTypeCommand, _v3CmdRegisterNotification)
-      : GAIA.COMMAND_REGISTER_NOTIFICATION;
+      : GAIA.commandRegisterNotification;
 
   int _cancelNotificationCommand() => _isV3VendorActive()
       ? _buildV3Command(
           _v3FeatureFramework, _v3PacketTypeCommand, _v3CmdCancelNotification)
-      : GAIA.COMMAND_CANCEL_NOTIFICATION;
+      : GAIA.commandCancelNotification;
 
   int _v3CommandFeature(int cmd) => (cmd >> 9) & 0x7F;
   int _v3CommandType(int cmd) => (cmd >> 7) & 0x03;
@@ -422,7 +422,7 @@ class OtaServer extends GetxService implements RWCPListener {
     final probeCommand = candidate == 0x001D
         ? _buildV3Command(
             _v3FeatureFramework, _v3PacketTypeCommand, _v3CmdAppVersion)
-        : GAIA.COMMAND_GET_API_VERSION;
+        : GAIA.commandGetApiVersion;
     final packet = _buildGaiaPacket(probeCommand, vendor: candidate);
     writeMsg(packet.getBytes());
     _vendorProbeTimer = Timer(const Duration(seconds: 2), () {
@@ -503,7 +503,7 @@ class OtaServer extends GetxService implements RWCPListener {
     }, onError: (dynamic error) {
       // code to handle errors
     });
-    final registerPayload = _isV3VendorActive() ? [0x06] : [GAIA.VMU_PACKET];
+    final registerPayload = _isV3VendorActive() ? [0x06] : [GAIA.vmuPacket];
     GaiaPacketBLE registerPacket = _buildGaiaPacket(
       _registerNotificationCommand(),
       payload: registerPayload,
@@ -699,30 +699,30 @@ class OtaServer extends GetxService implements RWCPListener {
     addLog(
         "receiveSuccessfulAcknowledgement ${StringUtils.intTo2HexString(packet.getCommand())}");
     switch (packet.getCommand()) {
-      case GAIA.COMMAND_DFU_REQUEST:
+      case GAIA.commandDfuRequest:
         sendDfuBegin();
         break;
-      case GAIA.COMMAND_DFU_BEGIN:
+      case GAIA.commandDfuBegin:
         sendNextDfuPacket();
         break;
-      case GAIA.COMMAND_DFU_WRITE:
+      case GAIA.commandDfuWrite:
         onDfuWriteAck();
         break;
-      case GAIA.COMMAND_DFU_COMMIT:
+      case GAIA.commandDfuCommit:
         onDfuCommitAck();
         break;
-      case GAIA.COMMAND_DFU_GET_RESULT:
+      case GAIA.commandDfuGetResult:
         onDfuGetResultAck(packet);
         break;
-      case GAIA.COMMAND_GET_API_VERSION:
+      case GAIA.commandGetApiVersion:
         if (_isVendorDetecting) {
           _onVendorProbeSuccess(packet.mVendorId);
         }
         break;
-      case GAIA.COMMAND_GET_APPLICATION_VERSION:
+      case GAIA.commandGetApplicationVersion:
         onApplicationVersionAck(packet);
         break;
-      case GAIA.COMMAND_VM_UPGRADE_CONNECT:
+      case GAIA.commandVmUpgradeConnect:
         {
           if (isUpgrading) {
             resetUpload();
@@ -734,7 +734,7 @@ class OtaServer extends GetxService implements RWCPListener {
               size = (size % 2 == 0) ? size : size - 1;
             }
             mMaxLengthForDataTransfer =
-                size - VMUPacket.REQUIRED_INFORMATION_LENGTH;
+                size - VMUPacket.requiredInformationLength;
             addLog(
                 "mMaxLengthForDataTransfer $mMaxLengthForDataTransfer mPayloadSizeMax $mPayloadSizeMax");
             //开始发送升级包
@@ -742,13 +742,13 @@ class OtaServer extends GetxService implements RWCPListener {
           }
         }
         break;
-      case GAIA.COMMAND_VM_UPGRADE_DISCONNECT:
+      case GAIA.commandVmUpgradeDisconnect:
         stopUpgrade(sendAbort: false, sendDisconnect: false);
         break;
-      case GAIA.COMMAND_VM_UPGRADE_CONTROL:
+      case GAIA.commandVmUpgradeControl:
         onSuccessfulTransmission();
         break;
-      case GAIA.COMMAND_SET_DATA_ENDPOINT_MODE:
+      case GAIA.commandSetDataEndpointMode:
         if (mIsRWCPEnabled.value) {
           unawaited(registerRWCP());
         } else {
@@ -768,19 +768,19 @@ class OtaServer extends GetxService implements RWCPListener {
     _reportDeviceError(
         "ACK失败 ${_gaiaCommandText(cmd)} status=0x${status.toRadixString(16)}",
         triggerRecovery: !isUpgrading);
-    if (cmd == GAIA.COMMAND_DFU_REQUEST && useDfuOnly) {
+    if (cmd == GAIA.commandDfuRequest && useDfuOnly) {
       addLog("DFU_REQUEST不支持，尝试直接发送DFU_BEGIN");
       sendDfuBegin();
       return;
     }
-    if (cmd == GAIA.COMMAND_DFU_BEGIN ||
-        cmd == GAIA.COMMAND_DFU_WRITE ||
-        cmd == GAIA.COMMAND_DFU_COMMIT) {
+    if (cmd == GAIA.commandDfuBegin ||
+        cmd == GAIA.commandDfuWrite ||
+        cmd == GAIA.commandDfuCommit) {
       _dfuWriteInFlight = false;
       stopUpgrade(sendAbort: false);
       return;
     }
-    if (cmd == GAIA.COMMAND_DFU_GET_RESULT) {
+    if (cmd == GAIA.commandDfuGetResult) {
       addLog("DFU_GET_RESULT失败，按提交成功处理（结果码不可得）");
       _finishDfuUpgrade("DFU提交完成（设备未返回结果码）", queryPostVersion: true);
       return;
@@ -790,7 +790,7 @@ class OtaServer extends GetxService implements RWCPListener {
           "$_currentVersionQueryTag版本查询失败 status=0x${status.toRadixString(16)}");
       return;
     }
-    if (cmd == GAIA.COMMAND_GET_API_VERSION && _isVendorDetecting) {
+    if (cmd == GAIA.commandGetApiVersion && _isVendorDetecting) {
       _vendorProbeIndex += 1;
       _probeNextVendor();
       return;
@@ -805,7 +805,7 @@ class OtaServer extends GetxService implements RWCPListener {
         _enterFatalUpgradeState("升级断开命令失败");
       }
     } else if (packet.getCommand() == _setDataEndpointModeCommand() ||
-        packet.getCommand() == GAIA.COMMAND_GET_DATA_ENDPOINT_MODE) {
+        packet.getCommand() == GAIA.commandGetDataEndpointMode) {
       _rwcpSetupInProgress = false;
       rwcpStatusText.value = "RWCP错误";
       _enterFatalUpgradeState("RWCP数据通道启用失败");
@@ -909,7 +909,7 @@ class OtaServer extends GetxService implements RWCPListener {
       return;
     }
     final endMd5 = StringUtils.hexStringToBytes(fileMd5.substring(24));
-    VMUPacket packet = VMUPacket.get(OpCodes.UPGRADE_SYNC_REQ, data: endMd5);
+    VMUPacket packet = VMUPacket.get(OpCodes.upgradeSyncReq, data: endMd5);
     sendVMUPacket(packet, false);
   }
 
@@ -919,7 +919,7 @@ class OtaServer extends GetxService implements RWCPListener {
     _dfuPendingChunkSize = 0;
     mStartOffset = 0;
     mBytesToSend = mBytesFile?.length ?? 0;
-    final packet = _buildGaiaPacket(GAIA.COMMAND_DFU_REQUEST);
+    final packet = _buildGaiaPacket(GAIA.commandDfuRequest);
     writeMsg(packet.getBytes());
   }
 
@@ -940,7 +940,7 @@ class OtaServer extends GetxService implements RWCPListener {
     final payload = [...fileLengthBytes, ...digest];
     addLog(
         "发送DFU_BEGIN length=$fileLength digest=${StringUtils.byteToHexString(digest)}");
-    final packet = _buildGaiaPacket(GAIA.COMMAND_DFU_BEGIN, payload: payload);
+    final packet = _buildGaiaPacket(GAIA.commandDfuBegin, payload: payload);
     writeMsg(packet.getBytes());
   }
 
@@ -959,7 +959,7 @@ class OtaServer extends GetxService implements RWCPListener {
     final payload = bytes.sublist(mStartOffset, mStartOffset + chunkSize);
     _dfuPendingChunkSize = chunkSize;
     _dfuWriteInFlight = true;
-    final packet = _buildGaiaPacket(GAIA.COMMAND_DFU_WRITE, payload: payload);
+    final packet = _buildGaiaPacket(GAIA.commandDfuWrite, payload: payload);
     writeMsg(packet.getBytes());
   }
 
@@ -979,7 +979,7 @@ class OtaServer extends GetxService implements RWCPListener {
 
   void sendDfuCommit() {
     addLog("发送DFU_COMMIT");
-    final packet = _buildGaiaPacket(GAIA.COMMAND_DFU_COMMIT);
+    final packet = _buildGaiaPacket(GAIA.commandDfuCommit);
     writeMsg(packet.getBytes());
   }
 
@@ -991,7 +991,7 @@ class OtaServer extends GetxService implements RWCPListener {
   void sendDfuGetResult() {
     _dfuResultTimer?.cancel();
     addLog("发送DFU_GET_RESULT");
-    final packet = _buildGaiaPacket(GAIA.COMMAND_DFU_GET_RESULT);
+    final packet = _buildGaiaPacket(GAIA.commandDfuGetResult);
     writeMsg(packet.getBytes());
     _dfuResultTimer = Timer(const Duration(seconds: 3), () {
       if (!isUpgrading) {
@@ -1035,21 +1035,21 @@ class OtaServer extends GetxService implements RWCPListener {
   String _gaiaStatusText(int status) {
     switch (status) {
       case 0:
-        return "SUCCESS";
+        return "success";
       case 1:
-        return "NOT_SUPPORTED";
+        return "notSupported";
       case 2:
-        return "NOT_AUTHENTICATED";
+        return "notAuthenticated";
       case 3:
-        return "INSUFFICIENT_RESOURCES";
+        return "insufficientResources";
       case 4:
-        return "AUTHENTICATING";
+        return "authenticating";
       case 5:
-        return "INVALID_PARAMETER";
+        return "invalidParameter";
       case 6:
-        return "INCORRECT_STATE";
+        return "incorrectState";
       case 7:
-        return "IN_PROGRESS";
+        return "inProgress";
       default:
         return "UNKNOWN_STATUS";
     }
@@ -1078,25 +1078,25 @@ class OtaServer extends GetxService implements RWCPListener {
       return "CANCEL_NOTIFICATION";
     }
     switch (cmd) {
-      case GAIA.COMMAND_SET_DATA_ENDPOINT_MODE:
+      case GAIA.commandSetDataEndpointMode:
         return "SET_DATA_ENDPOINT_MODE";
-      case GAIA.COMMAND_GET_DATA_ENDPOINT_MODE:
+      case GAIA.commandGetDataEndpointMode:
         return "GET_DATA_ENDPOINT_MODE";
-      case GAIA.COMMAND_VM_UPGRADE_CONNECT:
+      case GAIA.commandVmUpgradeConnect:
         return "VM_UPGRADE_CONNECT";
-      case GAIA.COMMAND_VM_UPGRADE_CONTROL:
+      case GAIA.commandVmUpgradeControl:
         return "VM_UPGRADE_CONTROL";
-      case GAIA.COMMAND_VM_UPGRADE_DISCONNECT:
+      case GAIA.commandVmUpgradeDisconnect:
         return "VM_UPGRADE_DISCONNECT";
-      case GAIA.COMMAND_DFU_REQUEST:
+      case GAIA.commandDfuRequest:
         return "DFU_REQUEST";
-      case GAIA.COMMAND_DFU_BEGIN:
+      case GAIA.commandDfuBegin:
         return "DFU_BEGIN";
-      case GAIA.COMMAND_DFU_WRITE:
+      case GAIA.commandDfuWrite:
         return "DFU_WRITE";
-      case GAIA.COMMAND_DFU_COMMIT:
+      case GAIA.commandDfuCommit:
         return "DFU_COMMIT";
-      case GAIA.COMMAND_DFU_GET_RESULT:
+      case GAIA.commandDfuGetResult:
         return "DFU_GET_RESULT";
       default:
         return "UNKNOWN_COMMAND";
@@ -1106,7 +1106,7 @@ class OtaServer extends GetxService implements RWCPListener {
   String _dfuResultText(int resultCode) {
     switch (resultCode) {
       case 0x00:
-        return "SUCCESS";
+        return "success";
       case 0x01:
         return "FAIL";
       default:
@@ -1317,7 +1317,7 @@ class OtaServer extends GetxService implements RWCPListener {
             "receiveVMUPacket 无法解析VMU包: ${StringUtils.byteToHexString(data)}");
         return;
       }
-      if (isUpgrading || packet.mOpCode == OpCodes.UPGRADE_ABORT_CFM) {
+      if (isUpgrading || packet.mOpCode == OpCodes.upgradeAbortCfm) {
         handleVMUPacket(packet);
       } else {
         addLog(
@@ -1330,31 +1330,31 @@ class OtaServer extends GetxService implements RWCPListener {
 
   void handleVMUPacket(VMUPacket? packet) {
     switch (packet?.mOpCode) {
-      case OpCodes.UPGRADE_SYNC_CFM:
+      case OpCodes.upgradeSyncCfm:
         receiveSyncCFM(packet);
         break;
-      case OpCodes.UPGRADE_START_CFM:
+      case OpCodes.upgradeStartCfm:
         receiveStartCFM(packet);
         break;
-      case OpCodes.UPGRADE_DATA_BYTES_REQ:
+      case OpCodes.upgradeDataBytesReq:
         receiveDataBytesREQ(packet);
         break;
-      case OpCodes.UPGRADE_ABORT_CFM:
+      case OpCodes.upgradeAbortCfm:
         receiveAbortCFM();
         break;
-      case OpCodes.UPGRADE_ERROR_WARN_IND:
+      case OpCodes.upgradeErrorWarnInd:
         receiveErrorWarnIND(packet);
         break;
-      case OpCodes.UPGRADE_IS_VALIDATION_DONE_CFM:
+      case OpCodes.upgradeIsValidationDoneCfm:
         receiveValidationDoneCFM(packet);
         break;
-      case OpCodes.UPGRADE_TRANSFER_COMPLETE_IND:
+      case OpCodes.upgradeTransferCompleteInd:
         receiveTransferCompleteIND();
         break;
-      case OpCodes.UPGRADE_COMMIT_REQ:
+      case OpCodes.upgradeCommitReq:
         receiveCommitREQ();
         break;
-      case OpCodes.UPGRADE_COMPLETE_IND:
+      case OpCodes.upgradeCompleteInd:
         receiveCompleteIND();
         break;
     }
@@ -1366,7 +1366,7 @@ class OtaServer extends GetxService implements RWCPListener {
   }
 
   void cancelNotification() async {
-    final cancelPayload = _isV3VendorActive() ? [0x06] : [GAIA.VMU_PACKET];
+    final cancelPayload = _isV3VendorActive() ? [0x06] : [GAIA.vmuPacket];
     GaiaPacketBLE packet = _buildGaiaPacket(
       _cancelNotificationCommand(),
       payload: cancelPayload,
@@ -1384,57 +1384,57 @@ class OtaServer extends GetxService implements RWCPListener {
     if (data.length >= 6) {
       int step = data[0];
       addLog("上次传输步骤 step $step");
-      if (step == ResumePoints.IN_PROGRESS) {
+      if (step == ResumePoints.inProgress) {
         setResumePoint(step);
       } else {
         mResumePoint = step;
       }
     } else {
       if (mResumePoint < 0) {
-        mResumePoint = ResumePoints.DATA_TRANSFER;
+        mResumePoint = ResumePoints.dataTransfer;
       }
       addLog("SYNC_CFM 数据不足，继续沿用断点 step=$mResumePoint");
     }
     sendStartReq();
   }
 
-  /// To send an UPGRADE_START_REQ message.
+  /// To send an upgradeStartReq message.
   void sendStartReq() {
-    VMUPacket packet = VMUPacket.get(OpCodes.UPGRADE_START_REQ);
+    VMUPacket packet = VMUPacket.get(OpCodes.upgradeStartReq);
     sendVMUPacket(packet, false);
   }
 
   void receiveStartCFM(VMUPacket? packet) {
     List<int> data = packet?.mData ?? [];
     if (data.isEmpty) {
-      _enterFatalUpgradeState("UPGRADE_START_CFM 数据为空");
+      _enterFatalUpgradeState("upgradeStartCfm 数据为空");
       return;
     }
     final status = data[0];
-    if (status == UpgradeStartCFMStatus.SUCCESS) {
+    if (status == UpgradeStartCFMStatus.success) {
       mStartAttempts = 0;
       // the device is ready for the upgrade, we can go to the resume point or to the upgrade beginning.
       switch (mResumePoint) {
-        case ResumePoints.COMMIT:
-          askForConfirmation(ConfirmationType.COMMIT);
+        case ResumePoints.commit:
+          askForConfirmation(ConfirmationType.commit);
           break;
-        case ResumePoints.TRANSFER_COMPLETE:
-          askForConfirmation(ConfirmationType.TRANSFER_COMPLETE);
+        case ResumePoints.transferComplete:
+          askForConfirmation(ConfirmationType.transferComplete);
           break;
-        case ResumePoints.IN_PROGRESS:
-          askForConfirmation(ConfirmationType.IN_PROGRESS);
+        case ResumePoints.inProgress:
+          askForConfirmation(ConfirmationType.inProgress);
           break;
-        case ResumePoints.VALIDATION:
+        case ResumePoints.validation:
           sendValidationDoneReq();
           break;
-        case ResumePoints.DATA_TRANSFER:
+        case ResumePoints.dataTransfer:
         default:
           sendStartDataReq();
           break;
       }
       return;
     }
-    if (status == UpgradeStartCFMStatus.ERROR_APP_NOT_READY) {
+    if (status == UpgradeStartCFMStatus.errorAppNotReady) {
       mStartAttempts += 1;
       addLog("设备应用未就绪(0x09)，第$mStartAttempts次重试");
       if (mStartAttempts <= _maxStartNotReadyRetries) {
@@ -1449,7 +1449,7 @@ class OtaServer extends GetxService implements RWCPListener {
       return;
     }
     _enterFatalUpgradeState(
-        "UPGRADE_START_CFM 异常状态: 0x${status.toRadixString(16)}");
+        "upgradeStartCfm 异常状态: 0x${status.toRadixString(16)}");
   }
 
   void receiveAbortCFM() {
@@ -1472,7 +1472,7 @@ class OtaServer extends GetxService implements RWCPListener {
     if (returnCode == 0x81) {
       addLog("包不通过，固件文件与设备不匹配");
       _reportDeviceError("升级错误码0x${returnCode.toRadixString(16)}");
-      askForConfirmation(ConfirmationType.WARNING_FILE_IS_DIFFERENT);
+      askForConfirmation(ConfirmationType.warningFileIsDifferent);
     } else if (returnCode == 0x21) {
       addLog("设备电量过低，停止升级");
       stopUpgrade();
@@ -1497,14 +1497,14 @@ class OtaServer extends GetxService implements RWCPListener {
   void receiveTransferCompleteIND() {
     addLog("receiveTransferCompleteIND");
     transFerComplete = true;
-    setResumePoint(ResumePoints.TRANSFER_COMPLETE);
-    askForConfirmation(ConfirmationType.TRANSFER_COMPLETE);
+    setResumePoint(ResumePoints.transferComplete);
+    askForConfirmation(ConfirmationType.transferComplete);
   }
 
   void receiveCommitREQ() {
     addLog("receiveCommitREQ");
-    setResumePoint(ResumePoints.COMMIT);
-    askForConfirmation(ConfirmationType.COMMIT);
+    setResumePoint(ResumePoints.commit);
+    askForConfirmation(ConfirmationType.commit);
   }
 
   void receiveCompleteIND() {
@@ -1516,13 +1516,13 @@ class OtaServer extends GetxService implements RWCPListener {
   }
 
   void sendValidationDoneReq() {
-    VMUPacket packet = VMUPacket.get(OpCodes.UPGRADE_IS_VALIDATION_DONE_REQ);
+    VMUPacket packet = VMUPacket.get(OpCodes.upgradeIsValidationDoneReq);
     sendVMUPacket(packet, false);
   }
 
   void sendStartDataReq() {
-    setResumePoint(ResumePoints.DATA_TRANSFER);
-    VMUPacket packet = VMUPacket.get(OpCodes.UPGRADE_START_DATA_REQ);
+    setResumePoint(ResumePoints.dataTransfer);
+    VMUPacket packet = VMUPacket.get(OpCodes.upgradeStartDataReq);
     sendVMUPacket(packet, false);
   }
 
@@ -1534,7 +1534,7 @@ class OtaServer extends GetxService implements RWCPListener {
     List<int> data = packet?.mData ?? [];
 
     // Checking the data has the good length
-    if (data.length == OpCodes.DATA_LENGTH) {
+    if (data.length == OpCodes.dataLength) {
       // retrieving information from the received packet
       //REC 120300080000002400000000
       //SEND 000A064204000D0000030000FFFF0001FFFF0002
@@ -1583,7 +1583,7 @@ class OtaServer extends GetxService implements RWCPListener {
   }
 
   void sendAbortReq() {
-    VMUPacket packet = VMUPacket.get(OpCodes.UPGRADE_ABORT_REQ);
+    VMUPacket packet = VMUPacket.get(OpCodes.upgradeAbortReq);
     sendVMUPacket(packet, false);
   }
 
@@ -1642,15 +1642,15 @@ class OtaServer extends GetxService implements RWCPListener {
     dataToSend.add(lastPacket ? 0x01 : 0x00);
     dataToSend.addAll(data);
     sendPkgCount++;
-    VMUPacket packet = VMUPacket.get(OpCodes.UPGRADE_DATA, data: dataToSend);
+    VMUPacket packet = VMUPacket.get(OpCodes.upgradeData, data: dataToSend);
     sendVMUPacket(packet, true);
   }
 
   void onSuccessfulTransmission() {
     if (wasLastPacket) {
-      if (mResumePoint == ResumePoints.DATA_TRANSFER) {
+      if (mResumePoint == ResumePoints.dataTransfer) {
         wasLastPacket = false;
-        setResumePoint(ResumePoints.VALIDATION);
+        setResumePoint(ResumePoints.validation);
         sendValidationDoneReq();
       }
     } else if (hasToAbort) {
@@ -1658,7 +1658,7 @@ class OtaServer extends GetxService implements RWCPListener {
       abortUpgrade();
     } else {
       if (mBytesToSend > 0 &&
-          mResumePoint == ResumePoints.DATA_TRANSFER &&
+          mResumePoint == ResumePoints.dataTransfer &&
           !mIsRWCPEnabled.value) {
         sendNextDataPacket();
       }
@@ -1674,28 +1674,28 @@ class OtaServer extends GetxService implements RWCPListener {
   void askForConfirmation(int type) {
     int code = -1;
     switch (type) {
-      case ConfirmationType.COMMIT:
+      case ConfirmationType.commit:
         {
-          code = OpCodes.UPGRADE_COMMIT_CFM;
+          code = OpCodes.upgradeCommitCfm;
         }
         break;
-      case ConfirmationType.IN_PROGRESS:
+      case ConfirmationType.inProgress:
         {
-          code = OpCodes.UPGRADE_IN_PROGRESS_RES;
+          code = OpCodes.upgradeInProgressRes;
         }
         break;
-      case ConfirmationType.TRANSFER_COMPLETE:
+      case ConfirmationType.transferComplete:
         {
-          code = OpCodes.UPGRADE_TRANSFER_COMPLETE_RES;
+          code = OpCodes.upgradeTransferCompleteRes;
         }
         break;
-      case ConfirmationType.BATTERY_LOW_ON_DEVICE:
+      case ConfirmationType.batteryLowOnDevice:
         {
           addLog("设备电量过低，停止升级");
           stopUpgrade();
         }
         return;
-      case ConfirmationType.WARNING_FILE_IS_DIFFERENT:
+      case ConfirmationType.warningFileIsDifferent:
         {
           stopUpgrade();
         }
@@ -1707,8 +1707,7 @@ class OtaServer extends GetxService implements RWCPListener {
   }
 
   void sendErrorConfirmation(List<int> data) {
-    VMUPacket packet =
-        VMUPacket.get(OpCodes.UPGRADE_ERROR_WARN_RES, data: data);
+    VMUPacket packet = VMUPacket.get(OpCodes.upgradeErrorWarnRes, data: data);
     sendVMUPacket(packet, false);
   }
 

@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gaia/utils/gaia/rwcp/RWCP.dart';
-import 'package:gaia/utils/gaia/rwcp/RWCPClient.dart';
-import 'package:gaia/utils/gaia/rwcp/RWCPListener.dart';
-import 'package:gaia/utils/gaia/rwcp/Segment.dart';
+import 'package:gaia/utils/gaia/rwcp/rwcp.dart';
+import 'package:gaia/utils/gaia/rwcp/rwcp_client.dart';
+import 'package:gaia/utils/gaia/rwcp/rwcp_listener.dart';
+import 'package:gaia/utils/gaia/rwcp/segment.dart';
 
 class _FakeRWCPListener implements RWCPListener {
   final List<List<int>> sentSegments = [];
@@ -51,7 +51,7 @@ void main() {
 
     group('timeout handling', () {
       test('timeout doubles data timeout up to max', () {
-        client.mState = RWCPState.ESTABLISHED;
+        client.mState = RWCPState.established;
         client.isTimeOutRunning = true;
         client.mDataTimeOutMs = 1200;
 
@@ -64,7 +64,7 @@ void main() {
       });
 
       test('timeout does nothing when not running', () {
-        client.mState = RWCPState.ESTABLISHED;
+        client.mState = RWCPState.established;
         client.isTimeOutRunning = false;
         client.mDataTimeOutMs = 500;
 
@@ -74,7 +74,7 @@ void main() {
       });
 
       test('timeout resets acknowledged segments counter', () {
-        client.mState = RWCPState.ESTABLISHED;
+        client.mState = RWCPState.established;
         client.isTimeOutRunning = true;
         client.mAcknowledgedSegments = 10;
         client.mSuccessfulAckStreak = 5;
@@ -93,12 +93,12 @@ void main() {
         client.mWindow = 10;
         client.mCredits = 0;
         client.mUnacknowledgedSegments
-            .add(Segment.get(RWCPOpCodeClient.DATA, 0));
+            .add(Segment.get(RWCPOpCodeClient.data, 0));
         client.mUnacknowledgedSegments
-            .add(Segment.get(RWCPOpCodeClient.DATA, 1));
+            .add(Segment.get(RWCPOpCodeClient.data, 1));
 
         final acknowledged =
-            client.validateAckSequence(RWCPOpCodeClient.DATA, 1);
+            client.validateAckSequence(RWCPOpCodeClient.data, 1);
 
         expect(acknowledged, 2);
         expect(client.mLastAckSequence, 1);
@@ -122,7 +122,7 @@ void main() {
         client.mNextSequence = 10;
         client.mWindow = 10;
         // sequence 3 is before lastAck, should be rejected
-        final result = client.validateAckSequence(RWCPOpCodeClient.DATA, 3);
+        final result = client.validateAckSequence(RWCPOpCodeClient.data, 3);
 
         expect(result, -1);
       });
@@ -134,10 +134,10 @@ void main() {
         client.mCredits = 5;
         for (int i = 0; i < 5; i++) {
           client.mUnacknowledgedSegments
-              .add(Segment.get(RWCPOpCodeClient.DATA, i));
+              .add(Segment.get(RWCPOpCodeClient.data, i));
         }
 
-        final result = client.validateAckSequence(RWCPOpCodeClient.DATA, 4);
+        final result = client.validateAckSequence(RWCPOpCodeClient.data, 4);
 
         expect(result, 5);
         expect(client.mLastAckSequence, 4);
@@ -146,7 +146,7 @@ void main() {
 
     group('timeout recovery', () {
       test('successful ACKs gradually recover timeout toward default', () {
-        client.mState = RWCPState.ESTABLISHED;
+        client.mState = RWCPState.established;
         client.mDataTimeOutMs = 400;
         client.mWindow = 16;
         client.mCredits = 0;
@@ -154,11 +154,11 @@ void main() {
         client.mNextSequence = 9;
         for (int i = 0; i < 9; i++) {
           client.mUnacknowledgedSegments
-              .add(Segment.get(RWCPOpCodeClient.DATA, i));
+              .add(Segment.get(RWCPOpCodeClient.data, i));
         }
 
         final handled =
-            client.receiveDataAck(Segment.get(RWCPOpCodeServer.DATA_ACK, 7));
+            client.receiveDataAck(Segment.get(RWCPOpCodeServer.dataAck, 7));
 
         expect(handled, isTrue);
         expect(client.mDataTimeOutMs, 300);
@@ -166,22 +166,22 @@ void main() {
       });
 
       test('timeout stays at default when already at minimum', () {
-        client.mState = RWCPState.ESTABLISHED;
-        client.mDataTimeOutMs = RWCP.DATA_TIMEOUT_MS_DEFAULT;
+        client.mState = RWCPState.established;
+        client.mDataTimeOutMs = RWCP.dataTimeoutMsDefault;
         client.mWindow = 10;
         client.mCredits = 0;
         client.mLastAckSequence = -1;
         client.mNextSequence = 1;
         client.mUnacknowledgedSegments
-            .add(Segment.get(RWCPOpCodeClient.DATA, 0));
+            .add(Segment.get(RWCPOpCodeClient.data, 0));
 
-        client.receiveDataAck(Segment.get(RWCPOpCodeServer.DATA_ACK, 0));
+        client.receiveDataAck(Segment.get(RWCPOpCodeServer.dataAck, 0));
 
-        expect(client.mDataTimeOutMs, RWCP.DATA_TIMEOUT_MS_DEFAULT);
+        expect(client.mDataTimeOutMs, RWCP.dataTimeoutMsDefault);
       });
 
       test('recovery requires 8 consecutive ACKs per step', () {
-        client.mState = RWCPState.ESTABLISHED;
+        client.mState = RWCPState.established;
         client.mDataTimeOutMs = 300;
         client.mWindow = 10;
         client.mCredits = 5;
@@ -189,32 +189,32 @@ void main() {
         client.mNextSequence = 5;
         for (int i = 0; i < 5; i++) {
           client.mUnacknowledgedSegments
-              .add(Segment.get(RWCPOpCodeClient.DATA, i));
+              .add(Segment.get(RWCPOpCodeClient.data, i));
         }
-        // Add pending data to prevent RST trigger after all ACKs
+        // Add pending data to prevent rst trigger after all ACKs
         client.mPendingData.add([0x01]);
 
         // Only 5 ACKs, not enough for recovery
-        client.receiveDataAck(Segment.get(RWCPOpCodeServer.DATA_ACK, 4));
+        client.receiveDataAck(Segment.get(RWCPOpCodeServer.dataAck, 4));
 
         expect(client.mDataTimeOutMs, 300);
         expect(client.mSuccessfulAckStreak, 5);
       });
     });
 
-    group('GAP handling', () {
+    group('gap handling', () {
       test('receiveGAP decreases window and triggers resend', () {
-        client.mState = RWCPState.ESTABLISHED;
+        client.mState = RWCPState.established;
         client.mWindow = 16;
         client.mCredits = 0;
         client.mLastAckSequence = 2;
         client.mNextSequence = 6;
         for (int i = 3; i < 6; i++) {
           client.mUnacknowledgedSegments
-              .add(Segment.get(RWCPOpCodeClient.DATA, i));
+              .add(Segment.get(RWCPOpCodeClient.data, i));
         }
 
-        final gapSegment = Segment.get(RWCPOpCodeServer.GAP, 3);
+        final gapSegment = Segment.get(RWCPOpCodeServer.gap, 3);
         final handled = client.receiveGAP(gapSegment);
 
         expect(handled, isTrue);
@@ -222,23 +222,23 @@ void main() {
         expect(client.mWindow, 8);
       });
 
-      test('receiveGAP ignores stale GAP with sequence before lastAck', () {
-        client.mState = RWCPState.ESTABLISHED;
+      test('receiveGAP ignores stale gap with sequence before lastAck', () {
+        client.mState = RWCPState.established;
         client.mWindow = 16;
         client.mLastAckSequence = 10;
         final originalWindow = client.mWindow;
 
-        final gapSegment = Segment.get(RWCPOpCodeServer.GAP, 5);
+        final gapSegment = Segment.get(RWCPOpCodeServer.gap, 5);
         final handled = client.receiveGAP(gapSegment);
 
         expect(handled, isTrue);
         expect(client.mWindow, originalWindow);
       });
 
-      test('receiveGAP returns false in LISTEN state', () {
-        client.mState = RWCPState.LISTEN;
+      test('receiveGAP returns false in listen state', () {
+        client.mState = RWCPState.listen;
 
-        final handled = client.receiveGAP(Segment.get(RWCPOpCodeServer.GAP, 0));
+        final handled = client.receiveGAP(Segment.get(RWCPOpCodeServer.gap, 0));
 
         expect(handled, isFalse);
       });
@@ -289,7 +289,7 @@ void main() {
       });
 
       test('setMaximumWindowSize fails during active session', () {
-        client.mState = RWCPState.ESTABLISHED;
+        client.mState = RWCPState.established;
 
         final result = client.setMaximumWindowSize(20);
 
@@ -306,35 +306,35 @@ void main() {
     });
 
     group('session management', () {
-      test('isRunningASession returns true when not in LISTEN', () {
+      test('isRunningASession returns true when not in listen', () {
         expect(client.isRunningASession(), isFalse);
 
-        client.mState = RWCPState.SYN_SENT;
+        client.mState = RWCPState.synSent;
         expect(client.isRunningASession(), isTrue);
 
-        client.mState = RWCPState.ESTABLISHED;
+        client.mState = RWCPState.established;
         expect(client.isRunningASession(), isTrue);
 
-        client.mState = RWCPState.CLOSING;
+        client.mState = RWCPState.closing;
         expect(client.isRunningASession(), isTrue);
       });
 
       test('reset clears all session state', () {
-        client.mState = RWCPState.ESTABLISHED;
+        client.mState = RWCPState.established;
         client.mLastAckSequence = 10;
         client.mNextSequence = 15;
         client.mDataTimeOutMs = 500;
         client.mAcknowledgedSegments = 5;
         client.mUnacknowledgedSegments
-            .add(Segment.get(RWCPOpCodeClient.DATA, 0));
+            .add(Segment.get(RWCPOpCodeClient.data, 0));
         client.mPendingData.add([0x01, 0x02]);
 
         client.reset(true);
 
-        expect(client.mState, RWCPState.LISTEN);
+        expect(client.mState, RWCPState.listen);
         expect(client.mLastAckSequence, -1);
         expect(client.mNextSequence, 0);
-        expect(client.mDataTimeOutMs, RWCP.DATA_TIMEOUT_MS_DEFAULT);
+        expect(client.mDataTimeOutMs, RWCP.dataTimeoutMsDefault);
         expect(client.mAcknowledgedSegments, 0);
         expect(client.mUnacknowledgedSegments, isEmpty);
         expect(client.mPendingData, isEmpty);
@@ -351,70 +351,70 @@ void main() {
     });
 
     group('receiveDataAck', () {
-      test('returns false in LISTEN state', () {
-        client.mState = RWCPState.LISTEN;
+      test('returns false in listen state', () {
+        client.mState = RWCPState.listen;
 
         final handled =
-            client.receiveDataAck(Segment.get(RWCPOpCodeServer.DATA_ACK, 0));
+            client.receiveDataAck(Segment.get(RWCPOpCodeServer.dataAck, 0));
 
         expect(handled, isFalse);
       });
 
-      test('discards DATA_ACK in CLOSING state', () {
-        client.mState = RWCPState.CLOSING;
+      test('discards dataAck in closing state', () {
+        client.mState = RWCPState.closing;
 
         final handled =
-            client.receiveDataAck(Segment.get(RWCPOpCodeServer.DATA_ACK, 0));
+            client.receiveDataAck(Segment.get(RWCPOpCodeServer.dataAck, 0));
 
         expect(handled, isTrue);
         expect(listener.progressAckCount, 0);
       });
 
-      test('sends RST when all data acknowledged and no pending', () {
-        client.mState = RWCPState.ESTABLISHED;
+      test('sends rst when all data acknowledged and no pending', () {
+        client.mState = RWCPState.established;
         client.mWindow = 10;
         client.mCredits = 9;
         client.mLastAckSequence = -1;
         client.mNextSequence = 1;
         client.mUnacknowledgedSegments
-            .add(Segment.get(RWCPOpCodeClient.DATA, 0));
+            .add(Segment.get(RWCPOpCodeClient.data, 0));
 
         listener.reset();
-        client.receiveDataAck(Segment.get(RWCPOpCodeServer.DATA_ACK, 0));
+        client.receiveDataAck(Segment.get(RWCPOpCodeServer.dataAck, 0));
 
-        expect(client.mState, RWCPState.CLOSING);
+        expect(client.mState, RWCPState.closing);
         expect(listener.sentSegments.length, 1);
-        // RST segment: sendRSTSegment calls reset() first which sets mNextSequence=0
+        // rst segment: sendRSTSegment calls reset() first which sets mNextSequence=0
         // So header = (2 << 6) | 0 = 128
         expect(listener.sentSegments[0][0], 128);
       });
     });
 
     group('receiveSynAck', () {
-      test('transitions to ESTABLISHED on valid SYN_ACK', () {
-        client.mState = RWCPState.SYN_SENT;
+      test('transitions to established on valid synAck', () {
+        client.mState = RWCPState.synSent;
         client.mLastAckSequence = -1;
         client.mNextSequence = 1;
         client.mCredits = 14;
         client.mUnacknowledgedSegments
-            .add(Segment.get(RWCPOpCodeClient.SYN, 0));
+            .add(Segment.get(RWCPOpCodeClient.syn, 0));
 
         final handled =
-            client.receiveSynAck(Segment.get(RWCPOpCodeServer.SYN_ACK, 0));
+            client.receiveSynAck(Segment.get(RWCPOpCodeServer.synAck, 0));
 
         expect(handled, isTrue);
-        expect(client.mState, RWCPState.ESTABLISHED);
+        expect(client.mState, RWCPState.established);
       });
 
-      test('terminates session on unexpected SYN_ACK sequence', () {
-        client.mState = RWCPState.SYN_SENT;
+      test('terminates session on unexpected synAck sequence', () {
+        client.mState = RWCPState.synSent;
         client.mLastAckSequence = -1;
         client.mNextSequence = 1;
         client.mUnacknowledgedSegments
-            .add(Segment.get(RWCPOpCodeClient.SYN, 0));
+            .add(Segment.get(RWCPOpCodeClient.syn, 0));
 
         // Wrong sequence number
-        client.receiveSynAck(Segment.get(RWCPOpCodeServer.SYN_ACK, 5));
+        client.receiveSynAck(Segment.get(RWCPOpCodeServer.synAck, 5));
 
         expect(listener.transferFailed, isTrue);
       });

@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gaia/utils/gaia/GAIA.dart';
-import 'package:gaia/utils/gaia/GaiaPacketBLE.dart';
+import 'package:gaia/utils/gaia/gaia.dart';
+import 'package:gaia/utils/gaia/gaia_packet_ble.dart';
 
 void main() {
   group('GaiaPacketBLE', () {
@@ -15,11 +15,11 @@ void main() {
         expect(packet.getBytes(), [0x00, 0xFF, 0x12, 0x34, 0xAA, 0xBB]);
       });
 
-      test('uses default VENDOR_QUALCOMM when mVendorId not specified', () {
+      test('uses default vendorQualcomm when mVendorId not specified', () {
         final packet = GaiaPacketBLE(0x0001);
 
         final bytes = packet.getBytes();
-        // VENDOR_QUALCOMM = 0x000A
+        // vendorQualcomm = 0x000A
         expect(bytes[0], 0x00);
         expect(bytes[1], 0x0A);
       });
@@ -77,11 +77,11 @@ void main() {
     group('acknowledgement handling', () {
       test('ack packet exposes status and event packet exposes event code', () {
         final ackPacket = GaiaPacketBLE(
-          GAIA.ACKNOWLEDGMENT_MASK | 0x0001,
+          GAIA.acknowledgmentMask | 0x0001,
           mPayload: [0x09],
         );
         final notificationPacket = GaiaPacketBLE(
-          GAIA.COMMANDS_NOTIFICATION_MASK | 0x0001,
+          GAIA.commandsNotificationMask | 0x0001,
           mPayload: [0x06, 0x77],
         );
 
@@ -90,34 +90,34 @@ void main() {
         expect(notificationPacket.getEvent(), 0x06);
       });
 
-      test('non-ack packet returns NOT_STATUS', () {
+      test('non-ack packet returns notStatus', () {
         final packet = GaiaPacketBLE(0x0001, mPayload: [0x01]);
 
         expect(packet.isAcknowledgement(), isFalse);
-        expect(packet.getStatus(), GAIA.NOT_STATUS);
+        expect(packet.getStatus(), GAIA.notStatus);
       });
 
-      test('ack packet with empty payload returns NOT_STATUS', () {
-        final packet = GaiaPacketBLE(GAIA.ACKNOWLEDGMENT_MASK | 0x0001);
+      test('ack packet with empty payload returns notStatus', () {
+        final packet = GaiaPacketBLE(GAIA.acknowledgmentMask | 0x0001);
 
         expect(packet.isAcknowledgement(), isTrue);
-        expect(packet.getStatus(), GAIA.NOT_STATUS);
+        expect(packet.getStatus(), GAIA.notStatus);
       });
 
-      test('ack packet with null payload returns NOT_STATUS', () {
+      test('ack packet with null payload returns notStatus', () {
         final packet = GaiaPacketBLE(
-          GAIA.ACKNOWLEDGMENT_MASK | 0x0001,
+          GAIA.acknowledgmentMask | 0x0001,
           mPayload: null,
         );
 
         expect(packet.isAcknowledgement(), isTrue);
-        expect(packet.getStatus(), GAIA.NOT_STATUS);
+        expect(packet.getStatus(), GAIA.notStatus);
       });
     });
 
     group('getCommand', () {
       test('extracts pure command without ack bit', () {
-        final ackPacket = GaiaPacketBLE(GAIA.ACKNOWLEDGMENT_MASK | 0x1234);
+        final ackPacket = GaiaPacketBLE(GAIA.acknowledgmentMask | 0x1234);
 
         expect(ackPacket.getCommandId(), 0x8000 | 0x1234);
         expect(ackPacket.getCommand(), 0x1234);
@@ -132,28 +132,28 @@ void main() {
     });
 
     group('getEvent', () {
-      test('returns NOT_NOTIFICATION for non-notification packet', () {
+      test('returns notNotification for non-notification packet', () {
         final packet = GaiaPacketBLE(0x0001, mPayload: [0x06]);
 
-        expect(packet.getEvent(), GAIA.NOT_NOTIFICATION);
+        expect(packet.getEvent(), GAIA.notNotification);
       });
 
-      test('returns NOT_NOTIFICATION when payload is null', () {
+      test('returns notNotification when payload is null', () {
         final packet = GaiaPacketBLE(
-          GAIA.COMMANDS_NOTIFICATION_MASK | 0x0001,
+          GAIA.commandsNotificationMask | 0x0001,
           mPayload: null,
         );
 
-        expect(packet.getEvent(), GAIA.NOT_NOTIFICATION);
+        expect(packet.getEvent(), GAIA.notNotification);
       });
 
-      test('returns NOT_NOTIFICATION when payload is empty', () {
+      test('returns notNotification when payload is empty', () {
         final packet = GaiaPacketBLE(
-          GAIA.COMMANDS_NOTIFICATION_MASK | 0x0001,
+          GAIA.commandsNotificationMask | 0x0001,
           mPayload: [],
         );
 
-        expect(packet.getEvent(), GAIA.NOT_NOTIFICATION);
+        expect(packet.getEvent(), GAIA.notNotification);
       });
     });
 

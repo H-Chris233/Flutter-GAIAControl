@@ -10,7 +10,7 @@ abstract class RWCPListener {
   /// <p>Called when the transfer with RWCP has failed. The transfer fails in the following cases:
   /// <ul>
   ///     <li>The sending of a segment fails at the transport layer.</li>
-  ///     <li>The Server sent a {@link com.qualcomm.qti.gaiacontrol.rwcp.RWCP.OpCode.Client#RST RST} segment.</li>
+  ///     <li>The Server sent a `com.qualcomm.qti.gaiacontrol.rwcp.RWCP.OpCode.Client#rst rst` segment.</li>
   /// </ul></p>
   void onTransferFailed();
 

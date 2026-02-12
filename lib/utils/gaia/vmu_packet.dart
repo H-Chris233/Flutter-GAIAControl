@@ -1,24 +1,24 @@
-import '../Log.dart';
-import '../StringUtils.dart';
+import '../log.dart';
+import '../string_utils.dart';
 
 class VMUPacket {
   /// <p>The tag to display for logs.</p>
-  final String TAG = "VMUPacket";
+  final String tag = "VMUPacket";
 
   /// The number of bytes to define the packet length information.
-  static final int LENGTH_LENGTH = 2;
+  static final int lengthLength = 2;
 
   /// The number of bytes to define the packet operation code information.
-  static final int OPCODE_LENGTH = 1;
+  static final int opcodeLength = 1;
 
   /// The offset for the operation code information.
-  static final int OPCODE_OFFSET = 0;
+  static final int opcodeOffset = 0;
 
   /// The offset for the length information.
-  static final int LENGTH_OFFSET = OPCODE_OFFSET + OPCODE_LENGTH;
+  static final int lengthOffset = opcodeOffset + opcodeLength;
 
   /// The offset for the data information.
-  static final int DATA_OFFSET = LENGTH_OFFSET + LENGTH_LENGTH;
+  static final int dataOffset = lengthOffset + lengthLength;
 
   /// The packet operation code information.
   int mOpCode = -1;
@@ -27,7 +27,7 @@ class VMUPacket {
   List<int>? mData;
 
   /// The minimum length a VMU packet should have to be a VMU packet.
-  static final int REQUIRED_INFORMATION_LENGTH = LENGTH_LENGTH + OPCODE_LENGTH;
+  static final int requiredInformationLength = lengthLength + opcodeLength;
 
   static VMUPacket get(int opCode, {List<int>? data}) {
     VMUPacket vmuPacket = VMUPacket();
@@ -40,10 +40,10 @@ class VMUPacket {
 
   static VMUPacket? getPackageFromByte(List<int> bytes) {
     int opCode = -1;
-    if (bytes.length >= REQUIRED_INFORMATION_LENGTH) {
+    if (bytes.length >= requiredInformationLength) {
       opCode = bytes[0];
       int length = StringUtils.byteListToInt([bytes[1], bytes[2]]);
-      int dataLength = bytes.length - REQUIRED_INFORMATION_LENGTH;
+      int dataLength = bytes.length - requiredInformationLength;
       if (length > dataLength) {
         Log.w("VMUPacket",
             "getPackageFromByte: declared length ($length) > actual data ($dataLength), packet incomplete");
@@ -53,7 +53,7 @@ class VMUPacket {
             "getPackageFromByte: declared length ($length) < actual data ($dataLength), trailing bytes will be ignored");
       }
       List<int> data = bytes.sublist(
-          REQUIRED_INFORMATION_LENGTH, REQUIRED_INFORMATION_LENGTH + length);
+          requiredInformationLength, requiredInformationLength + length);
       return VMUPacket.get(opCode, data: data);
     }
     return null;

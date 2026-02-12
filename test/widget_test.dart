@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gaia/utils/gaia/rwcp/RWCP.dart';
-import 'package:gaia/utils/gaia/rwcp/RWCPClient.dart';
-import 'package:gaia/utils/gaia/rwcp/RWCPListener.dart';
+import 'package:gaia/utils/gaia/rwcp/rwcp.dart';
+import 'package:gaia/utils/gaia/rwcp/rwcp_client.dart';
+import 'package:gaia/utils/gaia/rwcp/rwcp_listener.dart';
 
 class _FakeRWCPListener implements RWCPListener {
   @override
@@ -27,7 +27,7 @@ void main() {
 
       expect(setInitial, isTrue);
       expect(setMaximum, isFalse);
-      expect(client.getMaximumWindowSize(), RWCP.WINDOW_MAX);
+      expect(client.getMaximumWindowSize(), RWCP.windowMax);
     });
 
     test('accepts valid maximum window and updates value', () {

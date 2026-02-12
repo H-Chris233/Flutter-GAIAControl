@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:gaia/utils/gaia/VMUPacket.dart';
+import 'package:gaia/utils/gaia/vmu_packet.dart';
 
 void main() {
   group('VMUPacket', () {
@@ -141,17 +141,17 @@ void main() {
     });
 
     group('protocol constants', () {
-      test('REQUIRED_INFORMATION_LENGTH is correct', () {
+      test('requiredInformationLength is correct', () {
         // OpCode (1 byte) + Length (2 bytes) = 3 bytes
-        expect(VMUPacket.REQUIRED_INFORMATION_LENGTH, 3);
+        expect(VMUPacket.requiredInformationLength, 3);
       });
 
-      test('DATA_OFFSET is after header', () {
-        expect(VMUPacket.DATA_OFFSET, 3);
+      test('dataOffset is after header', () {
+        expect(VMUPacket.dataOffset, 3);
       });
 
-      test('LENGTH_OFFSET follows opcode', () {
-        expect(VMUPacket.LENGTH_OFFSET, 1);
+      test('lengthOffset follows opcode', () {
+        expect(VMUPacket.lengthOffset, 1);
       });
     });
   });
