@@ -204,27 +204,21 @@ class OpCodes {
   /// <dt><b>Next message</b></dt><dd>Depends on the received {@link ReturnCodes ReturnCodes} value.</dd> </dl>
   static const UPGRADE_ERROR_WARN_RES = 0x1F;
 
-  /**
-   * <p>The number of bytes which contains the number of bytes of the uploading file to send.</p>
-   */
+  /// <p>The number of bytes which contains the number of bytes of the uploading file to send.</p>
   static const NB_BYTES_LENGTH = 4;
-  /**
-   * <p>The offset in the {@link Enum#UPGRADE_DATA_BYTES_REQ UPGRADE_DATA_BYTES_REQ} bytes data where the "number
-   * of bytes to send" information starts.</p>
-   */
+
+  /// <p>The offset in the {@link Enum#UPGRADE_DATA_BYTES_REQ UPGRADE_DATA_BYTES_REQ} bytes data where the "number
+  /// of bytes to send" information starts.</p>
   static const NB_BYTES_OFFSET = 0;
-  /**
-   * <p>The number of bytes which contains the byte offset within the upgrade file from which the host should
-   * start transferring data to the device.</p>
-   */
+
+  /// <p>The number of bytes which contains the byte offset within the upgrade file from which the host should
+  /// start transferring data to the device.</p>
   static const FILE_OFFSET_LENGTH = 4;
-  /**
-   * <p>The offset in the {@link Enum#UPGRADE_DATA_BYTES_REQ UPGRADE_DATA_BYTES_REQ} bytes data where the file
-   * offset information starts. .</p>
-   */
+
+  /// <p>The offset in the {@link Enum#UPGRADE_DATA_BYTES_REQ UPGRADE_DATA_BYTES_REQ} bytes data where the file
+  /// offset information starts. .</p>
   static const FILE_OFFSET_OFFSET = NB_BYTES_OFFSET + NB_BYTES_LENGTH;
-  /**
-   * The length for the data of the {@link Enum#UPGRADE_DATA_BYTES_REQ UPGRADE_DATA_BYTES_REQ} message.
-   */
+
+  /// The length for the data of the {@link Enum#UPGRADE_DATA_BYTES_REQ UPGRADE_DATA_BYTES_REQ} message.
   static const DATA_LENGTH = FILE_OFFSET_LENGTH + NB_BYTES_LENGTH;
 }

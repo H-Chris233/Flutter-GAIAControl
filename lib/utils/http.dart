@@ -93,10 +93,6 @@ class HttpUtil {
     ));
   }
 
-  void _printKV(String key, Object? v) {
-    log('args $key: $v', name: 'HttpUtil');
-  }
-
   /*
    * error统一处理
    */
@@ -385,6 +381,7 @@ class ErrorEntity implements Exception {
 
   ErrorEntity({required this.code, required this.message});
 
+  @override
   String toString() {
     if (message == "") return "Exception";
     return "Exception: code $code, $message";

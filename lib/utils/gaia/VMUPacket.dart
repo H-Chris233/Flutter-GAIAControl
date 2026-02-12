@@ -2,49 +2,31 @@ import '../Log.dart';
 import '../StringUtils.dart';
 
 class VMUPacket {
-  /**
-   * <p>The tag to display for logs.</p>
-   */
+  /// <p>The tag to display for logs.</p>
   final String TAG = "VMUPacket";
 
-  /**
-   * The number of bytes to define the packet length information.
-   */
+  /// The number of bytes to define the packet length information.
   static final int LENGTH_LENGTH = 2;
 
-  /**
-   * The number of bytes to define the packet operation code information.
-   */
+  /// The number of bytes to define the packet operation code information.
   static final int OPCODE_LENGTH = 1;
 
-  /**
-   * The offset for the operation code information.
-   */
+  /// The offset for the operation code information.
   static final int OPCODE_OFFSET = 0;
 
-  /**
-   * The offset for the length information.
-   */
+  /// The offset for the length information.
   static final int LENGTH_OFFSET = OPCODE_OFFSET + OPCODE_LENGTH;
 
-  /**
-   * The offset for the data information.
-   */
+  /// The offset for the data information.
   static final int DATA_OFFSET = LENGTH_OFFSET + LENGTH_LENGTH;
 
-  /**
-   * The packet operation code information.
-   */
+  /// The packet operation code information.
   int mOpCode = -1;
 
-  /**
-   * The packet data information.
-   */
+  /// The packet data information.
   List<int>? mData;
 
-  /**
-   * The minimum length a VMU packet should have to be a VMU packet.
-   */
+  /// The minimum length a VMU packet should have to be a VMU packet.
   static final int REQUIRED_INFORMATION_LENGTH = LENGTH_LENGTH + OPCODE_LENGTH;
 
   static VMUPacket get(int opCode, {List<int>? data}) {

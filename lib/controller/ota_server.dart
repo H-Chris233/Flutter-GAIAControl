@@ -51,40 +51,28 @@ class OtaServer extends GetxService implements RWCPListener {
   StreamSubscription<ConnectionStateUpdate>? _connection;
   bool isDeviceConnected = false;
 
-  /**
-   * To know if the upgrade process is currently running.
-   */
+  /// To know if the upgrade process is currently running.
   bool isUpgrading = false;
 
   bool transFerComplete = false;
 
-  /**
-   * To know how many times we try to start the upgrade.
-   */
+  /// To know how many times we try to start the upgrade.
   var mStartAttempts = 0;
 
-  /**
-   * The offset to use to upload data on the device.
-   */
+  /// The offset to use to upload data on the device.
   var mStartOffset = 0;
 
-  /**
-   * The file to upload on the device.
-   */
+  /// The file to upload on the device.
   List<int>? mBytesFile;
 
   List<int> writeBytes = [];
 
-  /**
-   * The maximum value for the data length of a VM upgrade packet for the data transfer step.
-   */
+  /// The maximum value for the data length of a VM upgrade packet for the data transfer step.
   var mMaxLengthForDataTransfer = 16;
 
   var mPayloadSizeMax = 16;
 
-  /**
-   * To know if the packet with the operation code "UPGRADE_DATA" which was sent was the last packet to send.
-   */
+  /// To know if the packet with the operation code "UPGRADE_DATA" which was sent was the last packet to send.
   bool wasLastPacket = false;
 
   int mBytesToSend = 0;
@@ -98,9 +86,7 @@ class OtaServer extends GetxService implements RWCPListener {
   var versionBeforeUpgrade = "UNKNOWN".obs;
   var versionAfterUpgrade = "UNKNOWN".obs;
 
-  /**
-   * To know if we have to disconnect after any event which occurs as a fatal error from the board.
-   */
+  /// To know if we have to disconnect after any event which occurs as a fatal error from the board.
   bool hasToAbort = false;
 
   StreamSubscription<List<int>>? _subscribeConnection;
@@ -245,7 +231,7 @@ class OtaServer extends GetxService implements RWCPListener {
             rwcpStatusText.value = "待启用";
           }
           connectDeviceId = id;
-          addLog("连接成功" + connectDeviceId);
+          addLog("连接成功$connectDeviceId");
           _startVendorProbe(
             onSuccess: () {
               addLog("Vendor探测成功: ${_vendorToHex(_activeVendorId)}");
@@ -849,9 +835,7 @@ class OtaServer extends GetxService implements RWCPListener {
     }
   }
 
-  /**
-   * <p>To reset the file transfer.</p>
-   */
+  /// <p>To reset the file transfer.</p>
   void resetUpload() {
     transFerComplete = false;
     mStartAttempts = 0;
@@ -1261,7 +1245,7 @@ class OtaServer extends GetxService implements RWCPListener {
         return;
       }
       if (!isDeviceConnected) {
-        addLog("等待设备重连后查询升级后版本(${_postUpgradeVersionRetryCount}/10)");
+        addLog("等待设备重连后查询升级后版本($_postUpgradeVersionRetryCount/10)");
         return;
       }
       queryApplicationVersion(
@@ -1414,9 +1398,7 @@ class OtaServer extends GetxService implements RWCPListener {
     sendStartReq();
   }
 
-  /**
-   * To send an UPGRADE_START_REQ message.
-   */
+  /// To send an UPGRADE_START_REQ message.
   void sendStartReq() {
     VMUPacket packet = VMUPacket.get(OpCodes.UPGRADE_START_REQ);
     sendVMUPacket(packet, false);
@@ -1563,8 +1545,8 @@ class OtaServer extends GetxService implements RWCPListener {
       int fileOffset =
           int.parse(StringUtils.byteToHexString(fileByte), radix: 16);
 
-      addLog(StringUtils.byteToHexString(data) +
-          "本次发包: $fileOffset $mBytesToSend");
+      addLog(
+          "${StringUtils.byteToHexString(data)}本次发包: $fileOffset $mBytesToSend");
       // we check the value for the offset
       mStartOffset += (fileOffset > 0 &&
               fileOffset + mStartOffset < (mBytesFile?.length ?? 0))
@@ -1986,7 +1968,7 @@ class OtaServer extends GetxService implements RWCPListener {
     _errorBurstCount = 0;
     recoveryStatusText.value = "恢复中";
     rwcpStatusText.value = "恢复中";
-    addLog("执行快速恢复(${_recoveryAttempts}/3): $reason");
+    addLog("执行快速恢复($_recoveryAttempts/3): $reason");
     try {
       if (isUpgrading) {
         stopUpgrade(sendAbort: false);

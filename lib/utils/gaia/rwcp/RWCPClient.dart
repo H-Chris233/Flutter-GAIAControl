@@ -8,87 +8,55 @@ import 'RWCPListener.dart';
 import 'Segment.dart';
 
 class RWCPClient {
-  /**
-   * <p>The tag to display for logs.</p>
-   */
+  /// <p>The tag to display for logs.</p>
   final String TAG = "RWCPClient";
 
-  /**
-   * <p>The listener to communicate with the application and send segments.</p>
-   */
+  /// <p>The listener to communicate with the application and send segments.</p>
   final RWCPListener mListener;
 
-  /**
-   * The sequence number of the last sequence which had been acknowledged by the Server.
-   */
+  /// The sequence number of the last sequence which had been acknowledged by the Server.
   int mLastAckSequence = 0;
 
-  /**
-   * The next sequence number which will be send.
-   */
+  /// The next sequence number which will be send.
   int mNextSequence = 0;
 
-  /**
-   * The window size to use when starting a transfer.
-   */
+  /// The window size to use when starting a transfer.
   int mInitialWindow = RWCP.WINDOW_DEFAULT;
 
-  /**
-   * The maximum size of the window to use when adjusting the window size.
-   */
+  /// The maximum size of the window to use when adjusting the window size.
   int mMaximumWindow = RWCP.WINDOW_MAX;
 
-  /**
-   * The window represents the maximum number of segments which can be sent simultaneously.
-   */
+  /// The window represents the maximum number of segments which can be sent simultaneously.
   int mWindow = RWCP.WINDOW_DEFAULT;
 
-  /**
-   * The credit number represents the number of segments which can still be send to fill the current window.
-   */
+  /// The credit number represents the number of segments which can still be send to fill the current window.
   int mCredits = RWCP.WINDOW_DEFAULT;
 
-  /**
-   * When receiving a GAP or when an operation is timed out, this client resends the unacknowledged data and stops
-   * any other running operation.
-   */
+  /// When receiving a GAP or when an operation is timed out, this client resends the unacknowledged data and stops
+  /// any other running operation.
   bool mIsResendingSegments = false;
 
-  /**
-   * The state of the Client.
-   */
+  /// The state of the Client.
   int mState = RWCPState.LISTEN;
 
-  /**
-   * The queue of data which are waiting to be sent.
-   */
+  /// The queue of data which are waiting to be sent.
 
   var mPendingData = ListQueue<List<int>>();
 
-  /**
-   * The queue of segments which have been sent but have not been acknowledged yet.
-   */
+  /// The queue of segments which have been sent but have not been acknowledged yet.
 
   var mUnacknowledgedSegments = ListQueue<Segment>();
 
-  /**
-   * To know if a time out is running.
-   */
+  /// To know if a time out is running.
   bool isTimeOutRunning = false;
 
-  /**
-   * The time used to time out the DATA segments.
-   */
+  /// The time used to time out the DATA segments.
   int mDataTimeOutMs = RWCP.DATA_TIMEOUT_MS_DEFAULT;
 
-  /**
-   * <p>To show the debug logs indicating when a method had been reached.</p>
-   */
+  /// <p>To show the debug logs indicating when a method had been reached.</p>
   bool mShowDebugLogs = true;
 
-  /**
-   * To know the number of segments which had been acknowledged in a row with DATA_ACK.
-   */
+  /// To know the number of segments which had been acknowledged in a row with DATA_ACK.
   int mAcknowledgedSegments = 0;
   int mSuccessfulAckStreak = 0;
   static const int _timeoutRecoveryAckThreshold = 8;
@@ -102,8 +70,7 @@ class RWCPClient {
 
   void showDebugLogs(bool show) {
     mShowDebugLogs = show;
-    Log.i(TAG,
-        "Debug logs are now " + (show ? "activated" : "deactivated") + ".");
+    Log.i(TAG, "Debug logs are now ${show ? "activated" : "deactivated"}.");
   }
 
   bool sendData(List<int> bytes) {
@@ -142,10 +109,10 @@ class RWCPClient {
 
     if (bytes.length < RWCPSegment.REQUIRED_INFORMATION_LENGTH) {
       String message =
-          "Analyse of RWCP Segment failed: the byte array does not contain the minimum " +
-              "required information.";
+          "Analyse of RWCP Segment failed: the byte array does not contain the minimum "
+          "required information.";
       if (mShowDebugLogs) {
-        message += "\n\tbytes=" + StringUtils.byteToHexString(bytes);
+        message += "\n\tbytes=${StringUtils.byteToHexString(bytes)}";
       }
       Log.w(TAG, message);
       return false;
@@ -155,10 +122,8 @@ class RWCPClient {
     Segment segment = Segment.parse(bytes);
     int code = segment.getOperationCode();
     if (code == -1) {
-      Log.w(
-          TAG,
-          "onReceivedRWCPSegment failed to get a RWCP segment from given bytes: $code data->" +
-              StringUtils.byteToHexString(bytes));
+      Log.w(TAG,
+          "onReceivedRWCPSegment failed to get a RWCP segment from given bytes: $code data->${StringUtils.byteToHexString(bytes)}");
       return false;
     }
 
@@ -190,8 +155,8 @@ class RWCPClient {
     if (mState != RWCPState.LISTEN) {
       Log.w(
           TAG,
-          "FAIL to set initial window size to $size: not possible when there is an ongoing " +
-              "session.");
+          "FAIL to set initial window size to $size: not possible when there is an ongoing "
+          "session.");
       return false;
     }
 
@@ -216,8 +181,8 @@ class RWCPClient {
     if (mState != RWCPState.LISTEN) {
       Log.w(
           TAG,
-          "FAIL to set maximum window size to $size: not possible when there is an ongoing " +
-              "session.");
+          "FAIL to set maximum window size to $size: not possible when there is an ongoing "
+          "session.");
       return false;
     }
 
@@ -251,16 +216,16 @@ class RWCPClient {
       case RWCPState.SYN_SENT:
         Log.i(
             TAG,
-            "Received RST (sequence ${segment.getSequenceNumber()}) in SYN_SENT state, ignoring " +
-                "segment.");
+            "Received RST (sequence ${segment.getSequenceNumber()}) in SYN_SENT state, ignoring "
+            "segment.");
         return true;
 
       case RWCPState.ESTABLISHED:
         // received RST
         Log.w(
             TAG,
-            "Received RST (sequence ${segment.getSequenceNumber()}) in ESTABLISHED state, " +
-                "terminating session, transfer failed.");
+            "Received RST (sequence ${segment.getSequenceNumber()}) in ESTABLISHED state, "
+            "terminating session, transfer failed.");
         terminateSession();
         mListener.onTransferFailed();
         return true;
@@ -286,11 +251,8 @@ class RWCPClient {
 
       case RWCPState.LISTEN:
       default:
-        Log.w(
-            TAG,
-            "Received unexpected RST segment with sequence=${segment.getSequenceNumber()}" +
-                " while in state " +
-                RWCP.getStateLabel(mState));
+        Log.w(TAG,
+            "Received unexpected RST segment with sequence=${segment.getSequenceNumber()} while in state ${RWCP.getStateLabel(mState)}");
         return false;
     }
   }
@@ -311,23 +273,8 @@ class RWCPClient {
 
   void logState(String label) {
     if (mShowDebugLogs) {
-      String message = label +
-          "\t\t\tstate=" +
-          RWCP.getStateLabel(mState) +
-          "\n\tWindow: \tcurrent = " +
-          "$mWindow" +
-          " \t\tdefault = " +
-          "$mInitialWindow" +
-          " \t\tcredits = " +
-          "$mCredits" +
-          "\n\tSequence: \tlast = " +
-          "$mLastAckSequence" +
-          " \t\tnext = " +
-          "$mNextSequence" +
-          "\n\tPending: \tPSegments = " +
-          "${mUnacknowledgedSegments.length}" +
-          " \t\tPData = " +
-          "${mPendingData.length}";
+      String message =
+          "$label\t\t\tstate=${RWCP.getStateLabel(mState)}\n\tWindow: \tcurrent = $mWindow \t\tdefault = $mInitialWindow \t\tcredits = $mCredits\n\tSequence: \tlast = $mLastAckSequence \t\tnext = $mNextSequence\n\tPending: \tPSegments = ${mUnacknowledgedSegments.length} \t\tPData = ${mPendingData.length}";
       Log.d(TAG, message);
     }
   }
@@ -471,11 +418,8 @@ class RWCPClient {
         mPendingData.addFirst(segment.getPayload());
         moved++;
       } else {
-        Log.w(
-            TAG,
-            "Segment " +
-                segment.toString() +
-                " in pending segments but not a DATA segment.");
+        Log.w(TAG,
+            "Segment $segment in pending segments but not a DATA segment.");
         break;
       }
     }
@@ -584,41 +528,37 @@ class RWCPClient {
       case RWCPState.CLOSING:
       case RWCPState.LISTEN:
       default:
-        Log.w(
-            TAG,
-            "Received unexpected SYN_ACK segment with header " +
-                "${segment.getHeader()}" +
-                " while in state " +
-                RWCP.getStateLabel(mState));
+        Log.w(TAG,
+            "Received unexpected SYN_ACK segment with header ${segment.getHeader()} while in state ${RWCP.getStateLabel(mState)}");
         return false;
     }
   }
 
   int validateAckSequence(final int code, final int sequence) {
-    final int NOT_VALIDATED = -1;
+    final int notValidated = -1;
 
     if (sequence < 0) {
       Log.w(TAG, "Received ACK sequence ($sequence) is less than 0.");
-      return NOT_VALIDATED;
+      return notValidated;
     }
 
     if (sequence > RWCP.SEQUENCE_NUMBER_MAX) {
       Log.w(
           TAG,
-          "Received ACK sequence ($sequence) is bigger than its maximum value (" +
-              "${RWCP.SEQUENCE_NUMBER_MAX}" +
-              ").");
-      return NOT_VALIDATED;
+          "Received ACK sequence ($sequence) is bigger than its maximum value ("
+          "${RWCP.SEQUENCE_NUMBER_MAX}"
+          ").");
+      return notValidated;
     }
 
     if (!_isSequenceWithinAckWindow(sequence)) {
       Log.w(
           TAG,
-          "Received ACK sequence ($sequence) is out of interval: last received is " +
-              "$mLastAckSequence" +
-              " and next will be " +
-              "$mNextSequence");
-      return NOT_VALIDATED;
+          "Received ACK sequence ($sequence) is out of interval: last received is "
+          "$mLastAckSequence"
+          " and next will be "
+          "$mNextSequence");
+      return notValidated;
     }
 
     int acknowledged = 0;
@@ -634,14 +574,14 @@ class RWCPClient {
       } else {
         Log.w(
             TAG,
-            "Error validating sequence " +
-                "$nextAckSequence" +
-                ": no corresponding segment in " +
-                "pending segments.");
+            "Error validating sequence "
+            "$nextAckSequence"
+            ": no corresponding segment in "
+            "pending segments.");
       }
     }
 
-    logState("$acknowledged" +
+    logState("$acknowledged"
         " segment(s) validated with ACK sequence(code=$code seq=$sequence");
 
     // increase the window size if qualified.
@@ -748,11 +688,8 @@ class RWCPClient {
       case RWCPState.SYN_SENT:
       case RWCPState.LISTEN:
       default:
-        Log.w(
-            TAG,
-            "Received unexpected DATA_ACK segment with sequence ${segment.getSequenceNumber()}" +
-                " while in state " +
-                RWCP.getStateLabel(mState));
+        Log.w(TAG,
+            "Received unexpected DATA_ACK segment with sequence ${segment.getSequenceNumber()} while in state ${RWCP.getStateLabel(mState)}");
         return false;
     }
   }
@@ -793,10 +730,8 @@ class RWCPClient {
       case RWCPState.SYN_SENT:
       case RWCPState.LISTEN:
       default:
-        Log.w(
-            TAG,
-            "Received unexpected GAP segment with header ${segment.getHeader()} while in state " +
-                RWCP.getStateLabel(mState));
+        Log.w(TAG,
+            "Received unexpected GAP segment with header ${segment.getHeader()} while in state ${RWCP.getStateLabel(mState)}");
         return false;
     }
   }

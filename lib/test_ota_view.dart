@@ -7,7 +7,7 @@ import 'package:get/get.dart';
 import 'package:gaia/controller/ota_server.dart';
 
 class TestOtaView extends StatefulWidget {
-  const TestOtaView({Key? key}) : super(key: key);
+  const TestOtaView({super.key});
 
   @override
   State<TestOtaView> createState() => _TestOtaState();

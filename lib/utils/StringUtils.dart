@@ -28,7 +28,7 @@ class StringUtils {
 
   static List<int> hexStringToBytes(String hexString) {
     if (hexString.length % 2 != 0) {
-      hexString = "0" + hexString;
+      hexString = "0$hexString";
     }
     List<int> ret = [];
     for (int i = 0; i < hexString.length; i += 2) {
@@ -52,20 +52,18 @@ class StringUtils {
     return int.parse(s.split(":")[0]) * 60 + int.parse(s.split(":")[1]);
   }
 
-  /**
-   * <p>Extract an <code>int</code> value from a <code>bytes</code> array.</p>
-   *
-   * @param source
-   *         The array to extract from.
-   * @param offset
-   *         Offset within source array.
-   * @param length
-   *         Number of bytes to use (maximum 4).
-   * @param reverse
-   *         True if bytes should be interpreted in reverse (little endian) order.
-   *
-   * @return The extracted <code>int</code>.
-   */
+  /// <p>Extract an <code>int</code> value from a <code>bytes</code> array.</p>
+  ///
+  /// @param source
+  ///         The array to extract from.
+  /// @param offset
+  ///         Offset within source array.
+  /// @param length
+  ///         Number of bytes to use (maximum 4).
+  /// @param reverse
+  ///         True if bytes should be interpreted in reverse (little endian) order.
+  ///
+  /// @return The extracted <code>int</code>.
   static int extractIntFromByteArray(
       List<int> source, int offset, int length, bool reverse) {
     if (length < 0 || length > 8) {
