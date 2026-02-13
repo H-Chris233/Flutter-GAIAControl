@@ -31,8 +31,9 @@ class OtaServer extends GetxService
   late final GaiaCommandBuilder _cmdBuilder;
   late final BleConnectionManager _bleManager;
   late final UpgradeStateMachine _upgradeStateMachine;
+  final BleConnectionManager? _bleManagerOverride;
+  final UpgradeStateMachine? _upgradeStateMachineOverride;
 
-  final flutterReactiveBle = FlutterReactiveBle();
   var logText = "".obs;
   final String tag = "OtaServer";
   late final RxList<DiscoveredDevice> devices;
@@ -134,6 +135,12 @@ class OtaServer extends GetxService
   Timer? _postUpgradeVersionRetryTimer;
   int _postUpgradeVersionRetryCount = 0;
 
+  OtaServer({
+    BleConnectionManager? bleManagerOverride,
+    UpgradeStateMachine? upgradeStateMachineOverride,
+  })  : _bleManagerOverride = bleManagerOverride,
+        _upgradeStateMachineOverride = upgradeStateMachineOverride;
+
   static OtaServer get to => Get.find();
 
   @override
@@ -142,18 +149,20 @@ class OtaServer extends GetxService
     // 初始化组件
     _logBuffer = LogBuffer(logText: logText);
     _cmdBuilder = GaiaCommandBuilder(activeVendorId: _activeVendorId);
-    _bleManager = BleConnectionManager(
-      ble: FlutterReactiveBleClient(flutterReactiveBle),
-      onLog: addLog,
-      onConnectionStateChanged: (state, deviceId) {
-        if (state != DeviceConnectionState.connected) {
-          return;
-        }
-        connectDeviceId = deviceId;
-      },
-    );
+    _bleManager = _bleManagerOverride ??
+        BleConnectionManager(
+          ble: FlutterReactiveBleClient(FlutterReactiveBle()),
+          onLog: addLog,
+          onConnectionStateChanged: (state, deviceId) {
+            if (state != DeviceConnectionState.connected) {
+              return;
+            }
+            connectDeviceId = deviceId;
+          },
+        );
     devices = _bleManager.devices;
-    _upgradeStateMachine = UpgradeStateMachine(delegate: this);
+    _upgradeStateMachine =
+        _upgradeStateMachineOverride ?? UpgradeStateMachine(delegate: this);
     mRWCPClient = RWCPClient(this);
     _initDefaultFirmwarePath();
     _bleManager.startBleStatusMonitor();

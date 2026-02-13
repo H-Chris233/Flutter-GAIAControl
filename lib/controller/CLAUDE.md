@@ -6,11 +6,11 @@
 
 本模块包含 OTA 升级相关的核心组件，采用模块化架构设计：
 
-1. **OtaServer** -- 核心协调器，整合 LogBuffer 和 GaiaCommandBuilder，暴露 UI 状态
+1. **OtaServer** -- 核心协调器，整合 LogBuffer、GaiaCommandBuilder、BleConnectionManager、UpgradeStateMachine，暴露 UI 状态
 2. **LogBuffer** -- 日志缓冲、去重、刷新 ✅ 已集成
 3. **GaiaCommandBuilder** -- GAIA V3 命令构建、数据包封装 ✅ 已集成
-4. **BleConnectionManager** -- BLE 设备扫描、连接管理、服务发现（独立组件，待集成）
-5. **UpgradeStateMachine** -- 升级状态机、VMU 包处理（独立组件，待集成）
+4. **BleConnectionManager** -- BLE 设备扫描、连接管理、服务发现 ✅ 已集成
+5. **UpgradeStateMachine** -- 升级状态机、VMU 包处理 ✅ 已集成
 
 ---
 
@@ -31,7 +31,7 @@
 │               │                       │   Builder     │
 └───────────────┘                       └───────────────┘
 
-独立组件（已创建，待未来集成）:
+已集成组件:
 ┌───────────────┐   ┌───────────────┐
 │ BleConnection │   │  UpgradeState │
 │   Manager     │   │    Machine    │
@@ -44,11 +44,11 @@
 
 | 文件 | 行数 | 集成状态 | 说明 |
 |------|------|----------|------|
-| `ota_server.dart` | ~1892 | - | OTA 服务协调器，使用 LogBuffer 和 GaiaCommandBuilder |
+| `ota_server.dart` | ~1530 | ✅ 已集成 | OTA 服务协调器，已接入 LogBuffer/GaiaCommandBuilder/BleConnectionManager/UpgradeStateMachine |
 | `log_buffer.dart` | ~130 | ✅ 已集成 | 日志缓冲、去重、批量刷新 |
 | `gaia_command_builder.dart` | ~208 | ✅ 已集成 | GAIA V3 命令构建、状态文本转换 |
-| `ble_connection_manager.dart` | ~376 | 🔲 独立 | BLE 连接管理（有测试覆盖） |
-| `upgrade_state_machine.dart` | ~399 | 🔲 独立 | 升级状态机、VMU 包处理（有测试覆盖） |
+| `ble_connection_manager.dart` | ~376 | ✅ 已集成 | BLE 连接管理（有测试覆盖） |
+| `upgrade_state_machine.dart` | ~399 | ✅ 已集成 | 升级状态机、VMU 包处理（有测试覆盖） |
 
 ---
 
@@ -71,7 +71,7 @@ GAIA 协议命令构建器：
 
 ### BleConnectionManager
 
-BLE 连接管理器（独立组件）：
+BLE 连接管理器（已集成）：
 - 设备扫描
 - 连接管理与自动重连
 - 服务发现
@@ -80,7 +80,7 @@ BLE 连接管理器（独立组件）：
 
 ### UpgradeStateMachine
 
-升级状态机：
+升级状态机（已集成）：
 - 状态管理（idle → syncing → starting → transferring → validating → committing → complete）
 - VMU 包处理
 - 通过 delegate 接口与外部组件通信
@@ -90,7 +90,7 @@ BLE 连接管理器（独立组件）：
 ## 类结构
 
 ```
-OtaServer extends GetxService implements RWCPListener
+OtaServer extends GetxService implements RWCPListener, UpgradeStateMachineDelegate
 ```
 
 ### 核心状态变量
@@ -105,7 +105,6 @@ OtaServer extends GetxService implements RWCPListener
 | `vendorMode` | `Rx<String>` | Vendor 模式 ("v3" / "v1v2" / "auto") |
 | `firmwarePath` | `Rx<String>` | 当前固件文件路径 |
 | `mBytesFile` | `List<int>?` | 待上传的固件字节数据 |
-| `mResumePoint` | `int` | 断点续传恢复点 |
 | `mStartOffset` | `int` | 数据传输偏移量 |
 | `versionBeforeUpgrade` | `Rx<String>` | 升级前固件版本 |
 | `versionAfterUpgrade` | `Rx<String>` | 升级后固件版本 |
@@ -167,47 +166,24 @@ OtaServer extends GetxService implements RWCPListener
 
 ---
 
-## OTA 升级状态机流程
+## OTA 升级流程（当前实现）
 
 ```
 startUpdate()
     |
     v
-sendUpgradeConnect()  --> 注册通知/RWCP --> sendSyncReq()
+enableRwcpForUpgrade() --> registerRWCP()/registerNotice()
     |
     v
-receiveSyncCFM()  --> 获取 ResumePoint
+sendSyncReq() --> receiveVMUPacket()
     |
     v
-sendStartReq() / setResumePoint()
+UpgradeStateMachine.handleVmuPacket()
     |
-    v
-receiveStartCFM()  --> 根据 ResumePoint 跳转:
-    |
-    +-- DATA_TRANSFER --> sendStartDataReq() --> receiveDataBytesREQ()
-    |                                               |
-    |                                               v
-    |                                      sendNextDataPacket() (循环)
-    |                                               |
-    |                                               v
-    |                                      receiveDataBytesREQ() (直到传输完成)
-    |
-    +-- VALIDATION --> sendValidationDoneReq()
-    +-- TRANSFER_COMPLETE --> askForConfirmation(TRANSFER_COMPLETE)
-    +-- IN_PROGRESS --> askForConfirmation(IN_PROGRESS)
-    +-- COMMIT --> askForConfirmation(COMMIT)
-    |
-    v
-receiveTransferCompleteIND()  --> 确认继续
-    |
-    v
-receiveValidationDoneCFM()  --> sendValidationDoneReq()
-    |
-    v
-receiveCommitREQ()  --> 确认提交
-    |
-    v
-receiveCompleteIND()  --> 升级完成 --> 断开连接
+    +-- onRequestNextDataPacket() --> sendNextDataPacket() (循环传输)
+    +-- onRequestConfirmation() --> askForConfirmation()
+    +-- onUpgradeComplete() --> disconnectUpgrade()
+    +-- onUpgradeError() --> _enterFatalUpgradeState()
 ```
 
 ---
@@ -222,7 +198,6 @@ receiveCompleteIND()  --> 升级完成 --> 断开连接
 | `utils/gaia/VMUPacket.dart` | VMU 数据包构建 |
 | `utils/gaia/ConfirmationType.dart` | 确认类型枚举 |
 | `utils/gaia/ResumePoints.dart` | 断点续传恢复点 |
-| `utils/gaia/UpgradeStartCFMStatus.dart` | 升级启动确认状态 |
 | `utils/gaia/rwcp/RWCPClient.dart` | RWCP 可靠传输客户端 |
 | `utils/gaia/rwcp/RWCPListener.dart` | RWCP 事件回调接口 |
 | `utils/StringUtils.dart` | 字节/字符串转换 |
@@ -230,7 +205,7 @@ receiveCompleteIND()  --> 升级完成 --> 断开连接
 | `flutter_reactive_ble` | BLE 底层操作 |
 | `get` (GetX) | 状态管理、依赖注入、路由 |
 | `path_provider` | 获取文档目录 |
-| `permission_handler` | 蓝牙权限请求 |
+| `permission_handler` | 蓝牙权限请求（由 BleConnectionManager 使用） |
 
 ---
 
@@ -287,6 +262,8 @@ A: OtaServer 连接设备后会尝试注册 RWCP 写入特征。如果注册成�
 | `test/log_buffer_test.dart` | LogBuffer 单元测试（使用 fake_async） |
 | `test/gaia_command_builder_test.dart` | GaiaCommandBuilder 单元测试 |
 | `test/upgrade_state_machine_test.dart` | UpgradeStateMachine 单元测试 |
+| `test/ble_connection_manager_test.dart` | BleConnectionManager 单元测试 |
+| `test/ota_server_integration_test.dart` | OtaServer 集成测试（组件协作桥接） |
 
 ---
 
@@ -294,6 +271,9 @@ A: OtaServer 连接设备后会尝试注册 RWCP 写入特征。如果注册成�
 
 | 时间 | 操作 | 说明 |
 |------|------|------|
+| 2026-02-13 | 第三阶段重构 | 增加 OtaServer 可测试注入点，补充 `ota_server_integration_test.dart` |
+| 2026-02-13 | 第二阶段重构 | 清理 OtaServer 旧 VMU 分支（约 236 行），保留状态机主链 |
+| 2026-02-13 | 第一阶段重构 | OtaServer 接入 BleConnectionManager 与 UpgradeStateMachine |
 | 2026-02-13 | 组件集成 | 将 LogBuffer 和 GaiaCommandBuilder 集成到 OtaServer，代码减少 ~180 行 |
 | 2026-02-12 | 模块化重构 | 创建 5 个独立组件：LogBuffer、GaiaCommandBuilder、BleConnectionManager、UpgradeStateMachine |
 | 2026-02-10 22:00:06 CST | 初始化创建 | 由架构初始化工具生成 |
