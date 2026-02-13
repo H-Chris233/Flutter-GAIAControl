@@ -21,21 +21,13 @@ import 'package:gaia/utils/gaia/vmu_packet.dart';
 import 'package:gaia/utils/gaia/rwcp/rwcp_client.dart';
 import 'package:gaia/utils/gaia/rwcp/rwcp_listener.dart';
 
+import 'package:gaia/controller/log_buffer.dart';
+import 'package:gaia/controller/gaia_command_builder.dart';
+
 class OtaServer extends GetxService implements RWCPListener {
-  static const int _v3FeatureFramework = 0x00;
-  static const int _v3FeatureUpgrade = 0x06;
-  static const int _v3PacketTypeCommand = 0x00;
-  static const int _v3PacketTypeNotification = 0x01;
-  static const int _v3PacketTypeResponse = 0x02;
-  static const int _v3PacketTypeError = 0x03;
-  static const int _v3CmdAppVersion = 0x05;
-  static const int _v3CmdRegisterNotification = 0x07;
-  static const int _v3CmdCancelNotification = 0x08;
-  static const int _v3CmdUpgradeNotification = 0x00;
-  static const int _v3CmdUpgradeConnect = 0x00;
-  static const int _v3CmdUpgradeDisconnect = 0x01;
-  static const int _v3CmdUpgradeControl = 0x02;
-  static const int _v3CmdSetDataEndpointMode = 0x04;
+  // 组件实例
+  late final LogBuffer _logBuffer;
+  late final GaiaCommandBuilder _cmdBuilder;
 
   final flutterReactiveBle = FlutterReactiveBle();
   var logText = "".obs;
@@ -100,12 +92,6 @@ class OtaServer extends GetxService implements RWCPListener {
   var percentage = 0.0.obs;
 
   Timer? _timer;
-  Timer? _logFlushTimer;
-  final ListQueue<String> _pendingLogs = ListQueue();
-  bool _isLogFlushScheduled = false;
-  static const int _maxLogLines = 800;
-  String _lastLogDedupKey = "";
-  int _lastLogRepeat = 0;
   StreamSubscription<BleStatus>? _bleStatusSubscription;
   static const bool _enableWriteTraceLog = false;
 
@@ -164,6 +150,9 @@ class OtaServer extends GetxService implements RWCPListener {
   @override
   void onInit() {
     super.onInit();
+    // 初始化组件
+    _logBuffer = LogBuffer(logText: logText);
+    _cmdBuilder = GaiaCommandBuilder(activeVendorId: _activeVendorId);
     mRWCPClient = RWCPClient(this);
     _initDefaultFirmwarePath();
     _bleStatusSubscription?.cancel();
@@ -344,64 +333,34 @@ class OtaServer extends GetxService implements RWCPListener {
     return "0x${vendor.toRadixString(16).padLeft(4, '0').toUpperCase()}";
   }
 
-  bool _isV3VendorActive() => _activeVendorId == 0x001D;
+  bool _isV3VendorActive() => _cmdBuilder.isV3VendorActive;
 
-  int _buildV3Command(int feature, int packetType, int commandId) {
-    return ((feature & 0x7F) << 9) |
-        ((packetType & 0x03) << 7) |
-        (commandId & 0x7F);
-  }
+  // 命令构建（代理到 GaiaCommandBuilder）
+  int _upgradeConnectCommand() => _cmdBuilder.upgradeConnectCommand();
+  int _upgradeDisconnectCommand() => _cmdBuilder.upgradeDisconnectCommand();
+  int _upgradeControlCommand() => _cmdBuilder.upgradeControlCommand();
+  int _setDataEndpointModeCommand() => _cmdBuilder.setDataEndpointModeCommand();
+  int _getApplicationVersionCommand() => _cmdBuilder.getApplicationVersionCommand();
+  int _registerNotificationCommand() => _cmdBuilder.registerNotificationCommand();
+  int _cancelNotificationCommand() => _cmdBuilder.cancelNotificationCommand();
 
-  int _upgradeConnectCommand() => _isV3VendorActive()
-      ? _buildV3Command(
-          _v3FeatureUpgrade, _v3PacketTypeCommand, _v3CmdUpgradeConnect)
-      : GAIA.commandVmUpgradeConnect;
-
-  int _upgradeDisconnectCommand() => _isV3VendorActive()
-      ? _buildV3Command(
-          _v3FeatureUpgrade, _v3PacketTypeCommand, _v3CmdUpgradeDisconnect)
-      : GAIA.commandVmUpgradeDisconnect;
-
-  int _upgradeControlCommand() => _isV3VendorActive()
-      ? _buildV3Command(
-          _v3FeatureUpgrade, _v3PacketTypeCommand, _v3CmdUpgradeControl)
-      : GAIA.commandVmUpgradeControl;
-
-  int _setDataEndpointModeCommand() => _isV3VendorActive()
-      ? _buildV3Command(
-          _v3FeatureUpgrade, _v3PacketTypeCommand, _v3CmdSetDataEndpointMode)
-      : GAIA.commandSetDataEndpointMode;
-
-  int _getApplicationVersionCommand() => _isV3VendorActive()
-      ? _buildV3Command(
-          _v3FeatureFramework, _v3PacketTypeCommand, _v3CmdAppVersion)
-      : GAIA.commandGetApplicationVersion;
-
-  int _registerNotificationCommand() => _isV3VendorActive()
-      ? _buildV3Command(
-          _v3FeatureFramework, _v3PacketTypeCommand, _v3CmdRegisterNotification)
-      : GAIA.commandRegisterNotification;
-
-  int _cancelNotificationCommand() => _isV3VendorActive()
-      ? _buildV3Command(
-          _v3FeatureFramework, _v3PacketTypeCommand, _v3CmdCancelNotification)
-      : GAIA.commandCancelNotification;
-
-  int _v3CommandFeature(int cmd) => (cmd >> 9) & 0x7F;
-  int _v3CommandType(int cmd) => (cmd >> 7) & 0x03;
-  int _v3CommandId(int cmd) => cmd & 0x7F;
+  int _v3CommandFeature(int cmd) => _cmdBuilder.v3CommandFeature(cmd);
+  int _v3CommandType(int cmd) => _cmdBuilder.v3CommandType(cmd);
+  int _v3CommandId(int cmd) => _cmdBuilder.v3CommandId(cmd);
 
   void setVendorMode(String mode) {
     vendorMode.value = vendorModeV3;
     _isVendorDetecting = false;
     _vendorProbeTimer?.cancel();
     _activeVendorId = 0x001D;
+    _cmdBuilder.activeVendorId = _activeVendorId;
     addLog("Vendor模式固定为V3，使用${_vendorToHex(_activeVendorId)}");
   }
 
   void _startVendorProbe(
       {required VoidCallback onSuccess, required VoidCallback onFailed}) {
     _activeVendorId = 0x001D;
+    _cmdBuilder.activeVendorId = _activeVendorId;
     _isVendorDetecting = false;
     _vendorProbeTimer?.cancel();
     onSuccess();
@@ -420,8 +379,10 @@ class OtaServer extends GetxService implements RWCPListener {
     final candidate = _vendorCandidates[_vendorProbeIndex];
     addLog("探测Vendor ${_vendorToHex(candidate)}");
     final probeCommand = candidate == 0x001D
-        ? _buildV3Command(
-            _v3FeatureFramework, _v3PacketTypeCommand, _v3CmdAppVersion)
+        ? _cmdBuilder.buildV3Command(
+            GaiaCommandBuilder.v3FeatureFramework,
+            GaiaCommandBuilder.v3PacketTypeCommand,
+            GaiaCommandBuilder.v3CmdAppVersion)
         : GAIA.commandGetApiVersion;
     final packet = _buildGaiaPacket(probeCommand, vendor: candidate);
     writeMsg(packet.getBytes());
@@ -438,6 +399,7 @@ class OtaServer extends GetxService implements RWCPListener {
     _vendorProbeTimer?.cancel();
     _isVendorDetecting = false;
     _activeVendorId = vendor;
+    _cmdBuilder.activeVendorId = _activeVendorId;
     rwcpStatusText.value = "Vendor ${_vendorToHex(vendor)} 就绪";
     final callback = _onVendorReady;
     _onVendorReady = null;
@@ -613,8 +575,9 @@ class OtaServer extends GetxService implements RWCPListener {
     final commandId = _v3CommandId(cmd);
     final payload = packet.mPayload ?? [];
 
-    if (packetType == _v3PacketTypeResponse) {
-      if (feature == _v3FeatureFramework && commandId == _v3CmdAppVersion) {
+    if (packetType == GaiaCommandBuilder.v3PacketTypeResponse) {
+      if (feature == GaiaCommandBuilder.v3FeatureFramework &&
+          commandId == GaiaCommandBuilder.v3CmdAppVersion) {
         if (_isVendorDetecting) {
           _onVendorProbeSuccess(packet.mVendorId);
           return;
@@ -622,8 +585,8 @@ class OtaServer extends GetxService implements RWCPListener {
         onApplicationVersionAckV3(payload);
         return;
       }
-      if (feature == _v3FeatureUpgrade &&
-          commandId == _v3CmdSetDataEndpointMode) {
+      if (feature == GaiaCommandBuilder.v3FeatureUpgrade &&
+          commandId == GaiaCommandBuilder.v3CmdSetDataEndpointMode) {
         if (mIsRWCPEnabled.value) {
           unawaited(registerRWCP());
         } else {
@@ -631,34 +594,36 @@ class OtaServer extends GetxService implements RWCPListener {
         }
         return;
       }
-      if (feature == _v3FeatureUpgrade && commandId == _v3CmdUpgradeConnect) {
+      if (feature == GaiaCommandBuilder.v3FeatureUpgrade &&
+          commandId == GaiaCommandBuilder.v3CmdUpgradeConnect) {
         if (isUpgrading) {
           resetUpload();
           sendSyncReq();
         }
         return;
       }
-      if (feature == _v3FeatureUpgrade && commandId == _v3CmdUpgradeControl) {
+      if (feature == GaiaCommandBuilder.v3FeatureUpgrade &&
+          commandId == GaiaCommandBuilder.v3CmdUpgradeControl) {
         onSuccessfulTransmission();
         return;
       }
-      if (feature == _v3FeatureUpgrade &&
-          commandId == _v3CmdUpgradeDisconnect) {
+      if (feature == GaiaCommandBuilder.v3FeatureUpgrade &&
+          commandId == GaiaCommandBuilder.v3CmdUpgradeDisconnect) {
         stopUpgrade(sendAbort: false, sendDisconnect: false);
         return;
       }
       return;
     }
 
-    if (packetType == _v3PacketTypeNotification) {
-      if (feature == _v3FeatureUpgrade &&
-          commandId == _v3CmdUpgradeNotification) {
+    if (packetType == GaiaCommandBuilder.v3PacketTypeNotification) {
+      if (feature == GaiaCommandBuilder.v3FeatureUpgrade &&
+          commandId == GaiaCommandBuilder.v3CmdUpgradeNotification) {
         receiveVMUPacket(payload);
       }
       return;
     }
 
-    if (packetType == _v3PacketTypeError) {
+    if (packetType == GaiaCommandBuilder.v3PacketTypeError) {
       final status = payload.isNotEmpty ? payload.first : -1;
       addLog(
           "V3错误响应 feature=$feature cmdId=$commandId status=0x${status.toRadixString(16)} ${_gaiaStatusText(status)}");
@@ -666,7 +631,8 @@ class OtaServer extends GetxService implements RWCPListener {
           "V3错误 feature=$feature cmdId=$commandId status=0x${status.toRadixString(16)}",
           triggerRecovery: !isUpgrading);
 
-      if (feature == _v3FeatureFramework && commandId == _v3CmdAppVersion) {
+      if (feature == GaiaCommandBuilder.v3FeatureFramework &&
+          commandId == GaiaCommandBuilder.v3CmdAppVersion) {
         if (_isVendorDetecting) {
           _vendorProbeIndex += 1;
           _probeNextVendor();
@@ -677,18 +643,18 @@ class OtaServer extends GetxService implements RWCPListener {
         return;
       }
 
-      if (feature == _v3FeatureUpgrade &&
-          commandId == _v3CmdSetDataEndpointMode) {
+      if (feature == GaiaCommandBuilder.v3FeatureUpgrade &&
+          commandId == GaiaCommandBuilder.v3CmdSetDataEndpointMode) {
         _rwcpSetupInProgress = false;
         rwcpStatusText.value = "RWCP错误";
         _enterFatalUpgradeState("RWCP数据通道启用失败");
         return;
       }
 
-      if (feature == _v3FeatureUpgrade &&
-          (commandId == _v3CmdUpgradeConnect ||
-              commandId == _v3CmdUpgradeControl ||
-              commandId == _v3CmdUpgradeDisconnect)) {
+      if (feature == GaiaCommandBuilder.v3FeatureUpgrade &&
+          (commandId == GaiaCommandBuilder.v3CmdUpgradeConnect ||
+              commandId == GaiaCommandBuilder.v3CmdUpgradeControl ||
+              commandId == GaiaCommandBuilder.v3CmdUpgradeDisconnect)) {
         _enterFatalUpgradeState(
             "V3升级命令失败 cmdId=$commandId status=0x${status.toRadixString(16)}");
       }
@@ -1032,98 +998,11 @@ class OtaServer extends GetxService implements RWCPListener {
     }
   }
 
-  String _gaiaStatusText(int status) {
-    switch (status) {
-      case 0:
-        return "success";
-      case 1:
-        return "notSupported";
-      case 2:
-        return "notAuthenticated";
-      case 3:
-        return "insufficientResources";
-      case 4:
-        return "authenticating";
-      case 5:
-        return "invalidParameter";
-      case 6:
-        return "incorrectState";
-      case 7:
-        return "inProgress";
-      default:
-        return "UNKNOWN_STATUS";
-    }
-  }
-
-  String _gaiaCommandText(int cmd) {
-    if (cmd == _setDataEndpointModeCommand()) {
-      return "SET_DATA_ENDPOINT_MODE";
-    }
-    if (cmd == _upgradeConnectCommand()) {
-      return "VM_UPGRADE_CONNECT";
-    }
-    if (cmd == _upgradeControlCommand()) {
-      return "VM_UPGRADE_CONTROL";
-    }
-    if (cmd == _upgradeDisconnectCommand()) {
-      return "VM_UPGRADE_DISCONNECT";
-    }
-    if (cmd == _getApplicationVersionCommand()) {
-      return "GET_APPLICATION_VERSION";
-    }
-    if (cmd == _registerNotificationCommand()) {
-      return "REGISTER_NOTIFICATION";
-    }
-    if (cmd == _cancelNotificationCommand()) {
-      return "CANCEL_NOTIFICATION";
-    }
-    switch (cmd) {
-      case GAIA.commandSetDataEndpointMode:
-        return "SET_DATA_ENDPOINT_MODE";
-      case GAIA.commandGetDataEndpointMode:
-        return "GET_DATA_ENDPOINT_MODE";
-      case GAIA.commandVmUpgradeConnect:
-        return "VM_UPGRADE_CONNECT";
-      case GAIA.commandVmUpgradeControl:
-        return "VM_UPGRADE_CONTROL";
-      case GAIA.commandVmUpgradeDisconnect:
-        return "VM_UPGRADE_DISCONNECT";
-      case GAIA.commandDfuRequest:
-        return "DFU_REQUEST";
-      case GAIA.commandDfuBegin:
-        return "DFU_BEGIN";
-      case GAIA.commandDfuWrite:
-        return "DFU_WRITE";
-      case GAIA.commandDfuCommit:
-        return "DFU_COMMIT";
-      case GAIA.commandDfuGetResult:
-        return "DFU_GET_RESULT";
-      default:
-        return "UNKNOWN_COMMAND";
-    }
-  }
-
-  String _dfuResultText(int resultCode) {
-    switch (resultCode) {
-      case 0x00:
-        return "success";
-      case 0x01:
-        return "FAIL";
-      default:
-        return "UNKNOWN_RESULT";
-    }
-  }
-
-  String _upgradeErrorText(int returnCode) {
-    switch (returnCode) {
-      case 0x21:
-        return "电量过低";
-      case 0x81:
-        return "文件校验不通过";
-      default:
-        return "未知升级错误";
-    }
-  }
+  // 状态/命令文本转换（代理到 GaiaCommandBuilder）
+  String _gaiaStatusText(int status) => _cmdBuilder.gaiaStatusText(status);
+  String _gaiaCommandText(int cmd) => _cmdBuilder.gaiaCommandText(cmd);
+  String _dfuResultText(int resultCode) => _cmdBuilder.dfuResultText(resultCode);
+  String _upgradeErrorText(int returnCode) => _cmdBuilder.upgradeErrorText(returnCode);
 
   void queryApplicationVersion({
     required String tag,
@@ -1814,72 +1693,14 @@ class OtaServer extends GetxService implements RWCPListener {
     addLog("协商mtu $mtu mPayloadSizeMax $mPayloadSizeMax");
   }
 
-  void addLog(String s) {
-    if (kDebugMode) {
-      debugPrint(s);
-    }
-    final dedupKey = _normalizeLogKey(s);
-    if (_lastLogDedupKey.isEmpty) {
-      _lastLogDedupKey = dedupKey;
-      _lastLogRepeat = 1;
-      _pendingLogs.add(s);
-      _scheduleLogFlush();
-      return;
-    }
-
-    if (dedupKey == _lastLogDedupKey) {
-      _lastLogRepeat += 1;
-      _scheduleLogFlush();
-      return;
-    }
-
-    _emitRepeatSummaryIfNeeded();
-    _lastLogDedupKey = dedupKey;
-    _lastLogRepeat = 1;
-    _pendingLogs.add(s);
-    _scheduleLogFlush();
+  /// 添加日志（代理到 LogBuffer）
+  void addLog(String message) {
+    _logBuffer.addLog(message);
   }
 
-  String _normalizeLogKey(String message) {
-    final withoutTimestamp = message.replaceFirst(
-        RegExp(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+\s+'), "");
-    return withoutTimestamp.trim();
-  }
-
-  void _emitRepeatSummaryIfNeeded() {
-    if (_lastLogRepeat > 1) {
-      _pendingLogs.add("↳ 上一条重复 ${_lastLogRepeat - 1} 次");
-      _lastLogRepeat = 1;
-    }
-  }
-
-  void _scheduleLogFlush() {
-    if (_isLogFlushScheduled) {
-      return;
-    }
-    _isLogFlushScheduled = true;
-    _logFlushTimer?.cancel();
-    _logFlushTimer = Timer(const Duration(milliseconds: 120), _flushLogs);
-  }
-
-  void _flushLogs() {
-    _isLogFlushScheduled = false;
-    _emitRepeatSummaryIfNeeded();
-    if (_pendingLogs.isEmpty) {
-      return;
-    }
-    final builder = StringBuffer();
-    while (_pendingLogs.isNotEmpty) {
-      builder.writeln(_pendingLogs.removeFirst());
-    }
-    final merged = (logText.value + builder.toString());
-    final lines = merged.split('\n');
-    if (lines.length <= _maxLogLines) {
-      logText.value = merged;
-      return;
-    }
-    final start = lines.length - _maxLogLines;
-    logText.value = lines.sublist(start).join('\n');
+  /// 清空日志
+  void clearLog() {
+    _logBuffer.clear();
   }
 
   void _armUpgradeWatchdog() {
@@ -1999,6 +1820,7 @@ class OtaServer extends GetxService implements RWCPListener {
 
   @override
   void onClose() {
+    _logBuffer.dispose();
     _bleStatusSubscription?.cancel();
     _scanConnection?.cancel();
     _connection?.cancel();
@@ -2006,7 +1828,6 @@ class OtaServer extends GetxService implements RWCPListener {
     _subscribeConnectionRWCP?.cancel();
     _timer?.cancel();
     _dfuResultTimer?.cancel();
-    _logFlushTimer?.cancel();
     _upgradeWatchdogTimer?.cancel();
     _versionQueryTimer?.cancel();
     _postUpgradeVersionRetryTimer?.cancel();
