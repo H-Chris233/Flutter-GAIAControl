@@ -15,7 +15,6 @@ import 'package:gaia/utils/gaia/gaia.dart';
 import 'package:gaia/utils/gaia/gaia_packet_ble.dart';
 import 'package:gaia/utils/gaia/op_codes.dart';
 import 'package:gaia/utils/gaia/resume_points.dart';
-import 'package:gaia/utils/gaia/upgrade_start_cfm_status.dart';
 import 'package:gaia/utils/gaia/vmu_packet.dart';
 import 'package:gaia/utils/gaia/rwcp/rwcp_client.dart';
 import 'package:gaia/utils/gaia/rwcp/rwcp_listener.dart';
@@ -37,14 +36,12 @@ class OtaServer extends GetxService
   var logText = "".obs;
   final String tag = "OtaServer";
   late final RxList<DiscoveredDevice> devices;
-  StreamSubscription<DiscoveredDevice>? _scanConnection;
 
   String connectDeviceId = "";
   final Uuid otaUUID = BleConstants.otaServiceUuid;
   final Uuid notifyUUID = BleConstants.notifyCharacteristicUuid;
   final Uuid writeUUID = BleConstants.writeCharacteristicUuid;
   final Uuid writeNoResUUID = BleConstants.writeNoResponseCharacteristicUuid;
-  StreamSubscription<ConnectionStateUpdate>? _connection;
   bool isDeviceConnected = false;
 
   /// To know if the upgrade process is currently running.
@@ -53,7 +50,6 @@ class OtaServer extends GetxService
   bool transFerComplete = false;
 
   /// To know how many times we try to start the upgrade.
-  var mStartAttempts = 0;
 
   /// The offset to use to upload data on the device.
   var mStartOffset = 0;
@@ -69,11 +65,8 @@ class OtaServer extends GetxService
   var mPayloadSizeMax = 16;
 
   /// To know if the packet with the operation code "upgradeData" which was sent was the last packet to send.
-  bool wasLastPacket = false;
 
   int mBytesToSend = 0;
-
-  int mResumePoint = -1;
 
   var mIsRWCPEnabled = false.obs;
   int sendPkgCount = 0;
@@ -83,11 +76,6 @@ class OtaServer extends GetxService
   var versionAfterUpgrade = "UNKNOWN".obs;
 
   /// To know if we have to disconnect after any event which occurs as a fatal error from the board.
-  bool hasToAbort = false;
-
-  StreamSubscription<List<int>>? _subscribeConnection;
-
-  StreamSubscription<List<int>>? _subscribeConnectionRWCP;
 
   String fileMd5 = "";
   var firmwarePath = "".obs;
@@ -96,7 +84,6 @@ class OtaServer extends GetxService
   var percentage = 0.0.obs;
 
   Timer? _timer;
-  StreamSubscription<BleStatus>? _bleStatusSubscription;
   static const bool _enableWriteTraceLog = false;
 
   var timeCount = 0.obs;
@@ -146,7 +133,6 @@ class OtaServer extends GetxService
   bool _pendingStartAfterVersionQuery = false;
   Timer? _postUpgradeVersionRetryTimer;
   int _postUpgradeVersionRetryCount = 0;
-  static const int _maxStartNotReadyRetries = 3;
 
   static OtaServer get to => Get.find();
 
@@ -613,7 +599,7 @@ class OtaServer extends GetxService
           unawaited(registerRWCP());
         } else {
           _rwcpSetupInProgress = false;
-          _subscribeConnectionRWCP?.cancel();
+          unawaited(_bleManager.cancelRwcpChannel());
         }
 
         break;
@@ -699,12 +685,8 @@ class OtaServer extends GetxService
   void resetUpload() {
     _upgradeStateMachine.reset();
     transFerComplete = false;
-    mStartAttempts = 0;
     mBytesToSend = 0;
     mStartOffset = 0;
-    wasLastPacket = false;
-    hasToAbort = false;
-    mResumePoint = -1;
   }
 
   void stopUpgrade({bool sendAbort = true, bool sendDisconnect = true}) async {
@@ -901,8 +883,6 @@ class OtaServer extends GetxService
   String _gaiaCommandText(int cmd) => _cmdBuilder.gaiaCommandText(cmd);
   String _dfuResultText(int resultCode) =>
       _cmdBuilder.dfuResultText(resultCode);
-  String _upgradeErrorText(int returnCode) =>
-      _cmdBuilder.upgradeErrorText(returnCode);
 
   void queryApplicationVersion({
     required String tag,
@@ -1112,38 +1092,6 @@ class OtaServer extends GetxService
     }
   }
 
-  void handleVMUPacket(VMUPacket? packet) {
-    switch (packet?.mOpCode) {
-      case OpCodes.upgradeSyncCfm:
-        receiveSyncCFM(packet);
-        break;
-      case OpCodes.upgradeStartCfm:
-        receiveStartCFM(packet);
-        break;
-      case OpCodes.upgradeDataBytesReq:
-        receiveDataBytesREQ(packet);
-        break;
-      case OpCodes.upgradeAbortCfm:
-        receiveAbortCFM();
-        break;
-      case OpCodes.upgradeErrorWarnInd:
-        receiveErrorWarnIND(packet);
-        break;
-      case OpCodes.upgradeIsValidationDoneCfm:
-        receiveValidationDoneCFM(packet);
-        break;
-      case OpCodes.upgradeTransferCompleteInd:
-        receiveTransferCompleteIND();
-        break;
-      case OpCodes.upgradeCommitReq:
-        receiveCommitREQ();
-        break;
-      case OpCodes.upgradeCompleteInd:
-        receiveCompleteIND();
-        break;
-    }
-  }
-
   void sendUpgradeConnect() async {
     GaiaPacketBLE packet = _buildGaiaPacket(_upgradeConnectCommand());
     writeMsg(packet.getBytes());
@@ -1161,179 +1109,6 @@ class OtaServer extends GetxService
   void sendUpgradeDisconnect() {
     GaiaPacketBLE packet = _buildGaiaPacket(_upgradeDisconnectCommand());
     writeMsg(packet.getBytes());
-  }
-
-  void receiveSyncCFM(VMUPacket? packet) {
-    List<int> data = packet?.mData ?? [];
-    if (data.length >= 6) {
-      int step = data[0];
-      addLog("上次传输步骤 step $step");
-      if (step == ResumePoints.inProgress) {
-        setResumePoint(step);
-      } else {
-        mResumePoint = step;
-      }
-    } else {
-      if (mResumePoint < 0) {
-        mResumePoint = ResumePoints.dataTransfer;
-      }
-      addLog("SYNC_CFM 数据不足，继续沿用断点 step=$mResumePoint");
-    }
-    sendStartReq();
-  }
-
-  /// To send an upgradeStartReq message.
-  void sendStartReq() {
-    VMUPacket packet = VMUPacket.get(OpCodes.upgradeStartReq);
-    sendVMUPacket(packet, false);
-  }
-
-  void receiveStartCFM(VMUPacket? packet) {
-    List<int> data = packet?.mData ?? [];
-    if (data.isEmpty) {
-      _enterFatalUpgradeState("upgradeStartCfm 数据为空");
-      return;
-    }
-    final status = data[0];
-    if (status == UpgradeStartCFMStatus.success) {
-      mStartAttempts = 0;
-      // the device is ready for the upgrade, we can go to the resume point or to the upgrade beginning.
-      switch (mResumePoint) {
-        case ResumePoints.commit:
-          askForConfirmation(ConfirmationType.commit);
-          break;
-        case ResumePoints.transferComplete:
-          askForConfirmation(ConfirmationType.transferComplete);
-          break;
-        case ResumePoints.inProgress:
-          askForConfirmation(ConfirmationType.inProgress);
-          break;
-        case ResumePoints.validation:
-          sendValidationDoneReq();
-          break;
-        case ResumePoints.dataTransfer:
-        default:
-          sendStartDataReq();
-          break;
-      }
-      return;
-    }
-    if (status == UpgradeStartCFMStatus.errorAppNotReady) {
-      mStartAttempts += 1;
-      addLog("设备应用未就绪(0x09)，第$mStartAttempts次重试");
-      if (mStartAttempts <= _maxStartNotReadyRetries) {
-        Future<void>.delayed(const Duration(milliseconds: 500), () {
-          if (isUpgrading) {
-            sendStartReq();
-          }
-        });
-      } else {
-        _enterFatalUpgradeState("设备持续未就绪(0x09)，超过重试上限");
-      }
-      return;
-    }
-    _enterFatalUpgradeState(
-        "upgradeStartCfm 异常状态: 0x${status.toRadixString(16)}");
-  }
-
-  void receiveAbortCFM() {
-    addLog("receiveAbortCFM");
-    stopUpgrade(sendAbort: false, sendDisconnect: false);
-  }
-
-  void receiveErrorWarnIND(VMUPacket? packet) async {
-    List<int> data = packet?.mData ?? [];
-    if (data.length < 2) {
-      addLog("receiveErrorWarnIND 升级失败，设备返回异常：错误码长度不足");
-      stopUpgrade();
-      _reportDeviceError("升级错误包长度异常", triggerRecovery: true);
-      return;
-    }
-    sendErrorConfirmation(data);
-    int returnCode = StringUtils.extractIntFromByteArray(data, 0, 2, false);
-    addLog(
-        "receiveErrorWarnIND 升级失败 错误码0x${returnCode.toRadixString(16)} ${_upgradeErrorText(returnCode)} fileMd5$fileMd5");
-    if (returnCode == 0x81) {
-      addLog("包不通过，固件文件与设备不匹配");
-      _reportDeviceError("升级错误码0x${returnCode.toRadixString(16)}");
-      askForConfirmation(ConfirmationType.warningFileIsDifferent);
-    } else if (returnCode == 0x21) {
-      addLog("设备电量过低，停止升级");
-      stopUpgrade();
-      _reportDeviceError("设备电量过低");
-    } else {
-      _enterFatalUpgradeState("设备返回升级错误码0x${returnCode.toRadixString(16)}");
-    }
-  }
-
-  void receiveValidationDoneCFM(VMUPacket? packet) {
-    addLog("receiveValidationDoneCFM");
-    List<int> data = packet?.getBytes() ?? [];
-    if (data.length == 2) {
-      final time = StringUtils.extractIntFromByteArray(data, 0, 2, false);
-      Future.delayed(Duration(milliseconds: time))
-          .then((value) => sendValidationDoneReq());
-    } else {
-      sendValidationDoneReq();
-    }
-  }
-
-  void receiveTransferCompleteIND() {
-    addLog("receiveTransferCompleteIND");
-    transFerComplete = true;
-    setResumePoint(ResumePoints.transferComplete);
-    askForConfirmation(ConfirmationType.transferComplete);
-  }
-
-  void receiveCommitREQ() {
-    addLog("receiveCommitREQ");
-    setResumePoint(ResumePoints.commit);
-    askForConfirmation(ConfirmationType.commit);
-  }
-
-  void receiveCompleteIND() {
-    isUpgrading = false;
-    _timer?.cancel();
-    addLog("receiveCompleteIND 升级完成");
-    _schedulePostUpgradeVersionQuery();
-    disconnectUpgrade();
-  }
-
-  void sendValidationDoneReq() {
-    VMUPacket packet = VMUPacket.get(OpCodes.upgradeIsValidationDoneReq);
-    sendVMUPacket(packet, false);
-  }
-
-  void sendStartDataReq() {
-    setResumePoint(ResumePoints.dataTransfer);
-    VMUPacket packet = VMUPacket.get(OpCodes.upgradeStartDataReq);
-    sendVMUPacket(packet, false);
-  }
-
-  void setResumePoint(int point) {
-    mResumePoint = point;
-    _upgradeStateMachine.resumePoint = point;
-  }
-
-  void receiveDataBytesREQ(VMUPacket? packet) {
-    List<int> data = packet?.mData ?? [];
-
-    // Checking the data has the good length
-    if (data.length == OpCodes.dataLength) {
-      // retrieving information from the received packet
-      //REC 120300080000002400000000
-      //SEND 000A064204000D0000030000FFFF0001FFFF0002
-      var lengthByte = [data[0], data[1], data[2], data[3]];
-      var fileByte = [data[4], data[5], data[6], data[7]];
-      final bytesToSend =
-          int.parse(StringUtils.byteToHexString(lengthByte), radix: 16);
-      final fileOffset =
-          int.parse(StringUtils.byteToHexString(fileByte), radix: 16);
-      _handleDataBytesRequest(bytesToSend, fileOffset);
-    } else {
-      addLog("UpgradeError 数据传输失败");
-      abortUpgrade();
-    }
   }
 
   void _handleDataBytesRequest(int bytesToSend, int fileOffset) {
@@ -1394,7 +1169,6 @@ class OtaServer extends GetxService
     }
 
     if (lastPacket) {
-      wasLastPacket = true;
       _upgradeStateMachine.setWasLastPacket(true);
       mBytesToSend = 0;
     } else {
@@ -1434,11 +1208,8 @@ class OtaServer extends GetxService
 
   void onSuccessfulTransmission() {
     _upgradeStateMachine.onSuccessfulTransmission();
-    wasLastPacket = _upgradeStateMachine.wasLastPacket;
-    hasToAbort = _upgradeStateMachine.hasToAbort;
-    mResumePoint = _upgradeStateMachine.resumePoint;
     if (mBytesToSend > 0 &&
-        mResumePoint == ResumePoints.dataTransfer &&
+        _upgradeStateMachine.resumePoint == ResumePoints.dataTransfer &&
         !mIsRWCPEnabled.value) {
       sendNextDataPacket();
     }
@@ -1555,6 +1326,9 @@ class OtaServer extends GetxService
 
   @override
   void onRequestConfirmation(int confirmationType) {
+    if (confirmationType == ConfirmationType.transferComplete) {
+      transFerComplete = true;
+    }
     askForConfirmation(confirmationType);
   }
 
@@ -1739,11 +1513,6 @@ class OtaServer extends GetxService
   void onClose() {
     _logBuffer.dispose();
     _bleManager.dispose();
-    _bleStatusSubscription?.cancel();
-    _scanConnection?.cancel();
-    _connection?.cancel();
-    _subscribeConnection?.cancel();
-    _subscribeConnectionRWCP?.cancel();
     _timer?.cancel();
     _dfuResultTimer?.cancel();
     _upgradeWatchdogTimer?.cancel();
