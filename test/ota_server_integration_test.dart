@@ -91,7 +91,10 @@ void main() {
 
     setUp(() {
       fakeBleManager = _FakeBleConnectionManager();
-      server = OtaServer(bleManagerOverride: fakeBleManager);
+      server = OtaServer(
+        bleManagerOverride: fakeBleManager,
+        defaultFirmwarePathResolver: () async => '/tmp/test_firmware.bin',
+      );
       server.onInit();
       server.connectDeviceId = 'device-1';
     });

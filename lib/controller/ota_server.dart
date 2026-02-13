@@ -24,6 +24,8 @@ import 'package:gaia/controller/gaia_command_builder.dart';
 import 'package:gaia/controller/ble_connection_manager.dart';
 import 'package:gaia/controller/upgrade_state_machine.dart';
 
+typedef DefaultFirmwarePathResolver = Future<String> Function();
+
 class OtaServer extends GetxService
     implements RWCPListener, UpgradeStateMachineDelegate {
   // 组件实例
@@ -33,6 +35,7 @@ class OtaServer extends GetxService
   late final UpgradeStateMachine _upgradeStateMachine;
   final BleConnectionManager? _bleManagerOverride;
   final UpgradeStateMachine? _upgradeStateMachineOverride;
+  final DefaultFirmwarePathResolver _defaultFirmwarePathResolver;
 
   var logText = "".obs;
   final String tag = "OtaServer";
@@ -138,8 +141,16 @@ class OtaServer extends GetxService
   OtaServer({
     BleConnectionManager? bleManagerOverride,
     UpgradeStateMachine? upgradeStateMachineOverride,
+    DefaultFirmwarePathResolver? defaultFirmwarePathResolver,
   })  : _bleManagerOverride = bleManagerOverride,
-        _upgradeStateMachineOverride = upgradeStateMachineOverride;
+        _upgradeStateMachineOverride = upgradeStateMachineOverride,
+        _defaultFirmwarePathResolver =
+            defaultFirmwarePathResolver ?? _resolveDefaultFirmwarePath;
+
+  static Future<String> _resolveDefaultFirmwarePath() async {
+    final filePath = await getApplicationDocumentsDirectory();
+    return "${filePath.path}/1.bin";
+  }
 
   static OtaServer get to => Get.find();
 
@@ -170,8 +181,7 @@ class OtaServer extends GetxService
 
   void _initDefaultFirmwarePath() async {
     try {
-      final filePath = await getApplicationDocumentsDirectory();
-      firmwarePath.value = "${filePath.path}/1.bin";
+      firmwarePath.value = await _defaultFirmwarePathResolver();
     } catch (e) {
       addLog("初始化默认固件路径失败$e");
     }
@@ -733,8 +743,7 @@ class OtaServer extends GetxService
   Future<bool> loadFirmwareFile() async {
     String usePath = firmwarePath.value;
     if (usePath.isEmpty) {
-      final filePath = await getApplicationDocumentsDirectory();
-      usePath = "${filePath.path}/1.bin";
+      usePath = await _defaultFirmwarePathResolver();
       firmwarePath.value = usePath;
     }
     final selectedFile = File(usePath);
