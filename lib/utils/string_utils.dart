@@ -49,7 +49,12 @@ class StringUtils {
 
   static int minToSecond(String s) {
     if (s.isEmpty || !s.contains(":")) return 0;
-    return int.parse(s.split(":")[0]) * 60 + int.parse(s.split(":")[1]);
+    try {
+      final parts = s.split(":");
+      return int.parse(parts[0]) * 60 + int.parse(parts[1]);
+    } catch (e) {
+      return 0;
+    }
   }
 
   /// <p>Extract an <code>int</code> value from a <code>bytes</code> array.</p>

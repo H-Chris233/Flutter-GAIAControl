@@ -188,6 +188,17 @@ void main() {
       test('should return 0 for invalid format', () {
         expect(StringUtils.minToSecond('invalid'), equals(0));
       });
+
+      test('should return 0 for non-numeric parts', () {
+        expect(StringUtils.minToSecond('12:ab'), equals(0));
+        expect(StringUtils.minToSecond('ab:30'), equals(0));
+        expect(StringUtils.minToSecond('xx:yy'), equals(0));
+      });
+
+      test('should return 0 for partial numeric input', () {
+        expect(StringUtils.minToSecond('12:'), equals(0));
+        expect(StringUtils.minToSecond(':30'), equals(0));
+      });
     });
 
     group('roundtrip tests', () {

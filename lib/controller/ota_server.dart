@@ -494,7 +494,11 @@ class OtaServer extends GetxService
 
   void handleRecMsg(List<int> data) async {
     _touchUpgradeWatchdog();
-    GaiaPacketBLE packet = GaiaPacketBLE.fromByte(data) ?? GaiaPacketBLE(0);
+    final packet = GaiaPacketBLE.fromByte(data);
+    if (packet == null) {
+      addLog("数据包解析失败: 长度=${data.length}");
+      return;
+    }
     if (packet.mVendorId != 0x001D) {
       addLog("忽略非V3 Vendor包: ${_vendorToHex(packet.mVendorId)}");
       return;
