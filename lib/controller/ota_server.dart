@@ -28,6 +28,40 @@ typedef DefaultFirmwarePathResolver = Future<String> Function();
 
 class OtaServer extends GetxService
     implements RWCPListener, UpgradeStateMachineDelegate {
+  // ============== 配置常量 ==============
+  /// 升级看门狗超时时间（秒）
+  static const int kUpgradeWatchdogTimeoutSeconds = 15;
+
+  /// 升级后版本查询最大重试次数
+  static const int kPostUpgradeVersionMaxRetries = 10;
+
+  /// 升级后版本查询重试间隔（秒）
+  static const int kPostUpgradeVersionRetryIntervalSeconds = 2;
+
+  /// Vendor 探测超时时间（秒）
+  static const int kVendorProbeTimeoutSeconds = 2;
+
+  /// 版本查询超时时间（秒）
+  static const int kVersionQueryTimeoutSeconds = 3;
+
+  /// DFU 结果查询超时时间（秒）
+  static const int kDfuResultQueryTimeoutSeconds = 3;
+
+  /// 快速恢复前的延迟时间（秒）
+  static const int kRecoveryDelaySeconds = 2;
+
+  /// 错误累计触发恢复的阈值
+  static const int kErrorBurstThreshold = 3;
+
+  /// 错误累计时间窗口（秒）
+  static const int kErrorBurstWindowSeconds = 10;
+
+  /// 恢复时间窗口（分钟）
+  static const int kRecoveryWindowMinutes = 1;
+
+  /// 恢复窗口内最大恢复次数
+  static const int kMaxRecoveryAttemptsPerWindow = 3;
+
   // 组件实例
   late final LogBuffer _logBuffer;
   late final GaiaCommandBuilder _cmdBuilder;
@@ -308,7 +342,8 @@ class OtaServer extends GetxService
         : GAIA.commandGetApiVersion;
     final packet = _buildGaiaPacket(probeCommand, vendor: candidate);
     writeMsg(packet.getBytes());
-    _vendorProbeTimer = Timer(const Duration(seconds: 2), () {
+    _vendorProbeTimer =
+        Timer(Duration(seconds: kVendorProbeTimeoutSeconds), () {
       if (!_isVendorDetecting) {
         return;
       }
@@ -857,7 +892,8 @@ class OtaServer extends GetxService
     addLog("发送DFU_GET_RESULT");
     final packet = _buildGaiaPacket(GAIA.commandDfuGetResult);
     writeMsg(packet.getBytes());
-    _dfuResultTimer = Timer(const Duration(seconds: 3), () {
+    _dfuResultTimer =
+        Timer(Duration(seconds: kDfuResultQueryTimeoutSeconds), () {
       if (!isUpgrading) {
         return;
       }
@@ -924,7 +960,8 @@ class OtaServer extends GetxService
     addLog("发送GET_APPLICATION_VERSION($tag)");
     final packet = _buildGaiaPacket(_getApplicationVersionCommand());
     writeMsg(packet.getBytes());
-    _versionQueryTimer = Timer(const Duration(seconds: 3), () {
+    _versionQueryTimer =
+        Timer(Duration(seconds: kVersionQueryTimeoutSeconds), () {
       if (!_isVersionQueryInFlight) {
         return;
       }
@@ -1010,9 +1047,9 @@ class OtaServer extends GetxService
   void _schedulePostUpgradeVersionQuery() {
     _postUpgradeVersionRetryTimer?.cancel();
     _postUpgradeVersionRetryCount = 0;
-    _postUpgradeVersionRetryTimer =
-        Timer.periodic(const Duration(seconds: 2), (timer) {
-      if (_postUpgradeVersionRetryCount >= 10) {
+    _postUpgradeVersionRetryTimer = Timer.periodic(
+        Duration(seconds: kPostUpgradeVersionRetryIntervalSeconds), (timer) {
+      if (_postUpgradeVersionRetryCount >= kPostUpgradeVersionMaxRetries) {
         timer.cancel();
         addLog("升级后版本查询超时，无法自动对比");
         return;
@@ -1022,7 +1059,8 @@ class OtaServer extends GetxService
         return;
       }
       if (!isDeviceConnected) {
-        addLog("等待设备重连后查询升级后版本($_postUpgradeVersionRetryCount/10)");
+        addLog(
+            "等待设备重连后查询升级后版本($_postUpgradeVersionRetryCount/$kPostUpgradeVersionMaxRetries)");
         return;
       }
       queryApplicationVersion(
@@ -1033,7 +1071,7 @@ class OtaServer extends GetxService
           _logVersionCompare();
         },
         onFailed: () {
-          if (_postUpgradeVersionRetryCount >= 10) {
+          if (_postUpgradeVersionRetryCount >= kPostUpgradeVersionMaxRetries) {
             timer.cancel();
             addLog("升级后版本查询失败，无法自动对比");
           }
@@ -1422,11 +1460,12 @@ class OtaServer extends GetxService
     if (!isUpgrading) {
       return;
     }
-    _upgradeWatchdogTimer = Timer(const Duration(seconds: 15), () {
+    _upgradeWatchdogTimer =
+        Timer(Duration(seconds: kUpgradeWatchdogTimeoutSeconds), () {
       if (!isUpgrading) {
         return;
       }
-      _enterFatalUpgradeState("升级超时：15秒内未收到有效进展");
+      _enterFatalUpgradeState('升级超时：$kUpgradeWatchdogTimeoutSeconds秒内未收到有效进展');
     });
   }
 
@@ -1466,13 +1505,13 @@ class OtaServer extends GetxService
     }
     final now = DateTime.now();
     if (_lastErrorTime == null ||
-        now.difference(_lastErrorTime!).inSeconds > 10) {
+        now.difference(_lastErrorTime!).inSeconds > kErrorBurstWindowSeconds) {
       _errorBurstCount = 0;
     }
     _lastErrorTime = now;
     _errorBurstCount += 1;
-    addLog("错误累计($_errorBurstCount/3): $reason");
-    if (triggerRecovery || _errorBurstCount >= 3) {
+    addLog("错误累计($_errorBurstCount/$kErrorBurstThreshold): $reason");
+    if (triggerRecovery || _errorBurstCount >= kErrorBurstThreshold) {
       _quickRecoverFromDeviceError("自动恢复触发: $reason");
     }
   }
@@ -1488,13 +1527,14 @@ class OtaServer extends GetxService
     }
     final now = DateTime.now();
     _recoveryWindowStart ??= now;
-    if (now.difference(_recoveryWindowStart!).inMinutes >= 1) {
+    if (now.difference(_recoveryWindowStart!).inMinutes >=
+        kRecoveryWindowMinutes) {
       _recoveryWindowStart = now;
       _recoveryAttempts = 0;
     }
-    if (_recoveryAttempts >= 3) {
+    if (_recoveryAttempts >= kMaxRecoveryAttemptsPerWindow) {
       recoveryStatusText.value = "恢复受限";
-      addLog("1分钟内恢复次数过多，暂停自动恢复");
+      addLog('$kRecoveryWindowMinutes分钟内恢复次数过多，暂停自动恢复');
       return;
     }
     _isRecovering = true;
@@ -1502,7 +1542,8 @@ class OtaServer extends GetxService
     _errorBurstCount = 0;
     recoveryStatusText.value = "恢复中";
     rwcpStatusText.value = "恢复中";
-    addLog("执行快速恢复($_recoveryAttempts/3): $reason");
+    addLog(
+        "执行快速恢复($_recoveryAttempts/$kMaxRecoveryAttemptsPerWindow): $reason");
     try {
       if (isUpgrading) {
         stopUpgrade(sendAbort: false);
@@ -1512,7 +1553,7 @@ class OtaServer extends GetxService
       if (connectDeviceId.isNotEmpty) {
         recoveryStatusText.value = "重连中";
         rwcpStatusText.value = "重连中";
-        await Future.delayed(const Duration(seconds: 2));
+        await Future.delayed(Duration(seconds: kRecoveryDelaySeconds));
         connectDevice(connectDeviceId);
       } else {
         addLog("无连接设备ID，无法自动重连");

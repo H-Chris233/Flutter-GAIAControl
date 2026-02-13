@@ -45,7 +45,8 @@ class GaiaCommandBuilder {
   }
 
   /// 构建 GAIA 数据包
-  GaiaPacketBLE buildGaiaPacket(int command, {List<int>? payload, int? vendor}) {
+  GaiaPacketBLE buildGaiaPacket(int command,
+      {List<int>? payload, int? vendor}) {
     return GaiaPacketBLE(command,
         mPayload: payload, mVendorId: vendor ?? activeVendorId);
   }
@@ -72,22 +73,26 @@ class GaiaCommandBuilder {
 
   /// 获取升级连接命令
   int upgradeConnectCommand() => isV3VendorActive
-      ? buildV3Command(v3FeatureUpgrade, v3PacketTypeCommand, v3CmdUpgradeConnect)
+      ? buildV3Command(
+          v3FeatureUpgrade, v3PacketTypeCommand, v3CmdUpgradeConnect)
       : GAIA.commandVmUpgradeConnect;
 
   /// 获取升级断开命令
   int upgradeDisconnectCommand() => isV3VendorActive
-      ? buildV3Command(v3FeatureUpgrade, v3PacketTypeCommand, v3CmdUpgradeDisconnect)
+      ? buildV3Command(
+          v3FeatureUpgrade, v3PacketTypeCommand, v3CmdUpgradeDisconnect)
       : GAIA.commandVmUpgradeDisconnect;
 
   /// 获取升级控制命令
   int upgradeControlCommand() => isV3VendorActive
-      ? buildV3Command(v3FeatureUpgrade, v3PacketTypeCommand, v3CmdUpgradeControl)
+      ? buildV3Command(
+          v3FeatureUpgrade, v3PacketTypeCommand, v3CmdUpgradeControl)
       : GAIA.commandVmUpgradeControl;
 
   /// 获取设置数据端点模式命令
   int setDataEndpointModeCommand() => isV3VendorActive
-      ? buildV3Command(v3FeatureUpgrade, v3PacketTypeCommand, v3CmdSetDataEndpointMode)
+      ? buildV3Command(
+          v3FeatureUpgrade, v3PacketTypeCommand, v3CmdSetDataEndpointMode)
       : GAIA.commandSetDataEndpointMode;
 
   // ==================== 框架相关命令 ====================
@@ -99,12 +104,14 @@ class GaiaCommandBuilder {
 
   /// 获取注册通知命令
   int registerNotificationCommand() => isV3VendorActive
-      ? buildV3Command(v3FeatureFramework, v3PacketTypeCommand, v3CmdRegisterNotification)
+      ? buildV3Command(
+          v3FeatureFramework, v3PacketTypeCommand, v3CmdRegisterNotification)
       : GAIA.commandRegisterNotification;
 
   /// 获取取消通知命令
   int cancelNotificationCommand() => isV3VendorActive
-      ? buildV3Command(v3FeatureFramework, v3PacketTypeCommand, v3CmdCancelNotification)
+      ? buildV3Command(
+          v3FeatureFramework, v3PacketTypeCommand, v3CmdCancelNotification)
       : GAIA.commandCancelNotification;
 
   // ==================== 状态文本转换 ====================

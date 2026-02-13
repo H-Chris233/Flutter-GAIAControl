@@ -30,7 +30,8 @@ void main() {
 
     test('upgradeConnectCommand returns V3 command when V3 active', () {
       final cmd = builder.upgradeConnectCommand();
-      expect(builder.v3CommandFeature(cmd), GaiaCommandBuilder.v3FeatureUpgrade);
+      expect(
+          builder.v3CommandFeature(cmd), GaiaCommandBuilder.v3FeatureUpgrade);
       expect(builder.v3CommandId(cmd), GaiaCommandBuilder.v3CmdUpgradeConnect);
     });
 
@@ -43,19 +44,22 @@ void main() {
 
     test('upgradeControlCommand returns correct command', () {
       final cmd = builder.upgradeControlCommand();
-      expect(builder.v3CommandFeature(cmd), GaiaCommandBuilder.v3FeatureUpgrade);
+      expect(
+          builder.v3CommandFeature(cmd), GaiaCommandBuilder.v3FeatureUpgrade);
       expect(builder.v3CommandId(cmd), GaiaCommandBuilder.v3CmdUpgradeControl);
     });
 
     test('setDataEndpointModeCommand returns correct command', () {
       final cmd = builder.setDataEndpointModeCommand();
-      expect(builder.v3CommandFeature(cmd), GaiaCommandBuilder.v3FeatureUpgrade);
+      expect(
+          builder.v3CommandFeature(cmd), GaiaCommandBuilder.v3FeatureUpgrade);
       expect(cmd, builder.setDataEndpointModeCommand());
     });
 
     test('getApplicationVersionCommand returns correct command', () {
       final cmd = builder.getApplicationVersionCommand();
-      expect(builder.v3CommandFeature(cmd), GaiaCommandBuilder.v3FeatureFramework);
+      expect(
+          builder.v3CommandFeature(cmd), GaiaCommandBuilder.v3FeatureFramework);
       expect(builder.v3CommandId(cmd), GaiaCommandBuilder.v3CmdAppVersion);
     });
 

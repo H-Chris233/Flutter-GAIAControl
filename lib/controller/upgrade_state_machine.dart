@@ -223,8 +223,8 @@ class UpgradeStateMachine {
     }
 
     state = UpgradeState.error;
-    delegate.onUpgradeError(
-        "upgradeStartCfm 异常状态: 0x${status.toRadixString(16)}");
+    delegate
+        .onUpgradeError("upgradeStartCfm 异常状态: 0x${status.toRadixString(16)}");
   }
 
   /// 根据恢复点继续升级
@@ -241,7 +241,8 @@ class UpgradeStateMachine {
         break;
       case ResumePoints.validation:
         state = UpgradeState.validating;
-        final validationPacket = VMUPacket.get(OpCodes.upgradeIsValidationDoneReq);
+        final validationPacket =
+            VMUPacket.get(OpCodes.upgradeIsValidationDoneReq);
         delegate.sendVmuPacket(validationPacket, false);
         break;
       case ResumePoints.dataTransfer:
@@ -294,8 +295,8 @@ class UpgradeStateMachine {
     delegate.sendVmuPacket(errorConfirmPacket, false);
 
     int returnCode = _extractIntFromByteArray(data, 0, 2, false);
-    delegate.onLog(
-        "receiveErrorWarnIND 升级失败 错误码0x${returnCode.toRadixString(16)}");
+    delegate
+        .onLog("receiveErrorWarnIND 升级失败 错误码0x${returnCode.toRadixString(16)}");
 
     if (returnCode == 0x81) {
       delegate.onLog("包不通过，固件文件与设备不匹配");
@@ -317,11 +318,13 @@ class UpgradeStateMachine {
     if (data.length == 2) {
       final time = _extractIntFromByteArray(data, 0, 2, false);
       Future.delayed(Duration(milliseconds: time)).then((_) {
-        final validationPacket = VMUPacket.get(OpCodes.upgradeIsValidationDoneReq);
+        final validationPacket =
+            VMUPacket.get(OpCodes.upgradeIsValidationDoneReq);
         delegate.sendVmuPacket(validationPacket, false);
       });
     } else {
-      final validationPacket = VMUPacket.get(OpCodes.upgradeIsValidationDoneReq);
+      final validationPacket =
+          VMUPacket.get(OpCodes.upgradeIsValidationDoneReq);
       delegate.sendVmuPacket(validationPacket, false);
     }
   }
@@ -362,7 +365,8 @@ class UpgradeStateMachine {
         wasLastPacket = false;
         resumePoint = ResumePoints.validation;
         state = UpgradeState.validating;
-        final validationPacket = VMUPacket.get(OpCodes.upgradeIsValidationDoneReq);
+        final validationPacket =
+            VMUPacket.get(OpCodes.upgradeIsValidationDoneReq);
         delegate.sendVmuPacket(validationPacket, false);
       }
     } else if (hasToAbort) {
