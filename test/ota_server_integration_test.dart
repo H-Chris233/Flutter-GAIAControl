@@ -114,7 +114,7 @@ void main() {
 
     test('receiveVMUPacket handles transfer complete and sends confirmation',
         () async {
-      server.isUpgrading = true;
+      server.isUpgrading.value = true;
       final packet = VMUPacket.get(OpCodes.upgradeTransferCompleteInd);
 
       server.receiveVMUPacket(packet.getBytes());
@@ -125,12 +125,12 @@ void main() {
     });
 
     test('onUpgradeComplete sends upgrade disconnect packet', () async {
-      server.isUpgrading = true;
+      server.isUpgrading.value = true;
 
       server.onUpgradeComplete();
       await Future<void>.delayed(Duration.zero);
 
-      expect(server.isUpgrading, isFalse);
+      expect(server.isUpgrading.value, isFalse);
       expect(fakeBleManager.writeWithResponsePayloads, isNotEmpty);
     });
   });

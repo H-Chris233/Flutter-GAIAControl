@@ -83,7 +83,7 @@ class OtaServer extends GetxService
   bool isDeviceConnected = false;
 
   /// To know if the upgrade process is currently running.
-  bool isUpgrading = false;
+  RxBool isUpgrading = false.obs;
 
   bool transFerComplete = false;
 
@@ -106,7 +106,7 @@ class OtaServer extends GetxService
 
   int mBytesToSend = 0;
 
-  var mIsRWCPEnabled = false.obs;
+  var mIsRWCPEnabled = true.obs; // RWCP 始终启用，不可关闭
   int sendPkgCount = 0;
 
   RxDouble updatePer = RxDouble(0);
@@ -231,20 +231,20 @@ class OtaServer extends GetxService
         onConnected: () async {
           isDeviceConnected = true;
           connectDeviceId = id;
-          if (!isUpgrading) {
+          if (!isUpgrading.value) {
             rwcpStatusText.value = "待启用";
           }
           addLog("Vendor模式固定为V3，使用${_vendorToHex(_activeVendorId)}");
           await registerNotice();
           await restPayloadSize();
-          if (!isUpgrading) {
+          if (!isUpgrading.value) {
             Get.to(() => const TestOtaView());
           }
         },
         onDisconnected: () {
           isDeviceConnected = false;
           rwcpStatusText.value = "连接断开";
-          if (isUpgrading) {
+          if (isUpgrading.value) {
             _enterFatalUpgradeState("升级过程中蓝牙断链");
           }
         },
@@ -306,17 +306,18 @@ class OtaServer extends GetxService
       _rwcpSetupInProgress = false;
       return;
     }
-    addLog("isUpgrading$isUpgrading transFerComplete $transFerComplete");
-    if (isUpgrading) {
+    addLog(
+        "isUpgrading${isUpgrading.value} transFerComplete $transFerComplete");
+    if (isUpgrading.value) {
       rwcpStatusText.value = "已启用";
       _rwcpSetupInProgress = false;
       if (!transFerComplete) {
         sendUpgradeConnect();
       }
-      return;
-    }
-    if (!isUpgrading) {
-      startUpdate();
+    } else {
+      // 非升级状态下不自动启动升级，仅更新状态
+      rwcpStatusText.value = "待启用";
+      _rwcpSetupInProgress = false;
     }
   }
 
@@ -333,7 +334,7 @@ class OtaServer extends GetxService
     );
     writeMsg(registerPacket.getBytes());
     //如果开启RWCP那么需要在重连之后启用RWCP
-    if (isUpgrading && transFerComplete && mIsRWCPEnabled.value) {
+    if (isUpgrading.value && transFerComplete && mIsRWCPEnabled.value) {
       //开启RWCP
       writeMsg(_buildGaiaPacket(_setDataEndpointModeCommand(), payload: [0x01])
           .getBytes());
@@ -341,7 +342,7 @@ class OtaServer extends GetxService
   }
 
   Future<void> startUpdate() async {
-    if (isUpgrading) {
+    if (isUpgrading.value) {
       addLog("正在升级中，忽略重复开始请求");
       return;
     }
@@ -357,14 +358,13 @@ class OtaServer extends GetxService
     });
     sendPkgCount = 0;
     updatePer.value = 0;
-    isUpgrading = true;
+    isUpgrading.value = true;
     _dfuResultTimer?.cancel();
     _versionQueryTimer?.cancel();
     _postUpgradeVersionRetryTimer?.cancel();
     _rwcpSetupInProgress = false;
     _fatalUpgradeReason = "";
     _autoReconnectEnabled = true;
-    mIsRWCPEnabled.value = true;
     rwcpStatusText.value = "启用中";
     resetUpload();
     _armUpgradeWatchdog();
@@ -373,7 +373,7 @@ class OtaServer extends GetxService
   }
 
   void startUpdateWithVersionCheck() {
-    if (isUpgrading) {
+    if (isUpgrading.value) {
       addLog("正在升级中，忽略重复开始请求");
       return;
     }
@@ -437,7 +437,7 @@ class OtaServer extends GetxService
       }
       if (feature == GaiaCommandBuilder.v3FeatureUpgrade &&
           commandId == GaiaCommandBuilder.v3CmdUpgradeConnect) {
-        if (isUpgrading) {
+        if (isUpgrading.value) {
           resetUpload();
           sendSyncReq();
         }
@@ -470,7 +470,7 @@ class OtaServer extends GetxService
           "V3错误响应 feature=$feature cmdId=$commandId status=0x${status.toRadixString(16)} ${_gaiaStatusText(status)}");
       _reportDeviceError(
           "V3错误 feature=$feature cmdId=$commandId status=0x${status.toRadixString(16)}",
-          triggerRecovery: !isUpgrading);
+          triggerRecovery: !isUpgrading.value);
 
       if (feature == GaiaCommandBuilder.v3FeatureFramework &&
           commandId == GaiaCommandBuilder.v3CmdAppVersion) {
@@ -494,6 +494,16 @@ class OtaServer extends GetxService
         _enterFatalUpgradeState(
             "V3升级命令失败 cmdId=$commandId status=0x${status.toRadixString(16)}");
       }
+      return;
+    }
+
+    // 未识别的包类型，记录日志并报告错误
+    addLog(
+        "未知V3包类型 feature=$feature packetType=$packetType cmdId=$commandId payload=${payload.map((e) => e.toRadixString(16)).toList()}");
+    if (isUpgrading.value) {
+      _reportDeviceError(
+          "收到未知V3响应 feature=$feature type=$packetType cmd=$commandId",
+          triggerRecovery: false);
     }
   }
 
@@ -510,8 +520,8 @@ class OtaServer extends GetxService
   }
 
   void startUpgradeProcess() {
-    if (!isUpgrading) {
-      isUpgrading = true;
+    if (!isUpgrading.value) {
+      isUpgrading.value = true;
       resetUpload();
       sendSyncReq();
     } else {
@@ -528,7 +538,8 @@ class OtaServer extends GetxService
     mStartOffset = 0;
   }
 
-  Future<void> stopUpgrade({bool sendAbort = true, bool sendDisconnect = true}) async {
+  Future<void> stopUpgrade(
+      {bool sendAbort = true, bool sendDisconnect = true}) async {
     _clearUpgradeWatchdog();
     _timer?.cancel();
     _dfuResultTimer?.cancel();
@@ -536,9 +547,7 @@ class OtaServer extends GetxService
     _postUpgradeVersionRetryTimer?.cancel();
     _pendingStartAfterVersionQuery = false;
     _rwcpSetupInProgress = false;
-    if (!mIsRWCPEnabled.value) {
-      rwcpStatusText.value = "未启用";
-    }
+    rwcpStatusText.value = "待启用";
     timeCount.value = 0;
     if (sendAbort) {
       abortUpgrade();
@@ -546,12 +555,10 @@ class OtaServer extends GetxService
     resetUpload();
     writeRTCPCount = 0;
     updatePer.value = 0;
-    isUpgrading = false;
+    isUpgrading.value = false;
     _dfuWriteInFlight = false;
     _dfuPendingChunkSize = 0;
-    if (sendDisconnect &&
-        isDeviceConnected &&
-        connectDeviceId.isNotEmpty) {
+    if (sendDisconnect && isDeviceConnected && connectDeviceId.isNotEmpty) {
       await Future.delayed(const Duration(milliseconds: 500));
       sendUpgradeDisconnect();
     }
@@ -626,7 +633,7 @@ class OtaServer extends GetxService
   }
 
   void sendNextDfuPacket() {
-    if (!isUpgrading || _dfuWriteInFlight) {
+    if (!isUpgrading.value || _dfuWriteInFlight) {
       return;
     }
     final bytes = mBytesFile ?? [];
@@ -676,7 +683,7 @@ class OtaServer extends GetxService
     writeMsg(packet.getBytes());
     _dfuResultTimer =
         Timer(Duration(seconds: kDfuResultQueryTimeoutSeconds), () {
-      if (!isUpgrading) {
+      if (!isUpgrading.value) {
         return;
       }
       addLog("DFU_GET_RESULT超时，按提交成功处理");
@@ -697,7 +704,7 @@ class OtaServer extends GetxService
       return;
     }
     _dfuWriteInFlight = false;
-    isUpgrading = false;
+    isUpgrading.value = false;
     _timer?.cancel();
     addLog(
         "DFU升级失败，结果码=0x${resultCode.toRadixString(16).padLeft(2, '0')} ${_dfuResultText(resultCode)}");
@@ -705,7 +712,7 @@ class OtaServer extends GetxService
 
   void _finishDfuUpgrade(String message, {bool queryPostVersion = false}) {
     _dfuWriteInFlight = false;
-    isUpgrading = false;
+    isUpgrading.value = false;
     _timer?.cancel();
     _dfuResultTimer?.cancel();
     addLog(message);
@@ -804,7 +811,7 @@ class OtaServer extends GetxService
         return;
       }
       _postUpgradeVersionRetryCount++;
-      if (_isVersionQueryInFlight || isUpgrading) {
+      if (_isVersionQueryInFlight || isUpgrading.value) {
         return;
       }
       if (!isDeviceConnected) {
@@ -886,7 +893,7 @@ class OtaServer extends GetxService
             "receiveVMUPacket 无法解析VMU包: ${StringUtils.byteToHexString(data)}");
         return;
       }
-      if (isUpgrading || packet.mOpCode == OpCodes.upgradeAbortCfm) {
+      if (isUpgrading.value || packet.mOpCode == OpCodes.upgradeAbortCfm) {
         _upgradeStateMachine.handleVmuPacket(packet);
       } else {
         addLog(
@@ -934,7 +941,7 @@ class OtaServer extends GetxService
     }
     mProgressQueue.clear();
     sendAbortReq();
-    isUpgrading = false;
+    isUpgrading.value = false;
   }
 
   void sendAbortReq() {
@@ -944,7 +951,7 @@ class OtaServer extends GetxService
 
   //主要发包逻辑
   void sendNextDataPacket() {
-    if (!isUpgrading) {
+    if (!isUpgrading.value) {
       stopUpgrade();
       return;
     }
@@ -1100,7 +1107,7 @@ class OtaServer extends GetxService
 
   @override
   void onUpgradeComplete() {
-    isUpgrading = false;
+    isUpgrading.value = false;
     _timer?.cancel();
     addLog("receiveCompleteIND 升级完成");
     _schedulePostUpgradeVersionQuery();
@@ -1139,7 +1146,7 @@ class OtaServer extends GetxService
     } catch (e) {
       addLog("写入失败(writeWithResponse): $e");
       _reportDeviceError("写通道异常(writeWithResponse)");
-      if (isUpgrading) {
+      if (isUpgrading.value) {
         _enterFatalUpgradeState("写入通道异常");
       }
     }
@@ -1153,7 +1160,7 @@ class OtaServer extends GetxService
     } catch (e) {
       addLog("写入失败(writeWithoutResponse): $e");
       _reportDeviceError("写通道异常(writeWithoutResponse)");
-      if (isUpgrading) {
+      if (isUpgrading.value) {
         _enterFatalUpgradeState("RWCP写入异常");
       }
     }
@@ -1192,12 +1199,12 @@ class OtaServer extends GetxService
 
   void _armUpgradeWatchdog() {
     _clearUpgradeWatchdog();
-    if (!isUpgrading) {
+    if (!isUpgrading.value) {
       return;
     }
     _upgradeWatchdogTimer =
         Timer(Duration(seconds: kUpgradeWatchdogTimeoutSeconds), () {
-      if (!isUpgrading) {
+      if (!isUpgrading.value) {
         return;
       }
       _enterFatalUpgradeState('升级超时：$kUpgradeWatchdogTimeoutSeconds秒内未收到有效进展');
@@ -1205,7 +1212,7 @@ class OtaServer extends GetxService
   }
 
   void _touchUpgradeWatchdog() {
-    if (!isUpgrading) {
+    if (!isUpgrading.value) {
       return;
     }
     _armUpgradeWatchdog();
@@ -1217,15 +1224,15 @@ class OtaServer extends GetxService
   }
 
   void _enterFatalUpgradeState(String reason) {
-    if (_fatalUpgradeReason == reason && !isUpgrading) {
+    if (_fatalUpgradeReason == reason && !isUpgrading.value) {
       return;
     }
     _fatalUpgradeReason = reason;
     _autoReconnectEnabled = false;
     rwcpStatusText.value = "错误已退出";
     addLog("致命错误：$reason，已自动退出升级并关闭自动重连");
-    final wasUpgrading = isUpgrading;
-    if (isUpgrading) {
+    final wasUpgrading = isUpgrading.value;
+    if (isUpgrading.value) {
       unawaited(stopUpgrade(sendAbort: false));
     } else {
       _clearUpgradeWatchdog();
@@ -1280,7 +1287,7 @@ class OtaServer extends GetxService
     addLog(
         "执行快速恢复($_recoveryAttempts/$kMaxRecoveryAttemptsPerWindow): $reason");
     try {
-      if (isUpgrading) {
+      if (isUpgrading.value) {
         await stopUpgrade(sendAbort: false);
       }
       _bleManager.disconnect();

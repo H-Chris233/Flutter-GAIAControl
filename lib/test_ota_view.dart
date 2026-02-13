@@ -65,7 +65,7 @@ class _TestOtaState extends State<TestOtaView> {
           }),
           Obx(() {
             final time = OtaServer.to.timeCount.value;
-            final upgrading = OtaServer.to.isUpgrading;
+            final upgrading = OtaServer.to.isUpgrading.value;
             return MaterialButton(
               color: Colors.blue,
               onPressed: upgrading
@@ -104,7 +104,7 @@ class _TestOtaState extends State<TestOtaView> {
             );
           }),
           Obx(() {
-            final upgrading = OtaServer.to.isUpgrading;
+            final upgrading = OtaServer.to.isUpgrading.value;
             return MaterialButton(
               color: Colors.blue,
               onPressed: upgrading
@@ -116,7 +116,7 @@ class _TestOtaState extends State<TestOtaView> {
             );
           }),
           Obx(() {
-            final upgrading = OtaServer.to.isUpgrading;
+            final upgrading = OtaServer.to.isUpgrading.value;
             final rwcpStatus = OtaServer.to.rwcpStatusText.value;
             final recoveryStatus = OtaServer.to.recoveryStatusText.value;
             final canRecover = upgrading ||
