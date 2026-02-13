@@ -1226,7 +1226,7 @@ class OtaServer extends GetxService
     addLog("致命错误：$reason，已自动退出升级并关闭自动重连");
     final wasUpgrading = isUpgrading;
     if (isUpgrading) {
-      stopUpgrade(sendAbort: false);
+      unawaited(stopUpgrade(sendAbort: false));
     } else {
       _clearUpgradeWatchdog();
     }
@@ -1247,12 +1247,12 @@ class OtaServer extends GetxService
     _errorBurstCount += 1;
     addLog("错误累计($_errorBurstCount/$kErrorBurstThreshold): $reason");
     if (triggerRecovery || _errorBurstCount >= kErrorBurstThreshold) {
-      _quickRecoverFromDeviceError("自动恢复触发: $reason");
+      unawaited(_quickRecoverFromDeviceError("自动恢复触发: $reason"));
     }
   }
 
   void quickRecoverNow() {
-    _quickRecoverFromDeviceError("手动快速恢复");
+    unawaited(_quickRecoverFromDeviceError("手动快速恢复"));
   }
 
   Future<void> _quickRecoverFromDeviceError(String reason) async {
@@ -1281,7 +1281,7 @@ class OtaServer extends GetxService
         "执行快速恢复($_recoveryAttempts/$kMaxRecoveryAttemptsPerWindow): $reason");
     try {
       if (isUpgrading) {
-        stopUpgrade(sendAbort: false);
+        await stopUpgrade(sendAbort: false);
       }
       _bleManager.disconnect();
       isDeviceConnected = false;
@@ -1289,7 +1289,7 @@ class OtaServer extends GetxService
         recoveryStatusText.value = "重连中";
         rwcpStatusText.value = "重连中";
         await Future.delayed(Duration(seconds: kRecoveryDelaySeconds));
-        connectDevice(connectDeviceId);
+        await connectDevice(connectDeviceId);
       } else {
         addLog("无连接设备ID，无法自动重连");
         recoveryStatusText.value = "恢复失败";
