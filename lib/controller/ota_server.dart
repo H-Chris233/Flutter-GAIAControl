@@ -6,7 +6,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import 'package:get/get.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 import 'package:gaia/test_ota_view.dart';
 import 'package:gaia/utils/ble_constants.dart';
@@ -23,16 +22,21 @@ import 'package:gaia/utils/gaia/rwcp/rwcp_listener.dart';
 
 import 'package:gaia/controller/log_buffer.dart';
 import 'package:gaia/controller/gaia_command_builder.dart';
+import 'package:gaia/controller/ble_connection_manager.dart';
+import 'package:gaia/controller/upgrade_state_machine.dart';
 
-class OtaServer extends GetxService implements RWCPListener {
+class OtaServer extends GetxService
+    implements RWCPListener, UpgradeStateMachineDelegate {
   // 组件实例
   late final LogBuffer _logBuffer;
   late final GaiaCommandBuilder _cmdBuilder;
+  late final BleConnectionManager _bleManager;
+  late final UpgradeStateMachine _upgradeStateMachine;
 
   final flutterReactiveBle = FlutterReactiveBle();
   var logText = "".obs;
   final String tag = "OtaServer";
-  var devices = <DiscoveredDevice>[].obs;
+  late final RxList<DiscoveredDevice> devices;
   StreamSubscription<DiscoveredDevice>? _scanConnection;
 
   String connectDeviceId = "";
@@ -115,7 +119,6 @@ class OtaServer extends GetxService implements RWCPListener {
   Timer? _upgradeWatchdogTimer;
   Timer? _reconnectTimer;
   bool _autoReconnectEnabled = true;
-  int _connectionGeneration = 0;
   String _fatalUpgradeReason = "";
   static const String vendorModeAuto = "auto";
   static const String vendorModeV3 = "v3";
@@ -153,25 +156,21 @@ class OtaServer extends GetxService implements RWCPListener {
     // 初始化组件
     _logBuffer = LogBuffer(logText: logText);
     _cmdBuilder = GaiaCommandBuilder(activeVendorId: _activeVendorId);
+    _bleManager = BleConnectionManager(
+      ble: FlutterReactiveBleClient(flutterReactiveBle),
+      onLog: addLog,
+      onConnectionStateChanged: (state, deviceId) {
+        if (state != DeviceConnectionState.connected) {
+          return;
+        }
+        connectDeviceId = deviceId;
+      },
+    );
+    devices = _bleManager.devices;
+    _upgradeStateMachine = UpgradeStateMachine(delegate: this);
     mRWCPClient = RWCPClient(this);
     _initDefaultFirmwarePath();
-    _bleStatusSubscription?.cancel();
-    _bleStatusSubscription = flutterReactiveBle.statusStream.listen((event) {
-      switch (event) {
-        case BleStatus.ready:
-          addLog("蓝牙打开");
-          break;
-        case BleStatus.poweredOff:
-          addLog("蓝牙关闭");
-          break;
-        case BleStatus.unknown:
-          addLog("蓝牙状态未知");
-          break;
-        default:
-          addLog("蓝牙不可用");
-          break;
-      }
-    });
+    _bleManager.startBleStatusMonitor();
   }
 
   void _initDefaultFirmwarePath() async {
@@ -195,32 +194,16 @@ class OtaServer extends GetxService implements RWCPListener {
 
   void connectDevice(String id) async {
     try {
-      final int generation = ++_connectionGeneration;
-      _reconnectTimer?.cancel();
-      await _connection?.cancel();
-      await _subscribeConnection?.cancel();
-      await _subscribeConnectionRWCP?.cancel();
-      _connection = null;
-      _subscribeConnection = null;
-      _subscribeConnectionRWCP = null;
       _autoReconnectEnabled = true;
-      addLog('开始连接$id');
-      _connection = flutterReactiveBle
-          .connectToDevice(
-              id: id, connectionTimeout: const Duration(seconds: 5))
-          .listen((connectionState) async {
-        if (generation != _connectionGeneration) {
-          return;
-        }
-        if (connectionState.connectionState ==
-            DeviceConnectionState.connected) {
-          _reconnectTimer?.cancel();
+      _bleManager.setAutoReconnectEnabled(_autoReconnectEnabled);
+      await _bleManager.connect(
+        id,
+        onConnected: () async {
           isDeviceConnected = true;
+          connectDeviceId = id;
           if (!isUpgrading) {
             rwcpStatusText.value = "待启用";
           }
-          connectDeviceId = id;
-          addLog("连接成功$connectDeviceId");
           _startVendorProbe(
             onSuccess: () {
               addLog("Vendor探测成功: ${_vendorToHex(_activeVendorId)}");
@@ -230,90 +213,22 @@ class OtaServer extends GetxService implements RWCPListener {
                   "Vendor探测失败，继续使用默认Vendor ${_vendorToHex(_activeVendorId)}");
             },
           );
-          if (await _discoverServicesIfNeeded(id)) {
-            if (isDeviceConnected) {
-              await registerNotice();
-            }
-          } else {
-            addLog("服务发现失败，通知通道注册跳过");
-          }
+          await registerNotice();
           if (!isUpgrading) {
             Get.to(() => const TestOtaView());
           }
-        } else if (connectionState.connectionState ==
-            DeviceConnectionState.disconnected) {
+        },
+        onDisconnected: () {
           isDeviceConnected = false;
           rwcpStatusText.value = "连接断开";
-          addLog('断开连接');
           if (isUpgrading) {
             _enterFatalUpgradeState("升级过程中蓝牙断链");
-            return;
           }
-          if (_autoReconnectEnabled && connectDeviceId.isNotEmpty) {
-            _scheduleReconnect(expectedGeneration: generation);
-          } else {
-            addLog("自动重连已关闭，等待手动重连");
-          }
-        } else {
-          isDeviceConnected = false;
-          rwcpStatusText.value = "连接中断";
-          addLog('断开${connectionState.connectionState}');
-          if (isUpgrading) {
-            _enterFatalUpgradeState(
-                "升级过程中连接状态异常: ${connectionState.connectionState}");
-          }
-        }
-      });
+        },
+      );
     } catch (e) {
       addLog('开始连接失败$e');
     }
-  }
-
-  void _scheduleReconnect({required int expectedGeneration}) {
-    _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(const Duration(seconds: 5), () {
-      if (expectedGeneration != _connectionGeneration) {
-        return;
-      }
-      if (!_autoReconnectEnabled ||
-          isDeviceConnected ||
-          connectDeviceId.isEmpty) {
-        return;
-      }
-      connectDevice(connectDeviceId);
-    });
-  }
-
-  Future<bool> _discoverServicesIfNeeded(String deviceId) async {
-    try {
-      await flutterReactiveBle.discoverAllServices(deviceId);
-      final services = await flutterReactiveBle.getDiscoveredServices(deviceId);
-      if (_hasRequiredOtaService(services)) {
-        return true;
-      }
-      final stopwatch = Stopwatch()..start();
-      while (stopwatch.elapsed < const Duration(seconds: 3)) {
-        await Future<void>.delayed(const Duration(milliseconds: 120));
-        final retryServices =
-            await flutterReactiveBle.getDiscoveredServices(deviceId);
-        if (_hasRequiredOtaService(retryServices)) {
-          return true;
-        }
-      }
-      return false;
-    } catch (e) {
-      addLog("服务发现异常: $e");
-      return false;
-    }
-  }
-
-  bool _hasRequiredOtaService(List<Service> services) {
-    for (final service in services) {
-      if (service.id == otaUUID) {
-        return true;
-      }
-    }
-    return false;
   }
 
   void writeMsg(List<int> data) {
@@ -340,8 +255,10 @@ class OtaServer extends GetxService implements RWCPListener {
   int _upgradeDisconnectCommand() => _cmdBuilder.upgradeDisconnectCommand();
   int _upgradeControlCommand() => _cmdBuilder.upgradeControlCommand();
   int _setDataEndpointModeCommand() => _cmdBuilder.setDataEndpointModeCommand();
-  int _getApplicationVersionCommand() => _cmdBuilder.getApplicationVersionCommand();
-  int _registerNotificationCommand() => _cmdBuilder.registerNotificationCommand();
+  int _getApplicationVersionCommand() =>
+      _cmdBuilder.getApplicationVersionCommand();
+  int _registerNotificationCommand() =>
+      _cmdBuilder.registerNotificationCommand();
   int _cancelNotificationCommand() => _cmdBuilder.cancelNotificationCommand();
 
   int _v3CommandFeature(int cmd) => _cmdBuilder.v3CommandFeature(cmd);
@@ -412,25 +329,16 @@ class OtaServer extends GetxService implements RWCPListener {
       return;
     }
     rwcpStatusText.value = "建立通道中";
-    await _subscribeConnectionRWCP?.cancel();
-    if (!await _discoverServicesIfNeeded(connectDeviceId)) {
+    await _bleManager.cancelRwcpChannel();
+    await _bleManager.registerRwcpChannel((data) {
+      //addLog("wenDataRec2>${StringUtils.byteToHexString(data)}");
+      mRWCPClient.onReceiveRWCPSegment(data);
+    });
+    if (!_bleManager.isDeviceConnected) {
       rwcpStatusText.value = "服务未就绪";
       _rwcpSetupInProgress = false;
       return;
     }
-    final characteristic = QualifiedCharacteristic(
-        serviceId: otaUUID,
-        characteristicId: writeNoResUUID,
-        deviceId: connectDeviceId);
-    _subscribeConnectionRWCP = flutterReactiveBle
-        .subscribeToCharacteristic(characteristic)
-        .listen((data) {
-      //addLog("wenDataRec2>${StringUtils.byteToHexString(data)}");
-      mRWCPClient.onReceiveRWCPSegment(data);
-      // code to handle incoming data
-    }, onError: (dynamic error) {
-      // code to handle errors
-    });
     addLog("isUpgrading$isUpgrading transFerComplete $transFerComplete");
     if (isUpgrading) {
       rwcpStatusText.value = "已启用";
@@ -447,23 +355,9 @@ class OtaServer extends GetxService implements RWCPListener {
 
   //注册通知
   Future<void> registerNotice() async {
-    await _subscribeConnection?.cancel();
-    if (!await _discoverServicesIfNeeded(connectDeviceId)) {
-      addLog("通知注册失败：服务未就绪");
-      return;
-    }
-    final characteristic = QualifiedCharacteristic(
-        serviceId: otaUUID,
-        characteristicId: notifyUUID,
-        deviceId: connectDeviceId);
-    _subscribeConnection = flutterReactiveBle
-        .subscribeToCharacteristic(characteristic)
-        .listen((data) {
+    await _bleManager.registerNotifyChannel((data) {
       addLog("收到通知>${StringUtils.byteToHexString(data)}");
       handleRecMsg(data);
-      // code to handle incoming data
-    }, onError: (dynamic error) {
-      // code to handle errors
     });
     final registerPayload = _isV3VendorActive() ? [0x06] : [GAIA.vmuPacket];
     GaiaPacketBLE registerPacket = _buildGaiaPacket(
@@ -803,11 +697,14 @@ class OtaServer extends GetxService implements RWCPListener {
 
   /// <p>To reset the file transfer.</p>
   void resetUpload() {
+    _upgradeStateMachine.reset();
     transFerComplete = false;
     mStartAttempts = 0;
     mBytesToSend = 0;
     mStartOffset = 0;
     wasLastPacket = false;
+    hasToAbort = false;
+    mResumePoint = -1;
   }
 
   void stopUpgrade({bool sendAbort = true, bool sendDisconnect = true}) async {
@@ -875,6 +772,7 @@ class OtaServer extends GetxService implements RWCPListener {
       return;
     }
     final endMd5 = StringUtils.hexStringToBytes(fileMd5.substring(24));
+    _upgradeStateMachine.startUpgrade();
     VMUPacket packet = VMUPacket.get(OpCodes.upgradeSyncReq, data: endMd5);
     sendVMUPacket(packet, false);
   }
@@ -1001,8 +899,10 @@ class OtaServer extends GetxService implements RWCPListener {
   // 状态/命令文本转换（代理到 GaiaCommandBuilder）
   String _gaiaStatusText(int status) => _cmdBuilder.gaiaStatusText(status);
   String _gaiaCommandText(int cmd) => _cmdBuilder.gaiaCommandText(cmd);
-  String _dfuResultText(int resultCode) => _cmdBuilder.dfuResultText(resultCode);
-  String _upgradeErrorText(int returnCode) => _cmdBuilder.upgradeErrorText(returnCode);
+  String _dfuResultText(int resultCode) =>
+      _cmdBuilder.dfuResultText(resultCode);
+  String _upgradeErrorText(int returnCode) =>
+      _cmdBuilder.upgradeErrorText(returnCode);
 
   void queryApplicationVersion({
     required String tag,
@@ -1188,6 +1088,11 @@ class OtaServer extends GetxService implements RWCPListener {
     }
   }
 
+  @override
+  void sendVmuPacket(VMUPacket packet, bool isTransferringData) {
+    sendVMUPacket(packet, isTransferringData);
+  }
+
   void receiveVMUPacket(List<int> data) {
     try {
       final packet = VMUPacket.getPackageFromByte(data);
@@ -1197,7 +1102,7 @@ class OtaServer extends GetxService implements RWCPListener {
         return;
       }
       if (isUpgrading || packet.mOpCode == OpCodes.upgradeAbortCfm) {
-        handleVMUPacket(packet);
+        _upgradeStateMachine.handleVmuPacket(packet);
       } else {
         addLog(
             "receiveVMUPacket Received VMU packet while application is not upgrading anymore, opcode received");
@@ -1407,6 +1312,7 @@ class OtaServer extends GetxService implements RWCPListener {
 
   void setResumePoint(int point) {
     mResumePoint = point;
+    _upgradeStateMachine.resumePoint = point;
   }
 
   void receiveDataBytesREQ(VMUPacket? packet) {
@@ -1419,37 +1325,36 @@ class OtaServer extends GetxService implements RWCPListener {
       //SEND 000A064204000D0000030000FFFF0001FFFF0002
       var lengthByte = [data[0], data[1], data[2], data[3]];
       var fileByte = [data[4], data[5], data[6], data[7]];
-      mBytesToSend =
+      final bytesToSend =
           int.parse(StringUtils.byteToHexString(lengthByte), radix: 16);
-      int fileOffset =
+      final fileOffset =
           int.parse(StringUtils.byteToHexString(fileByte), radix: 16);
-
-      addLog(
-          "${StringUtils.byteToHexString(data)}本次发包: $fileOffset $mBytesToSend");
-      // we check the value for the offset
-      mStartOffset += (fileOffset > 0 &&
-              fileOffset + mStartOffset < (mBytesFile?.length ?? 0))
-          ? fileOffset
-          : 0;
-
-      // if the asked length doesn't fit with possibilities we use the maximum length we can use.
-      mBytesToSend = (mBytesToSend > 0) ? mBytesToSend : 0;
-      // if the requested length will look for bytes out of the array we reduce it to the remaining length.
-      int remainingLength = (mBytesFile?.length ?? 0) - mStartOffset;
-      mBytesToSend =
-          (mBytesToSend < remainingLength) ? mBytesToSend : remainingLength;
-      if (mIsRWCPEnabled.value) {
-        while (mBytesToSend > 0) {
-          sendNextDataPacket();
-        }
-      } else {
-        addLog("receiveDataBytesREQ: sendNextDataPacket");
-        sendNextDataPacket();
-      }
+      _handleDataBytesRequest(bytesToSend, fileOffset);
     } else {
       addLog("UpgradeError 数据传输失败");
       abortUpgrade();
     }
+  }
+
+  void _handleDataBytesRequest(int bytesToSend, int fileOffset) {
+    mBytesToSend = bytesToSend;
+    addLog("本次发包: offset=$fileOffset bytesToSend=$mBytesToSend");
+    mStartOffset += (fileOffset > 0 &&
+            fileOffset + mStartOffset < (mBytesFile?.length ?? 0))
+        ? fileOffset
+        : 0;
+
+    mBytesToSend = (mBytesToSend > 0) ? mBytesToSend : 0;
+    final remainingLength = (mBytesFile?.length ?? 0) - mStartOffset;
+    mBytesToSend =
+        (mBytesToSend < remainingLength) ? mBytesToSend : remainingLength;
+    if (mIsRWCPEnabled.value) {
+      while (mBytesToSend > 0) {
+        sendNextDataPacket();
+      }
+      return;
+    }
+    sendNextDataPacket();
   }
 
   void abortUpgrade() {
@@ -1490,8 +1395,10 @@ class OtaServer extends GetxService implements RWCPListener {
 
     if (lastPacket) {
       wasLastPacket = true;
+      _upgradeStateMachine.setWasLastPacket(true);
       mBytesToSend = 0;
     } else {
+      _upgradeStateMachine.setWasLastPacket(false);
       mStartOffset += bytesToSend;
       mBytesToSend -= bytesToSend;
     }
@@ -1526,21 +1433,14 @@ class OtaServer extends GetxService implements RWCPListener {
   }
 
   void onSuccessfulTransmission() {
-    if (wasLastPacket) {
-      if (mResumePoint == ResumePoints.dataTransfer) {
-        wasLastPacket = false;
-        setResumePoint(ResumePoints.validation);
-        sendValidationDoneReq();
-      }
-    } else if (hasToAbort) {
-      hasToAbort = false;
-      abortUpgrade();
-    } else {
-      if (mBytesToSend > 0 &&
-          mResumePoint == ResumePoints.dataTransfer &&
-          !mIsRWCPEnabled.value) {
-        sendNextDataPacket();
-      }
+    _upgradeStateMachine.onSuccessfulTransmission();
+    wasLastPacket = _upgradeStateMachine.wasLastPacket;
+    hasToAbort = _upgradeStateMachine.hasToAbort;
+    mResumePoint = _upgradeStateMachine.resumePoint;
+    if (mBytesToSend > 0 &&
+        mResumePoint == ResumePoints.dataTransfer &&
+        !mIsRWCPEnabled.value) {
+      sendNextDataPacket();
     }
   }
 
@@ -1629,18 +1529,42 @@ class OtaServer extends GetxService implements RWCPListener {
     return true;
   }
 
+  @override
+  void onUpgradeProgress(double percent) {
+    updatePer.value = percent;
+  }
+
+  @override
+  void onUpgradeComplete() {
+    isUpgrading = false;
+    _timer?.cancel();
+    addLog("receiveCompleteIND 升级完成");
+    _schedulePostUpgradeVersionQuery();
+    disconnectUpgrade();
+  }
+
+  @override
+  void onUpgradeError(String reason) {
+    _enterFatalUpgradeState(reason);
+  }
+
+  @override
+  void onRequestNextDataPacket(int bytesToSend, int startOffset) {
+    _handleDataBytesRequest(bytesToSend, startOffset);
+  }
+
+  @override
+  void onRequestConfirmation(int confirmationType) {
+    askForConfirmation(confirmationType);
+  }
+
   //一般命令写入通道
   Future<void> writeData(List<int> data) async {
     try {
       if (_enableWriteTraceLog) {
         addLog("writeData start>${StringUtils.byteToHexString(data)}");
       }
-      final characteristic = QualifiedCharacteristic(
-          serviceId: otaUUID,
-          characteristicId: writeUUID,
-          deviceId: connectDeviceId);
-      await flutterReactiveBle.writeCharacteristicWithResponse(characteristic,
-          value: data);
+      await _bleManager.writeWithResponse(data);
       _touchUpgradeWatchdog();
       if (_enableWriteTraceLog) {
         addLog("writeData end>${StringUtils.byteToHexString(data)}");
@@ -1657,12 +1581,7 @@ class OtaServer extends GetxService implements RWCPListener {
   //RWCP写入通道
   void writeMsgRWCP(List<int> data) async {
     try {
-      final characteristic = QualifiedCharacteristic(
-          serviceId: otaUUID,
-          characteristicId: writeNoResUUID,
-          deviceId: connectDeviceId);
-      await flutterReactiveBle
-          .writeCharacteristicWithoutResponse(characteristic, value: data);
+      await _bleManager.writeWithoutResponse(data);
       _touchUpgradeWatchdog();
     } catch (e) {
       addLog("写入失败(writeWithoutResponse): $e");
@@ -1677,14 +1596,12 @@ class OtaServer extends GetxService implements RWCPListener {
     _vendorProbeTimer?.cancel();
     _reconnectTimer?.cancel();
     _isVendorDetecting = false;
-    _connection?.cancel();
-    _subscribeConnection?.cancel();
-    _subscribeConnectionRWCP?.cancel();
+    _bleManager.disconnect();
+    isDeviceConnected = false;
   }
 
   Future<void> restPayloadSize() async {
-    int mtu = await flutterReactiveBle.requestMtu(
-        deviceId: connectDeviceId, mtu: 256);
+    int mtu = await _bleManager.requestMtu(256);
     if (!mIsRWCPEnabled.value) {
       mtu = 23;
     }
@@ -1696,6 +1613,11 @@ class OtaServer extends GetxService implements RWCPListener {
   /// 添加日志（代理到 LogBuffer）
   void addLog(String message) {
     _logBuffer.addLog(message);
+  }
+
+  @override
+  void onLog(String message) {
+    addLog(message);
   }
 
   /// 清空日志
@@ -1793,12 +1715,7 @@ class OtaServer extends GetxService implements RWCPListener {
       if (isUpgrading) {
         stopUpgrade(sendAbort: false);
       }
-      await _subscribeConnection?.cancel();
-      await _subscribeConnectionRWCP?.cancel();
-      await _connection?.cancel();
-      _subscribeConnection = null;
-      _subscribeConnectionRWCP = null;
-      _connection = null;
+      _bleManager.disconnect();
       isDeviceConnected = false;
       if (connectDeviceId.isNotEmpty) {
         recoveryStatusText.value = "重连中";
@@ -1821,6 +1738,7 @@ class OtaServer extends GetxService implements RWCPListener {
   @override
   void onClose() {
     _logBuffer.dispose();
+    _bleManager.dispose();
     _bleStatusSubscription?.cancel();
     _scanConnection?.cancel();
     _connection?.cancel();
@@ -1837,58 +1755,6 @@ class OtaServer extends GetxService implements RWCPListener {
   }
 
   void startScan() async {
-    devices.clear();
-    if (Platform.isAndroid) {
-      final statuses = await [
-        Permission.location,
-        Permission.bluetooth,
-        Permission.bluetoothScan,
-        Permission.bluetoothConnect,
-      ].request();
-      final location =
-          statuses[Permission.location] ?? await Permission.location.status;
-      final bluetoothScan = statuses[Permission.bluetoothScan] ??
-          await Permission.bluetoothScan.status;
-      final bluetoothConnect = statuses[Permission.bluetoothConnect] ??
-          await Permission.bluetoothConnect.status;
-      if (location.isDenied) {
-        addLog("location deny");
-        return;
-      }
-      if (bluetoothScan.isDenied) {
-        return;
-      }
-      if (bluetoothConnect.isDenied) {
-        addLog("bluetoothConnect deny");
-        return;
-      }
-    } else {
-      var bluetooth = await Permission.bluetooth.status;
-      if (bluetooth.isDenied) {
-        addLog("bluetooth deny");
-        return;
-      }
-    }
-    try {
-      await _scanConnection?.cancel();
-      await _connection?.cancel();
-    } catch (e) {
-      addLog("清理旧连接时出错: $e");
-    }
-    // Start scannin
-    _scanConnection = flutterReactiveBle.scanForDevices(
-        withServices: [otaUUID],
-        scanMode: ScanMode.lowLatency,
-        requireLocationServicesEnabled: true).listen((device) {
-      if (device.name.isNotEmpty) {
-        final knownDeviceIndex = devices.indexWhere((d) => d.id == device.id);
-        if (knownDeviceIndex >= 0) {
-          devices[knownDeviceIndex] = device;
-        } else {
-          devices.add(device);
-        }
-      }
-      //code for handling results
-    });
+    await _bleManager.startScan();
   }
 }
