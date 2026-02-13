@@ -136,7 +136,6 @@ class OtaServer extends GetxService
   int writeRTCPCount = 0;
 
   File? file;
-  final bool useDfuOnly = false;
   int _dfuPendingChunkSize = 0;
   bool _dfuWriteInFlight = false;
   Timer? _dfuResultTimer;
@@ -205,7 +204,7 @@ class OtaServer extends GetxService
     _bleManager.startBleStatusMonitor();
   }
 
-  void _initDefaultFirmwarePath() async {
+  Future<void> _initDefaultFirmwarePath() async {
     try {
       firmwarePath.value = await _defaultFirmwarePathResolver();
     } catch (e) {
@@ -223,7 +222,7 @@ class OtaServer extends GetxService
     addLog("已设置固件路径$trimPath");
   }
 
-  void connectDevice(String id) async {
+  Future<void> connectDevice(String id) async {
     try {
       _autoReconnectEnabled = true;
       _bleManager.setAutoReconnectEnabled(_autoReconnectEnabled);
@@ -237,6 +236,7 @@ class OtaServer extends GetxService
           }
           addLog("Vendor模式固定为V3，使用${_vendorToHex(_activeVendorId)}");
           await registerNotice();
+          await restPayloadSize();
           if (!isUpgrading) {
             Get.to(() => const TestOtaView());
           }
@@ -340,7 +340,7 @@ class OtaServer extends GetxService
     }
   }
 
-  void startUpdate() async {
+  Future<void> startUpdate() async {
     if (isUpgrading) {
       addLog("正在升级中，忽略重复开始请求");
       return;
@@ -368,21 +368,8 @@ class OtaServer extends GetxService
     rwcpStatusText.value = "启用中";
     resetUpload();
     _armUpgradeWatchdog();
-    if (!useDfuOnly) {
-      enableRwcpForUpgrade();
-      return;
-    }
-    if (useDfuOnly) {
-      final loaded = await loadFirmwareFile();
-      if (!loaded) {
-        isUpgrading = false;
-        _timer?.cancel();
-        return;
-      }
-      sendDfuRequest();
-      return;
-    }
-    sendUpgradeConnect();
+    // 当前仅支持 RWCP 模式，DFU 直传模式保留但未启用
+    enableRwcpForUpgrade();
   }
 
   void startUpdateWithVersionCheck() {
@@ -541,7 +528,7 @@ class OtaServer extends GetxService
     mStartOffset = 0;
   }
 
-  void stopUpgrade({bool sendAbort = true, bool sendDisconnect = true}) async {
+  Future<void> stopUpgrade({bool sendAbort = true, bool sendDisconnect = true}) async {
     _clearUpgradeWatchdog();
     _timer?.cancel();
     _dfuResultTimer?.cancel();
@@ -553,7 +540,7 @@ class OtaServer extends GetxService
       rwcpStatusText.value = "未启用";
     }
     timeCount.value = 0;
-    if (sendAbort && !useDfuOnly) {
+    if (sendAbort) {
       abortUpgrade();
     }
     resetUpload();
@@ -562,8 +549,7 @@ class OtaServer extends GetxService
     isUpgrading = false;
     _dfuWriteInFlight = false;
     _dfuPendingChunkSize = 0;
-    if (!useDfuOnly &&
-        sendDisconnect &&
+    if (sendDisconnect &&
         isDeviceConnected &&
         connectDeviceId.isNotEmpty) {
       await Future.delayed(const Duration(milliseconds: 500));
@@ -594,7 +580,7 @@ class OtaServer extends GetxService
     return true;
   }
 
-  void sendSyncReq() async {
+  Future<void> sendSyncReq() async {
     //A2305C3A9059C15171BD33F3BB08ADE4 MD5
     //000A0642130004BB08ADE4
     final loaded = await loadFirmwareFile();
@@ -911,7 +897,7 @@ class OtaServer extends GetxService
     }
   }
 
-  void sendUpgradeConnect() async {
+  Future<void> sendUpgradeConnect() async {
     GaiaPacketBLE packet = _buildGaiaPacket(_upgradeConnectCommand());
     writeMsg(packet.getBytes());
   }
@@ -1160,7 +1146,7 @@ class OtaServer extends GetxService
   }
 
   //RWCP写入通道
-  void writeMsgRWCP(List<int> data) async {
+  Future<void> writeMsgRWCP(List<int> data) async {
     try {
       await _bleManager.writeWithoutResponse(data);
       _touchUpgradeWatchdog();
@@ -1269,7 +1255,7 @@ class OtaServer extends GetxService
     _quickRecoverFromDeviceError("手动快速恢复");
   }
 
-  void _quickRecoverFromDeviceError(String reason) async {
+  Future<void> _quickRecoverFromDeviceError(String reason) async {
     if (_isRecovering) {
       addLog("恢复进行中，忽略重复触发");
       return;
@@ -1321,6 +1307,7 @@ class OtaServer extends GetxService
   void onClose() {
     _logBuffer.dispose();
     _bleManager.dispose();
+    mRWCPClient.dispose();
     _timer?.cancel();
     _dfuResultTimer?.cancel();
     _upgradeWatchdogTimer?.cancel();
@@ -1330,7 +1317,7 @@ class OtaServer extends GetxService
     super.onClose();
   }
 
-  void startScan() async {
+  Future<void> startScan() async {
     await _bleManager.startScan();
   }
 }

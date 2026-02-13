@@ -746,4 +746,11 @@ class RWCPClient {
 
     logState("decrease window to $mWindow");
   }
+
+  /// Releases resources held by the client.
+  /// Should be called when the client is no longer needed.
+  void dispose() {
+    cancelTimeOut();
+    reset(true);
+  }
 }
