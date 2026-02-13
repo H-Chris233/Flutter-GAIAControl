@@ -23,7 +23,7 @@
 graph TD
     subgraph UI["UI 层"]
         A["main.dart<br/>应用入口/设备列表"]
-        B["TestOtaView.dart<br/>OTA 升级操作页"]
+        B["test_ota_view.dart<br/>OTA 升级操作页"]
     end
 
     subgraph BIZ["业务逻辑层"]
@@ -81,7 +81,7 @@ graph TD
 graph TD
     ROOT["(根) GAIA Control"] --> LIB["lib/"]
     LIB --> MAIN["main.dart"]
-    LIB --> OTAVIEW["TestOtaView.dart"]
+    LIB --> OTAVIEW["test_ota_view.dart"]
     LIB --> CTRL["controller/"]
     LIB --> UTILS_DIR["utils/"]
 
@@ -120,19 +120,21 @@ graph TD
 | `lib/controller/` | OTA 服务核心 -- BLE 连接管理、升级状态机、分包传输编排（当前仅 V3 协议） | Dart | [controller/CLAUDE.md](./lib/controller/CLAUDE.md) |
 | `lib/utils/gaia/` | GAIA 协议实现 -- Qualcomm CSR 蓝牙协议命令、数据包、操作码 | Dart | [gaia/CLAUDE.md](./lib/utils/gaia/CLAUDE.md) |
 | `lib/utils/gaia/rwcp/` | RWCP 可靠传输协议 -- 滑动窗口、序列号管理、数据分段 | Dart | [rwcp/CLAUDE.md](./lib/utils/gaia/rwcp/CLAUDE.md) |
-| `lib/utils/` (根工具) | 通用工具 -- 日志、字符串/字节处理、HTTP 封装 | Dart | 无（文件较少，接口见下方） |
+| `lib/utils/` (根工具) | 通用工具 -- 日志、字符串/字节处理 | Dart | 无（文件较少，接口见下方） |
 
 ### 工具文件接口速查
 
 #### Log.dart
 
 ```dart
+enum LogLevel { info, debug, error, warning }
+
 class Log {
-  static bool isLog = false;           // 全局日志开关（默认关闭）
-  static void i(String tag, String msg); // Info 级别
-  static void d(String tag, String msg); // Debug 级别
-  static void e(String tag, String msg); // Error 级别
-  static void w(String tag, String msg); // Warning 级别
+  static bool isLog = false;              // 全局日志开关（默认关闭）
+  static void i(String tag, String msg);  // [I] Info 级别
+  static void d(String tag, String msg);  // [D] Debug 级别
+  static void e(String tag, String msg);  // [E] Error 级别
+  static void w(String tag, String msg);  // [W] Warning 级别
 }
 ```
 
@@ -140,27 +142,17 @@ class Log {
 
 ```dart
 class StringUtils {
-  static String byteToString(List<int> list);     // UTF-8 字节 → 字符串
+  static String byteToString(List<int> list);      // UTF-8 字节 → 字符串
   static String byteToHexString(List<int> bytes);  // 字节 → 十六进制字符串
-  static List<int> hexStringToBytes(String hex);    // 十六进制字符串 → 字节
-  static String file2md5(List<int> input);          // 计算 MD5 哈希
-  static List<int> encode(String s);                // 字符串 → UTF-8 字节
-  static int extractIntFromByteArray(               // 从字节数组提取 int（支持大/小端）
+  static List<int> hexStringToBytes(String hex);   // 十六进制字符串 → 字节
+  static String file2md5(List<int> input);         // 计算 MD5 哈希
+  static List<int> encode(String s);               // 字符串 → UTF-8 字节
+  static int extractIntFromByteArray(              // 从字节数组提取 int（支持大/小端）
       List<int> source, int offset, int length, bool reverse);
-  static String intTo2HexString(int value);         // int → 2字节十六进制字符串
-  static List<int> intTo2List(int value);           // int → 2字节 List
-  static int byteListToInt(List<int> hex);          // 2字节 List → int
-}
-```
-
-#### http.dart
-
-```dart
-class HttpUtil {
-  factory HttpUtil();                               // 单例工厂
-  // 基于 Dio 封装，提供 RESTful 方法:
-  // get / post / download / put / patch / delete
-  // 默认超时 3000ms，JSON 编解码
+  static String intTo2HexString(int value);        // int → 2字节十六进制字符串
+  static List<int> intTo2List(int value);          // int → 2字节 List
+  static int byteListToInt(List<int> hex);         // 2字节 List → int
+  static int minToSecond(String s);                // "MM:SS" → 秒数
 }
 ```
 
@@ -172,13 +164,12 @@ class HttpUtil {
 |------|------|------|
 | `flutter_reactive_ble` | ^5.4.0 | BLE 设备扫描、连接、特征值读写与通知订阅 |
 | `get` (GetX) | ^4.7.2 | 状态管理 (Obx/Rx)、依赖注入 (Get.put/Get.find)、路由导航 |
-| `dio` | ^5.9.0 | HTTP 客户端封装（固件下载等网络请求） |
 | `crypto` | ^3.0.6 | MD5 校验（固件文件完整性验证） |
 | `permission_handler` | ^12.0.1 | 运行时权限请求（蓝牙、存储） |
 | `path_provider` | ^2.1.5 | 获取应用文档目录路径（固件存储） |
 | `file_picker` | ^10.1.9 | 文件选择器（用户选择本地固件文件） |
 | `cupertino_icons` | ^1.0.8 | iOS 风格图标 |
-| `flutter_lints` | ^5.0.0 | 静态分析规则（dev） |
+| `flutter_lints` | ^6.0.0 | 静态分析规则（dev） |
 
 ---
 

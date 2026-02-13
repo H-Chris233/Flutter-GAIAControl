@@ -15,13 +15,13 @@ void main() {
         expect(packet.getBytes(), [0x00, 0xFF, 0x12, 0x34, 0xAA, 0xBB]);
       });
 
-      test('uses default vendorQualcomm when mVendorId not specified', () {
+      test('uses default V3 vendor when mVendorId not specified', () {
         final packet = GaiaPacketBLE(0x0001);
 
         final bytes = packet.getBytes();
-        // vendorQualcomm = 0x000A
+        // default V3 vendor = 0x001D
         expect(bytes[0], 0x00);
-        expect(bytes[1], 0x0A);
+        expect(bytes[1], 0x1D);
       });
 
       test('builds bytes with empty payload', () {

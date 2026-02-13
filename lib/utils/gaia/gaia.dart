@@ -1,3 +1,29 @@
+/// GAIA 协议常量定义
+///
+/// 本文件包含完整的 Qualcomm GAIA 协议常量，从 Android 版 GAIA Control 移植。
+/// 保留完整定义以便未来扩展，但当前项目仅使用以下常量：
+///
+/// **核心掩码:**
+/// - [commandMask], [acknowledgmentMask]
+///
+/// **通知命令:**
+/// - [commandsNotificationMask], [commandRegisterNotification], [commandCancelNotification]
+/// - [notNotification], [NotificationEvents]
+///
+/// **数据传输:**
+/// - [commandGetApiVersion], [commandGetApplicationVersion]
+/// - [commandSetDataEndpointMode], [commandGetDataEndpointMode]
+///
+/// **DFU 命令:**
+/// - [commandDfuRequest], [commandDfuBegin], [commandDfuWrite]
+/// - [commandDfuCommit], [commandDfuGetResult]
+///
+/// **VM 升级:**
+/// - [commandVmUpgradeConnect], [commandVmUpgradeDisconnect], [commandVmUpgradeControl]
+/// - [vmuPacket]
+///
+/// **状态:**
+/// - [notStatus]
 class GAIA {
   /// <p>The mask which represents a command.</p>
   /// <p>Mask used to retrieve the command from the packet.</p>
@@ -16,9 +42,6 @@ class GAIA {
 
   /// <p>The default value defined by the protocol for a "none" vendor.</p>
   static const int vendorNone = 0x7FFE;
-
-  /// <p>The vendor default value defined by the protocol for Qualcomm vendor.</p>
-  static const int vendorQualcomm = 0x000A;
 
   // -------------------------------------------------------------------
   // |                  CONFIGURATION COMMANDS 0x01nn                  |

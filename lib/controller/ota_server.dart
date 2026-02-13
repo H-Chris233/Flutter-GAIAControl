@@ -145,17 +145,9 @@ class OtaServer extends GetxService
   Timer? _reconnectTimer;
   bool _autoReconnectEnabled = true;
   String _fatalUpgradeReason = "";
-  static const String vendorModeAuto = "auto";
   static const String vendorModeV3 = "v3";
-  static const String vendorModeV1V2 = "v1v2";
   var vendorMode = vendorModeV3.obs;
   int _activeVendorId = 0x001D;
-  bool _isVendorDetecting = false;
-  int _vendorProbeIndex = 0;
-  Timer? _vendorProbeTimer;
-  final List<int> _vendorCandidates = [0x001D];
-  VoidCallback? _onVendorReady;
-  VoidCallback? _onVendorFailed;
   var autoRecoveryEnabled = true.obs;
   var recoveryStatusText = "空闲".obs;
   int _errorBurstCount = 0;
@@ -193,7 +185,7 @@ class OtaServer extends GetxService
     super.onInit();
     // 初始化组件
     _logBuffer = LogBuffer(logText: logText);
-    _cmdBuilder = GaiaCommandBuilder(activeVendorId: _activeVendorId);
+    _cmdBuilder = GaiaCommandBuilder();
     _bleManager = _bleManagerOverride ??
         BleConnectionManager(
           ble: FlutterReactiveBleClient(FlutterReactiveBle()),
@@ -243,15 +235,7 @@ class OtaServer extends GetxService
           if (!isUpgrading) {
             rwcpStatusText.value = "待启用";
           }
-          _startVendorProbe(
-            onSuccess: () {
-              addLog("Vendor探测成功: ${_vendorToHex(_activeVendorId)}");
-            },
-            onFailed: () {
-              addLog(
-                  "Vendor探测失败，继续使用默认Vendor ${_vendorToHex(_activeVendorId)}");
-            },
-          );
+          addLog("Vendor模式固定为V3，使用${_vendorToHex(_activeVendorId)}");
           await registerNotice();
           if (!isUpgrading) {
             Get.to(() => const TestOtaView());
@@ -287,8 +271,6 @@ class OtaServer extends GetxService
     return "0x${vendor.toRadixString(16).padLeft(4, '0').toUpperCase()}";
   }
 
-  bool _isV3VendorActive() => _cmdBuilder.isV3VendorActive;
-
   // 命令构建（代理到 GaiaCommandBuilder）
   int _upgradeConnectCommand() => _cmdBuilder.upgradeConnectCommand();
   int _upgradeDisconnectCommand() => _cmdBuilder.upgradeDisconnectCommand();
@@ -298,7 +280,6 @@ class OtaServer extends GetxService
       _cmdBuilder.getApplicationVersionCommand();
   int _registerNotificationCommand() =>
       _cmdBuilder.registerNotificationCommand();
-  int _cancelNotificationCommand() => _cmdBuilder.cancelNotificationCommand();
 
   int _v3CommandFeature(int cmd) => _cmdBuilder.v3CommandFeature(cmd);
   int _v3CommandType(int cmd) => _cmdBuilder.v3CommandType(cmd);
@@ -306,62 +287,8 @@ class OtaServer extends GetxService
 
   void setVendorMode(String mode) {
     vendorMode.value = vendorModeV3;
-    _isVendorDetecting = false;
-    _vendorProbeTimer?.cancel();
     _activeVendorId = 0x001D;
-    _cmdBuilder.activeVendorId = _activeVendorId;
     addLog("Vendor模式固定为V3，使用${_vendorToHex(_activeVendorId)}");
-  }
-
-  void _startVendorProbe(
-      {required VoidCallback onSuccess, required VoidCallback onFailed}) {
-    _activeVendorId = 0x001D;
-    _cmdBuilder.activeVendorId = _activeVendorId;
-    _isVendorDetecting = false;
-    _vendorProbeTimer?.cancel();
-    onSuccess();
-  }
-
-  void _probeNextVendor() {
-    _vendorProbeTimer?.cancel();
-    if (_vendorProbeIndex >= _vendorCandidates.length) {
-      _isVendorDetecting = false;
-      rwcpStatusText.value = "Vendor探测失败";
-      _onVendorFailed?.call();
-      _onVendorReady = null;
-      _onVendorFailed = null;
-      return;
-    }
-    final candidate = _vendorCandidates[_vendorProbeIndex];
-    addLog("探测Vendor ${_vendorToHex(candidate)}");
-    final probeCommand = candidate == 0x001D
-        ? _cmdBuilder.buildV3Command(
-            GaiaCommandBuilder.v3FeatureFramework,
-            GaiaCommandBuilder.v3PacketTypeCommand,
-            GaiaCommandBuilder.v3CmdAppVersion)
-        : GAIA.commandGetApiVersion;
-    final packet = _buildGaiaPacket(probeCommand, vendor: candidate);
-    writeMsg(packet.getBytes());
-    _vendorProbeTimer =
-        Timer(Duration(seconds: kVendorProbeTimeoutSeconds), () {
-      if (!_isVendorDetecting) {
-        return;
-      }
-      _vendorProbeIndex += 1;
-      _probeNextVendor();
-    });
-  }
-
-  void _onVendorProbeSuccess(int vendor) {
-    _vendorProbeTimer?.cancel();
-    _isVendorDetecting = false;
-    _activeVendorId = vendor;
-    _cmdBuilder.activeVendorId = _activeVendorId;
-    rwcpStatusText.value = "Vendor ${_vendorToHex(vendor)} 就绪";
-    final callback = _onVendorReady;
-    _onVendorReady = null;
-    _onVendorFailed = null;
-    callback?.call();
   }
 
   Future<void> registerRWCP() async {
@@ -399,7 +326,7 @@ class OtaServer extends GetxService
       addLog("收到通知>${StringUtils.byteToHexString(data)}");
       handleRecMsg(data);
     });
-    final registerPayload = _isV3VendorActive() ? [0x06] : [GAIA.vmuPacket];
+    final registerPayload = [0x06];
     GaiaPacketBLE registerPacket = _buildGaiaPacket(
       _registerNotificationCommand(),
       payload: registerPayload,
@@ -463,31 +390,24 @@ class OtaServer extends GetxService
       addLog("正在升级中，忽略重复开始请求");
       return;
     }
-    _startVendorProbe(
-      onSuccess: () {
-        _pendingStartAfterVersionQuery = true;
-        versionAfterUpgrade.value = "UNKNOWN";
-        queryApplicationVersion(
-          tag: "升级前",
-          onSuccess: (version) {
-            versionBeforeUpgrade.value = version;
-            if (_pendingStartAfterVersionQuery) {
-              _pendingStartAfterVersionQuery = false;
-              startUpdate();
-            }
-          },
-          onFailed: () {
-            versionBeforeUpgrade.value = "UNKNOWN";
-            addLog("升级前版本查询失败，继续执行升级");
-            if (_pendingStartAfterVersionQuery) {
-              _pendingStartAfterVersionQuery = false;
-              startUpdate();
-            }
-          },
-        );
+    _pendingStartAfterVersionQuery = true;
+    versionAfterUpgrade.value = "UNKNOWN";
+    queryApplicationVersion(
+      tag: "升级前",
+      onSuccess: (version) {
+        versionBeforeUpgrade.value = version;
+        if (_pendingStartAfterVersionQuery) {
+          _pendingStartAfterVersionQuery = false;
+          startUpdate();
+        }
       },
       onFailed: () {
-        addLog("Vendor探测失败，升级取消");
+        versionBeforeUpgrade.value = "UNKNOWN";
+        addLog("升级前版本查询失败，继续执行升级");
+        if (_pendingStartAfterVersionQuery) {
+          _pendingStartAfterVersionQuery = false;
+          startUpdate();
+        }
       },
     );
   }
@@ -516,10 +436,6 @@ class OtaServer extends GetxService
     if (packetType == GaiaCommandBuilder.v3PacketTypeResponse) {
       if (feature == GaiaCommandBuilder.v3FeatureFramework &&
           commandId == GaiaCommandBuilder.v3CmdAppVersion) {
-        if (_isVendorDetecting) {
-          _onVendorProbeSuccess(packet.mVendorId);
-          return;
-        }
         onApplicationVersionAckV3(payload);
         return;
       }
@@ -571,11 +487,6 @@ class OtaServer extends GetxService
 
       if (feature == GaiaCommandBuilder.v3FeatureFramework &&
           commandId == GaiaCommandBuilder.v3CmdAppVersion) {
-        if (_isVendorDetecting) {
-          _vendorProbeIndex += 1;
-          _probeNextVendor();
-          return;
-        }
         _finishVersionQueryFailed(
             "$_currentVersionQueryTag版本查询失败 status=0x${status.toRadixString(16)}");
         return;
@@ -596,123 +507,6 @@ class OtaServer extends GetxService
         _enterFatalUpgradeState(
             "V3升级命令失败 cmdId=$commandId status=0x${status.toRadixString(16)}");
       }
-    }
-  }
-
-  void receiveSuccessfulAcknowledgement(GaiaPacketBLE packet) {
-    addLog(
-        "receiveSuccessfulAcknowledgement ${StringUtils.intTo2HexString(packet.getCommand())}");
-    switch (packet.getCommand()) {
-      case GAIA.commandDfuRequest:
-        sendDfuBegin();
-        break;
-      case GAIA.commandDfuBegin:
-        sendNextDfuPacket();
-        break;
-      case GAIA.commandDfuWrite:
-        onDfuWriteAck();
-        break;
-      case GAIA.commandDfuCommit:
-        onDfuCommitAck();
-        break;
-      case GAIA.commandDfuGetResult:
-        onDfuGetResultAck(packet);
-        break;
-      case GAIA.commandGetApiVersion:
-        if (_isVendorDetecting) {
-          _onVendorProbeSuccess(packet.mVendorId);
-        }
-        break;
-      case GAIA.commandGetApplicationVersion:
-        onApplicationVersionAck(packet);
-        break;
-      case GAIA.commandVmUpgradeConnect:
-        {
-          if (isUpgrading) {
-            resetUpload();
-            sendSyncReq();
-          } else {
-            int size = mPayloadSizeMax;
-            if (mIsRWCPEnabled.value) {
-              size = mPayloadSizeMax - 1;
-              size = (size % 2 == 0) ? size : size - 1;
-            }
-            mMaxLengthForDataTransfer =
-                size - VMUPacket.requiredInformationLength;
-            addLog(
-                "mMaxLengthForDataTransfer $mMaxLengthForDataTransfer mPayloadSizeMax $mPayloadSizeMax");
-            //开始发送升级包
-            startUpgradeProcess();
-          }
-        }
-        break;
-      case GAIA.commandVmUpgradeDisconnect:
-        stopUpgrade(sendAbort: false, sendDisconnect: false);
-        break;
-      case GAIA.commandVmUpgradeControl:
-        onSuccessfulTransmission();
-        break;
-      case GAIA.commandSetDataEndpointMode:
-        if (mIsRWCPEnabled.value) {
-          unawaited(registerRWCP());
-        } else {
-          _rwcpSetupInProgress = false;
-          unawaited(_bleManager.cancelRwcpChannel());
-        }
-
-        break;
-    }
-  }
-
-  void receiveUnsuccessfulAcknowledgement(GaiaPacketBLE packet) {
-    final cmd = packet.getCommand();
-    final status = packet.getStatus();
-    addLog(
-        "命令发送失败 cmd=${StringUtils.intTo2HexString(cmd)}(${_gaiaCommandText(cmd)}) status=0x${status.toRadixString(16)} ${_gaiaStatusText(status)}");
-    _reportDeviceError(
-        "ACK失败 ${_gaiaCommandText(cmd)} status=0x${status.toRadixString(16)}",
-        triggerRecovery: !isUpgrading);
-    if (cmd == GAIA.commandDfuRequest && useDfuOnly) {
-      addLog("DFU_REQUEST不支持，尝试直接发送DFU_BEGIN");
-      sendDfuBegin();
-      return;
-    }
-    if (cmd == GAIA.commandDfuBegin ||
-        cmd == GAIA.commandDfuWrite ||
-        cmd == GAIA.commandDfuCommit) {
-      _dfuWriteInFlight = false;
-      stopUpgrade(sendAbort: false);
-      return;
-    }
-    if (cmd == GAIA.commandDfuGetResult) {
-      addLog("DFU_GET_RESULT失败，按提交成功处理（结果码不可得）");
-      _finishDfuUpgrade("DFU提交完成（设备未返回结果码）", queryPostVersion: true);
-      return;
-    }
-    if (cmd == _getApplicationVersionCommand()) {
-      _finishVersionQueryFailed(
-          "$_currentVersionQueryTag版本查询失败 status=0x${status.toRadixString(16)}");
-      return;
-    }
-    if (cmd == GAIA.commandGetApiVersion && _isVendorDetecting) {
-      _vendorProbeIndex += 1;
-      _probeNextVendor();
-      return;
-    }
-    if (packet.getCommand() == _upgradeConnectCommand() ||
-        packet.getCommand() == _upgradeControlCommand()) {
-      addLog("升级命令失败：${_gaiaCommandText(cmd)}，触发升级断开");
-      _enterFatalUpgradeState(
-          "升级命令失败：${_gaiaCommandText(cmd)} status=0x${status.toRadixString(16)}");
-    } else if (packet.getCommand() == _upgradeDisconnectCommand()) {
-      if (isUpgrading) {
-        _enterFatalUpgradeState("升级断开命令失败");
-      }
-    } else if (packet.getCommand() == _setDataEndpointModeCommand() ||
-        packet.getCommand() == GAIA.commandGetDataEndpointMode) {
-      _rwcpSetupInProgress = false;
-      rwcpStatusText.value = "RWCP错误";
-      _enterFatalUpgradeState("RWCP数据通道启用失败");
     }
   }
 
@@ -749,8 +543,6 @@ class OtaServer extends GetxService
 
   void stopUpgrade({bool sendAbort = true, bool sendDisconnect = true}) async {
     _clearUpgradeWatchdog();
-    _vendorProbeTimer?.cancel();
-    _isVendorDetecting = false;
     _timer?.cancel();
     _dfuResultTimer?.cancel();
     _versionQueryTimer?.cancel();
@@ -938,7 +730,6 @@ class OtaServer extends GetxService
 
   // 状态/命令文本转换（代理到 GaiaCommandBuilder）
   String _gaiaStatusText(int status) => _cmdBuilder.gaiaStatusText(status);
-  String _gaiaCommandText(int cmd) => _cmdBuilder.gaiaCommandText(cmd);
   String _dfuResultText(int resultCode) =>
       _cmdBuilder.dfuResultText(resultCode);
 
@@ -973,22 +764,6 @@ class OtaServer extends GetxService
     });
   }
 
-  void onApplicationVersionAck(GaiaPacketBLE packet) {
-    if (!_isVersionQueryInFlight) {
-      return;
-    }
-    _versionQueryTimer?.cancel();
-    final version = _parseApplicationVersion(packet.mPayload ?? []);
-    final tag = _currentVersionQueryTag;
-    _isVersionQueryInFlight = false;
-    _currentVersionQueryTag = "";
-    addLog("$tag版本号: $version");
-    final successCallback = _onVersionQuerySuccess;
-    _onVersionQuerySuccess = null;
-    _onVersionQueryFailed = null;
-    successCallback?.call(version);
-  }
-
   void onApplicationVersionAckV3(List<int> payload) {
     if (!_isVersionQueryInFlight) {
       return;
@@ -1016,36 +791,20 @@ class OtaServer extends GetxService
     failedCallback?.call();
   }
 
-  String _parseApplicationVersion(List<int> payload) {
-    if (payload.length <= 1) {
-      return "UNKNOWN";
-    }
-    final raw = payload.sublist(1);
-    final hex = StringUtils.byteToHexString(raw).toUpperCase();
-    final printable = raw.every((b) => b >= 0x20 && b <= 0x7E);
+  /// 格式化字节数组为版本字符串
+  /// 如果是可打印 ASCII，返回字符串格式；否则返回 HEX 格式
+  String _formatVersionBytes(List<int> bytes) {
+    if (bytes.isEmpty) return "UNKNOWN";
+    final hex = StringUtils.byteToHexString(bytes).toUpperCase();
+    final printable = bytes.every((b) => b >= 0x20 && b <= 0x7E);
     if (printable) {
-      return "${String.fromCharCodes(raw)} (HEX:$hex)";
-    }
-    if (raw.length == 4) {
-      final value = ((raw[0] & 0xFF) << 24) |
-          ((raw[1] & 0xFF) << 16) |
-          ((raw[2] & 0xFF) << 8) |
-          (raw[3] & 0xFF);
-      return "0x${value.toRadixString(16).padLeft(8, '0').toUpperCase()} (HEX:$hex)";
+      return "${String.fromCharCodes(bytes)} (HEX:$hex)";
     }
     return "HEX:$hex";
   }
 
   String _parseApplicationVersionV3(List<int> payload) {
-    if (payload.isEmpty) {
-      return "UNKNOWN";
-    }
-    final hex = StringUtils.byteToHexString(payload).toUpperCase();
-    final printable = payload.every((b) => b >= 0x20 && b <= 0x7E);
-    if (printable) {
-      return "${String.fromCharCodes(payload)} (HEX:$hex)";
-    }
-    return "HEX:$hex";
+    return _formatVersionBytes(payload);
   }
 
   void _schedulePostUpgradeVersionQuery() {
@@ -1154,15 +913,6 @@ class OtaServer extends GetxService
 
   void sendUpgradeConnect() async {
     GaiaPacketBLE packet = _buildGaiaPacket(_upgradeConnectCommand());
-    writeMsg(packet.getBytes());
-  }
-
-  void cancelNotification() async {
-    final cancelPayload = _isV3VendorActive() ? [0x06] : [GAIA.vmuPacket];
-    GaiaPacketBLE packet = _buildGaiaPacket(
-      _cancelNotificationCommand(),
-      payload: cancelPayload,
-    );
     writeMsg(packet.getBytes());
   }
 
@@ -1322,9 +1072,6 @@ class OtaServer extends GetxService
   }
 
   void disconnectUpgrade() {
-    if (!_isV3VendorActive()) {
-      cancelNotification();
-    }
     sendUpgradeDisconnect();
   }
 
@@ -1427,9 +1174,7 @@ class OtaServer extends GetxService
   }
 
   void disconnect() {
-    _vendorProbeTimer?.cancel();
     _reconnectTimer?.cancel();
-    _isVendorDetecting = false;
     _bleManager.disconnect();
     isDeviceConnected = false;
   }
@@ -1581,7 +1326,6 @@ class OtaServer extends GetxService
     _upgradeWatchdogTimer?.cancel();
     _versionQueryTimer?.cancel();
     _postUpgradeVersionRetryTimer?.cancel();
-    _vendorProbeTimer?.cancel();
     _reconnectTimer?.cancel();
     super.onClose();
   }

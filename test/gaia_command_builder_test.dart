@@ -11,8 +11,8 @@ void main() {
     });
 
     test('default vendor is V3', () {
-      expect(builder.activeVendorId, GaiaCommandBuilder.vendorIdV3);
-      expect(builder.isV3VendorActive, isTrue);
+      final packet = builder.buildGaiaPacket(0x1234);
+      expect(packet.mVendorId, GaiaCommandBuilder.vendorIdV3);
     });
 
     test('vendorToHex formats vendor ID correctly', () {
@@ -33,13 +33,6 @@ void main() {
       expect(
           builder.v3CommandFeature(cmd), GaiaCommandBuilder.v3FeatureUpgrade);
       expect(builder.v3CommandId(cmd), GaiaCommandBuilder.v3CmdUpgradeConnect);
-    });
-
-    test('upgradeConnectCommand returns V1/V2 command when V1/V2 active', () {
-      builder.activeVendorId = GaiaCommandBuilder.vendorIdV1V2;
-      expect(builder.isV3VendorActive, isFalse);
-      final cmd = builder.upgradeConnectCommand();
-      expect(cmd, GAIA.commandVmUpgradeConnect);
     });
 
     test('upgradeControlCommand returns correct command', () {
@@ -95,9 +88,9 @@ void main() {
     });
 
     test('buildGaiaPacket allows vendor override', () {
-      final packet = builder.buildGaiaPacket(0x1234,
-          payload: [0x01], vendor: GaiaCommandBuilder.vendorIdV1V2);
-      expect(packet.mVendorId, GaiaCommandBuilder.vendorIdV1V2);
+      final packet =
+          builder.buildGaiaPacket(0x1234, payload: [0x01], vendor: 0x00AA);
+      expect(packet.mVendorId, 0x00AA);
     });
   });
 }

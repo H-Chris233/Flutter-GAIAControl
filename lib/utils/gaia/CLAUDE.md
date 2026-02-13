@@ -51,8 +51,7 @@ class GAIA {
 
   // Vendor 定义
   static const int VENDOR_NONE = 0x7FFE;
-  static const int VENDOR_QUALCOMM = 0x000A;    // V1/V2 Vendor
-  // V3 Vendor (0x001D) 在 OtaServer 中定义
+  // 当前项目仅使用 V3 Vendor (0x001D)
 
   // 命令分类 (0x01nn ~ 0x06nn)
   static const int COMMANDS_CONFIGURATION_MASK = 0x0100;  // 配置命令

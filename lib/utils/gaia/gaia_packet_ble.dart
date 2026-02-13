@@ -3,7 +3,7 @@ import 'gaia.dart';
 
 class GaiaPacketBLE {
   /// <p>The vendor ID of the packet.</p>
-  int mVendorId = GAIA.vendorQualcomm;
+  int mVendorId = 0x001D;
 
   /// <p>This attribute contains the full command of the packet. If this packet is an acknowledgement packet, this
   /// attribute will contain the acknowledgement bit set to 1.</p>

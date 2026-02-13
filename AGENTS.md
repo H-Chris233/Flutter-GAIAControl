@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `lib/` 是核心业务代码：`main.dart` 为入口，`TestOtaView.dart` 为 OTA 页面，`utils/gaia/` 与 `utils/gaia/rwcp/` 实现 GAIA/RWCP 协议细节。
+- `lib/` 是核心业务代码：`main.dart` 为入口，`test_ota_view.dart` 为 OTA 页面，`utils/gaia/` 与 `utils/gaia/rwcp/` 实现 GAIA/RWCP 协议细节。
 - `lib/controller/ota_server.dart` 承载 BLE OTA 主要流程与状态管理。
 - `test/` 放置测试代码；当前包含 `widget_test.dart`，新增测试请按功能模块拆分。
 - `img/` 存放 README 展示图片；平台壳工程分别位于 `android/` 与 `ios/`。
@@ -37,5 +37,5 @@
 ## Architecture Notes
 - 本项目以 Flutter UI 层 + OTA 服务层分离为主：页面负责交互展示，`OtaServer` 负责 BLE 通信、分包传输与升级状态机。
 - 协议相关代码集中在 `lib/utils/gaia/`，新增协议能力时优先在该目录扩展，避免把协议细节散落到页面组件中。
-- 引入新依赖前请评估是否可复用现有 `dio`、`get`、`flutter_reactive_ble` 能力，减少包体积与维护成本。
+- 引入新依赖前请评估是否可复用现有 `get`、`flutter_reactive_ble` 能力，减少包体积与维护成本。
 - 若修改 OTA 流程，建议在 PR 描述中附上“连接设备 → 下发升级 → 结果校验”的最小复现步骤，便于审查与回归。

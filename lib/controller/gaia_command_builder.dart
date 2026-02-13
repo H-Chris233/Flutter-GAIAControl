@@ -4,7 +4,6 @@ import 'package:gaia/utils/gaia/gaia_packet_ble.dart';
 /// GAIA V3 命令构建器
 ///
 /// 负责 GAIA 协议命令的构建和数据包封装。
-/// 支持 V3 (Vendor 0x001D) 和 V1/V2 (Vendor 0x000A) 两种协议版本。
 class GaiaCommandBuilder {
   // V3 协议常量
   static const int v3FeatureFramework = 0x00;
@@ -25,20 +24,6 @@ class GaiaCommandBuilder {
   // V3 Vendor ID
   static const int vendorIdV3 = 0x001D;
 
-  // V1/V2 Vendor ID (Qualcomm)
-  static const int vendorIdV1V2 = 0x000A;
-
-  /// 当前活动的 Vendor ID
-  int activeVendorId;
-
-  /// 构造函数
-  ///
-  /// [activeVendorId] 初始 Vendor ID，默认为 V3 (0x001D)
-  GaiaCommandBuilder({this.activeVendorId = vendorIdV3});
-
-  /// 是否使用 V3 协议
-  bool get isV3VendorActive => activeVendorId == vendorIdV3;
-
   /// 将 Vendor ID 转换为十六进制字符串
   String vendorToHex(int vendor) {
     return "0x${vendor.toRadixString(16).padLeft(4, '0').toUpperCase()}";
@@ -48,7 +33,7 @@ class GaiaCommandBuilder {
   GaiaPacketBLE buildGaiaPacket(int command,
       {List<int>? payload, int? vendor}) {
     return GaiaPacketBLE(command,
-        mPayload: payload, mVendorId: vendor ?? activeVendorId);
+        mPayload: payload, mVendorId: vendor ?? vendorIdV3);
   }
 
   /// 构建 V3 命令码
@@ -72,47 +57,34 @@ class GaiaCommandBuilder {
   // ==================== 升级相关命令 ====================
 
   /// 获取升级连接命令
-  int upgradeConnectCommand() => isV3VendorActive
-      ? buildV3Command(
-          v3FeatureUpgrade, v3PacketTypeCommand, v3CmdUpgradeConnect)
-      : GAIA.commandVmUpgradeConnect;
+  int upgradeConnectCommand() => buildV3Command(
+      v3FeatureUpgrade, v3PacketTypeCommand, v3CmdUpgradeConnect);
 
   /// 获取升级断开命令
-  int upgradeDisconnectCommand() => isV3VendorActive
-      ? buildV3Command(
-          v3FeatureUpgrade, v3PacketTypeCommand, v3CmdUpgradeDisconnect)
-      : GAIA.commandVmUpgradeDisconnect;
+  int upgradeDisconnectCommand() => buildV3Command(
+      v3FeatureUpgrade, v3PacketTypeCommand, v3CmdUpgradeDisconnect);
 
   /// 获取升级控制命令
-  int upgradeControlCommand() => isV3VendorActive
-      ? buildV3Command(
-          v3FeatureUpgrade, v3PacketTypeCommand, v3CmdUpgradeControl)
-      : GAIA.commandVmUpgradeControl;
+  int upgradeControlCommand() => buildV3Command(
+      v3FeatureUpgrade, v3PacketTypeCommand, v3CmdUpgradeControl);
 
   /// 获取设置数据端点模式命令
-  int setDataEndpointModeCommand() => isV3VendorActive
-      ? buildV3Command(
-          v3FeatureUpgrade, v3PacketTypeCommand, v3CmdSetDataEndpointMode)
-      : GAIA.commandSetDataEndpointMode;
+  int setDataEndpointModeCommand() => buildV3Command(
+      v3FeatureUpgrade, v3PacketTypeCommand, v3CmdSetDataEndpointMode);
 
   // ==================== 框架相关命令 ====================
 
   /// 获取应用版本命令
-  int getApplicationVersionCommand() => isV3VendorActive
-      ? buildV3Command(v3FeatureFramework, v3PacketTypeCommand, v3CmdAppVersion)
-      : GAIA.commandGetApplicationVersion;
+  int getApplicationVersionCommand() =>
+      buildV3Command(v3FeatureFramework, v3PacketTypeCommand, v3CmdAppVersion);
 
   /// 获取注册通知命令
-  int registerNotificationCommand() => isV3VendorActive
-      ? buildV3Command(
-          v3FeatureFramework, v3PacketTypeCommand, v3CmdRegisterNotification)
-      : GAIA.commandRegisterNotification;
+  int registerNotificationCommand() => buildV3Command(
+      v3FeatureFramework, v3PacketTypeCommand, v3CmdRegisterNotification);
 
   /// 获取取消通知命令
-  int cancelNotificationCommand() => isV3VendorActive
-      ? buildV3Command(
-          v3FeatureFramework, v3PacketTypeCommand, v3CmdCancelNotification)
-      : GAIA.commandCancelNotification;
+  int cancelNotificationCommand() => buildV3Command(
+      v3FeatureFramework, v3PacketTypeCommand, v3CmdCancelNotification);
 
   // ==================== 状态文本转换 ====================
 
@@ -164,16 +136,6 @@ class GaiaCommandBuilder {
       return "CANCEL_NOTIFICATION";
     }
     switch (cmd) {
-      case GAIA.commandSetDataEndpointMode:
-        return "SET_DATA_ENDPOINT_MODE";
-      case GAIA.commandGetDataEndpointMode:
-        return "GET_DATA_ENDPOINT_MODE";
-      case GAIA.commandVmUpgradeConnect:
-        return "VM_UPGRADE_CONNECT";
-      case GAIA.commandVmUpgradeControl:
-        return "VM_UPGRADE_CONTROL";
-      case GAIA.commandVmUpgradeDisconnect:
-        return "VM_UPGRADE_DISCONNECT";
       case GAIA.commandDfuRequest:
         return "DFU_REQUEST";
       case GAIA.commandDfuBegin:

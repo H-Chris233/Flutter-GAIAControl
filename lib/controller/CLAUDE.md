@@ -67,7 +67,7 @@ GAIA 协议命令构建器：
 - V3 协议常量定义
 - 命令码构建（V3 格式: Feature + PacketType + CommandId）
 - 状态/错误码文本转换
-- 支持 V3 (0x001D) 和 V1/V2 (0x000A) 双协议
+- 仅支持 V3 (0x001D)
 
 ### BleConnectionManager
 
@@ -102,7 +102,7 @@ OtaServer extends GetxService implements RWCPListener, UpgradeStateMachineDelega
 | `isDeviceConnected` | `bool` | 设备是否已连接 |
 | `updatePer` | `RxDouble` | 升级进度百分比 (0~100) |
 | `mIsRWCPEnabled` | `RxBool` | RWCP 是否已启用 |
-| `vendorMode` | `Rx<String>` | Vendor 模式 ("v3" / "v1v2" / "auto") |
+| `vendorMode` | `Rx<String>` | Vendor 模式（固定为 "v3"） |
 | `firmwarePath` | `Rx<String>` | 当前固件文件路径 |
 | `mBytesFile` | `List<int>?` | 待上传的固件字节数据 |
 | `mStartOffset` | `int` | 数据传输偏移量 |
@@ -135,7 +135,7 @@ OtaServer extends GetxService implements RWCPListener, UpgradeStateMachineDelega
 | 方法 | 说明 |
 |------|------|
 | `startScan()` | 开始 BLE 设备扫描 |
-| `connectDevice(String id)` | 连接指定设备，成功后自动探测 Vendor |
+| `connectDevice(String id)` | 连接指定设备，成功后按 V3 协议初始化 |
 | `disconnect()` | 断开当前设备连接 |
 
 ### OTA 升级
@@ -152,7 +152,7 @@ OtaServer extends GetxService implements RWCPListener, UpgradeStateMachineDelega
 | 方法 | 说明 |
 |------|------|
 | `setFirmwarePath(String path)` | 设置固件文件路径 |
-| `setVendorMode(String mode)` | 设置 Vendor 模式 ("v3" / "v1v2" / "auto") |
+| `setVendorMode(String mode)` | 设置 Vendor 模式（当前仅支持 "v3"） |
 | `quickRecoverNow()` | 手动触发快速恢复 |
 
 ### RWCPListener 实现
@@ -201,7 +201,7 @@ UpgradeStateMachine.handleVmuPacket()
 | `utils/gaia/rwcp/RWCPClient.dart` | RWCP 可靠传输客户端 |
 | `utils/gaia/rwcp/RWCPListener.dart` | RWCP 事件回调接口 |
 | `utils/StringUtils.dart` | 字节/字符串转换 |
-| `TestOtaView.dart` | 页面导航（连接成功后跳转） |
+| `test_ota_view.dart` | 页面导航（连接成功后跳转） |
 | `flutter_reactive_ble` | BLE 底层操作 |
 | `get` (GetX) | 状态管理、依赖注入、路由 |
 | `path_provider` | 获取文档目录 |
@@ -235,8 +235,8 @@ UpgradeStateMachine.handleVmuPacket()
 
 ## 常见问题 (FAQ)
 
-**Q: V3 和 V1/V2 的区别是什么？**
-A: V3 使用 Vendor ID 0x001D，命令格式包含 Feature + PacketType + CommandId 三段；V1/V2 使用 Vendor ID 0x000A (Qualcomm)，命令格式为标准 GAIA 命令。
+**Q: 当前支持哪些 GAIA 协议版本？**
+A: 当前仅支持 V3，Vendor ID 固定为 0x001D，命令格式为 Feature + PacketType + CommandId。
 
 **Q: RWCP 和 DFU 模式如何选择？**
 A: OtaServer 连接设备后会尝试注册 RWCP 写入特征。如果注册成功且设备支持，则启用 RWCP（更快、有窗口控制）；否则回退到 DFU 直传模式。
@@ -250,7 +250,7 @@ A: OtaServer 连接设备后会尝试注册 RWCP 写入特征。如果注册成�
 - `lib/controller/gaia_command_builder.dart` -- 命令构建器
 - `lib/controller/ble_connection_manager.dart` -- BLE 连接管理器
 - `lib/controller/upgrade_state_machine.dart` -- 升级状态机
-- `lib/TestOtaView.dart` (UI 页面，依赖 OtaServer)
+- `lib/test_ota_view.dart` (UI 页面，依赖 OtaServer)
 - `lib/main.dart` (GetX 注入 OtaServer)
 
 ---
