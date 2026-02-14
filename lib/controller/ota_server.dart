@@ -1259,10 +1259,11 @@ class OtaServer extends GetxService
   }
 
   void quickRecoverNow() {
-    unawaited(_quickRecoverFromDeviceError("手动快速恢复"));
+    unawaited(_quickRecoverFromDeviceError("手动快速恢复", forceAbort: true));
   }
 
-  Future<void> _quickRecoverFromDeviceError(String reason) async {
+  Future<void> _quickRecoverFromDeviceError(String reason,
+      {bool forceAbort = false}) async {
     if (_isRecovering) {
       addLog("恢复进行中，忽略重复触发");
       return;
@@ -1284,11 +1285,17 @@ class OtaServer extends GetxService
     _errorBurstCount = 0;
     recoveryStatusText.value = "恢复中";
     rwcpStatusText.value = "恢复中";
+    // 手动恢复或第二次及以后的自动恢复，发送 Abort 强制重置设备状态
+    final shouldSendAbort = forceAbort || _recoveryAttempts >= 2;
     addLog(
-        "执行快速恢复($_recoveryAttempts/$kMaxRecoveryAttemptsPerWindow): $reason");
+        "执行快速恢复($_recoveryAttempts/$kMaxRecoveryAttemptsPerWindow): $reason${shouldSendAbort ? ' [含Abort]' : ''}");
     try {
       if (isUpgrading.value) {
-        await stopUpgrade(sendAbort: false);
+        await stopUpgrade(sendAbort: shouldSendAbort);
+      } else if (shouldSendAbort && isDeviceConnected) {
+        // 非升级状态但需要强制重置，直接发送 Abort
+        sendAbortReq();
+        await Future.delayed(const Duration(milliseconds: 300));
       }
       _bleManager.disconnect();
       isDeviceConnected = false;
