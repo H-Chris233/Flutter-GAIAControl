@@ -18,6 +18,8 @@ import 'package:gaia/utils/gaia/resume_points.dart';
 import 'package:gaia/utils/gaia/vmu_packet.dart';
 import 'package:gaia/utils/gaia/rwcp/rwcp_client.dart';
 import 'package:gaia/utils/gaia/rwcp/rwcp_listener.dart';
+import 'package:gaia/utils/gaia/rwcp/rwcp.dart';
+import 'package:gaia/utils/gaia/rwcp/segment.dart';
 
 import 'package:gaia/controller/log_buffer.dart';
 import 'package:gaia/controller/gaia_command_builder.dart';
@@ -123,6 +125,7 @@ class OtaServer extends GetxService
 
   Timer? _timer;
   static const bool _enableWriteTraceLog = false;
+  static const int _dataPacketLogSampleInterval = 50;
 
   var timeCount = 0.obs;
 
@@ -1135,6 +1138,7 @@ class OtaServer extends GetxService
   //一般命令写入通道
   Future<void> writeData(List<int> data) async {
     try {
+      _logGaiaWritePacket(data, channel: "WR");
       if (_enableWriteTraceLog) {
         addLog("writeData start>${StringUtils.byteToHexString(data)}");
       }
@@ -1155,6 +1159,7 @@ class OtaServer extends GetxService
   //RWCP写入通道
   Future<void> writeMsgRWCP(List<int> data) async {
     try {
+      _logRwcpWritePacket(data);
       await _bleManager.writeWithoutResponse(data);
       _touchUpgradeWatchdog();
     } catch (e) {
@@ -1185,6 +1190,125 @@ class OtaServer extends GetxService
   /// 添加日志（代理到 LogBuffer）
   void addLog(String message) {
     _logBuffer.addLog(message);
+  }
+
+  void _logGaiaWritePacket(List<int> bytes, {required String channel}) {
+    final gaia = GaiaPacketBLE.fromByte(bytes);
+    if (gaia == null) {
+      addLog("TX[$channel] RAW ${StringUtils.byteToHexString(bytes)}");
+      return;
+    }
+    final cmd = gaia.getCommand();
+    final cmdText = _cmdBuilder.gaiaCommandText(cmd);
+    final payload = gaia.mPayload ?? [];
+    final base =
+        "TX[$channel] $cmdText(0x${cmd.toRadixString(16).padLeft(4, '0').toUpperCase()})";
+    if (cmd == _upgradeControlCommand()) {
+      final vmu = VMUPacket.getPackageFromByte(payload);
+      if (vmu != null) {
+        final vmuData = vmu.mData ?? [];
+        final isUpgradeData = vmu.mOpCode == OpCodes.upgradeData;
+        final isLastDataPacket = vmuData.isNotEmpty && vmuData.first == 0x01;
+        final shouldLogUpgradeData = !isUpgradeData ||
+            sendPkgCount <= 3 ||
+            sendPkgCount % _dataPacketLogSampleInterval == 0 ||
+            isLastDataPacket;
+        if (!shouldLogUpgradeData) {
+          return;
+        }
+        final chunkLength =
+            isUpgradeData && vmuData.isNotEmpty ? vmuData.length - 1 : vmuData.length;
+        addLog(
+            "$base VMU=${_vmuOpText(vmu.mOpCode)}(0x${vmu.mOpCode.toRadixString(16).padLeft(2, '0').toUpperCase()}) "
+            "len=$chunkLength last=${isLastDataPacket ? 1 : 0} bytes=${StringUtils.byteToHexString(bytes)}");
+        return;
+      }
+    }
+    addLog("$base bytes=${StringUtils.byteToHexString(bytes)}");
+  }
+
+  void _logRwcpWritePacket(List<int> bytes) {
+    final segment = Segment.parse(bytes);
+    final opCode = segment.getOperationCode();
+    final seq = segment.getSequenceNumber();
+    final opText = _rwcpClientOpText(opCode);
+    if (opCode != RWCPOpCodeClient.data) {
+      addLog("TX[RWCP] op=$opText seq=$seq bytes=${StringUtils.byteToHexString(bytes)}");
+      return;
+    }
+
+    final payload = segment.getPayload();
+    final gaia = GaiaPacketBLE.fromByte(payload);
+    if (gaia == null) {
+      addLog("TX[RWCP] op=$opText seq=$seq bytes=${StringUtils.byteToHexString(bytes)}");
+      return;
+    }
+    final cmd = gaia.getCommand();
+    final gaiaName = _cmdBuilder.gaiaCommandText(cmd);
+    final gaiaPayload = gaia.mPayload ?? [];
+    if (cmd == _upgradeControlCommand()) {
+      final vmu = VMUPacket.getPackageFromByte(gaiaPayload);
+      if (vmu != null) {
+        final vmuData = vmu.mData ?? [];
+        final isUpgradeData = vmu.mOpCode == OpCodes.upgradeData;
+        final isLastDataPacket = vmuData.isNotEmpty && vmuData.first == 0x01;
+        final shouldLogUpgradeData = !isUpgradeData ||
+            sendPkgCount <= 3 ||
+            sendPkgCount % _dataPacketLogSampleInterval == 0 ||
+            isLastDataPacket;
+        if (!shouldLogUpgradeData) {
+          return;
+        }
+        final chunkLength =
+            isUpgradeData && vmuData.isNotEmpty ? vmuData.length - 1 : vmuData.length;
+        addLog("TX[RWCP] op=$opText seq=$seq gaia=$gaiaName "
+            "vmu=${_vmuOpText(vmu.mOpCode)}(0x${vmu.mOpCode.toRadixString(16).padLeft(2, '0').toUpperCase()}) "
+            "len=$chunkLength last=${isLastDataPacket ? 1 : 0} bytes=${StringUtils.byteToHexString(bytes)}");
+        return;
+      }
+    }
+    addLog("TX[RWCP] op=$opText seq=$seq gaia=$gaiaName "
+        "bytes=${StringUtils.byteToHexString(bytes)}");
+  }
+
+  String _rwcpClientOpText(int opCode) {
+    switch (opCode) {
+      case RWCPOpCodeClient.data:
+        return "DATA";
+      case RWCPOpCodeClient.syn:
+        return "SYN";
+      case RWCPOpCodeClient.rst:
+        return "RST";
+      default:
+        return "UNKNOWN";
+    }
+  }
+
+  String _vmuOpText(int opCode) {
+    switch (opCode) {
+      case OpCodes.upgradeStartReq:
+        return "upgradeStartReq";
+      case OpCodes.upgradeData:
+        return "upgradeData";
+      case OpCodes.upgradeAbortReq:
+        return "upgradeAbortReq";
+      case OpCodes.upgradeTransferCompleteRes:
+        return "upgradeTransferCompleteRes";
+      case OpCodes.upgradeInProgressRes:
+        return "upgradeInProgressRes";
+      case OpCodes.upgradeCommitCfm:
+        return "upgradeCommitCfm";
+      case OpCodes.upgradeSyncReq:
+        return "upgradeSyncReq";
+      case OpCodes.upgradeStartDataReq:
+        return "upgradeStartDataReq";
+      case OpCodes.upgradeIsValidationDoneReq:
+        return "upgradeIsValidationDoneReq";
+      case OpCodes.upgradeErrorWarnRes:
+        return "upgradeErrorWarnRes";
+      default:
+        return "unknownVMU";
+    }
   }
 
   @override
