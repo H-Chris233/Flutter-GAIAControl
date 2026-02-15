@@ -128,6 +128,15 @@ typedef OnDataReceived = void Function(List<int> data);
 typedef OnConnectionStateChanged = void Function(
     DeviceConnectionState state, String deviceId);
 
+enum BleScanStartResult {
+  started,
+  bluetoothDenied,
+  locationDenied,
+  bluetoothScanDenied,
+  bluetoothConnectDenied,
+  failed,
+}
+
 /// BLE 连接管理器
 ///
 /// 负责 BLE 设备扫描、连接管理、服务发现和特征值读写。
@@ -229,7 +238,7 @@ class BleConnectionManager {
   }
 
   /// 开始扫描设备
-  Future<void> startScan() async {
+  Future<BleScanStartResult> startScan() async {
     devices.clear();
     if (Platform.isAndroid) {
       final statuses = await [
@@ -246,20 +255,21 @@ class BleConnectionManager {
           await Permission.bluetoothConnect.status;
       if (location.isDenied) {
         _log("location deny");
-        return;
+        return BleScanStartResult.locationDenied;
       }
       if (bluetoothScan.isDenied) {
-        return;
+        _log("bluetoothScan deny");
+        return BleScanStartResult.bluetoothScanDenied;
       }
       if (bluetoothConnect.isDenied) {
         _log("bluetoothConnect deny");
-        return;
+        return BleScanStartResult.bluetoothConnectDenied;
       }
     } else {
       var bluetooth = await Permission.bluetooth.status;
       if (bluetooth.isDenied) {
         _log("bluetooth deny");
-        return;
+        return BleScanStartResult.bluetoothDenied;
       }
     }
     try {
@@ -268,19 +278,27 @@ class BleConnectionManager {
     } catch (e) {
       _log("清理旧连接时出错: $e");
     }
-    _scanSubscription = ble.scanForDevices(
-        withServices: [otaServiceUuid],
-        scanMode: ScanMode.lowLatency,
-        requireLocationServicesEnabled: true).listen((device) {
-      if (device.name.isNotEmpty) {
-        final knownDeviceIndex = devices.indexWhere((d) => d.id == device.id);
-        if (knownDeviceIndex >= 0) {
-          devices[knownDeviceIndex] = device;
-        } else {
-          devices.add(device);
+    try {
+      _scanSubscription = ble.scanForDevices(
+          withServices: [otaServiceUuid],
+          scanMode: ScanMode.lowLatency,
+          requireLocationServicesEnabled: true).listen((device) {
+        if (device.name.isNotEmpty) {
+          final knownDeviceIndex = devices.indexWhere((d) => d.id == device.id);
+          if (knownDeviceIndex >= 0) {
+            devices[knownDeviceIndex] = device;
+          } else {
+            devices.add(device);
+          }
         }
-      }
-    });
+      }, onError: (dynamic error) {
+        _log("扫描失败: $error");
+      });
+      return BleScanStartResult.started;
+    } catch (e) {
+      _log("扫描启动失败: $e");
+      return BleScanStartResult.failed;
+    }
   }
 
   /// 停止扫描
@@ -298,6 +316,7 @@ class BleConnectionManager {
     String deviceId, {
     VoidCallback? onConnected,
     VoidCallback? onDisconnected,
+    void Function(Object error)? onError,
   }) async {
     final int generation = ++_connectionGeneration;
     _reconnectTimer?.cancel();
@@ -340,6 +359,11 @@ class BleConnectionManager {
         _log('连接状态变更: $state');
         onConnectionStateChanged?.call(state, deviceId);
       }
+    }, onError: (Object error) {
+      isDeviceConnected = false;
+      _log("连接异常: $error");
+      onError?.call(error);
+      onDisconnected?.call();
     });
   }
 

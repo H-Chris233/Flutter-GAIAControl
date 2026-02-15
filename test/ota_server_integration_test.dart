@@ -74,8 +74,9 @@ class _FakeBleConnectionManager extends BleConnectionManager {
   }
 
   @override
-  Future<void> startScan() async {
+  Future<BleScanStartResult> startScan() async {
     startScanCalled = true;
+    return BleScanStartResult.started;
   }
 
   @override

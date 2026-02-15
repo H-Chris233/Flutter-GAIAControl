@@ -18,19 +18,36 @@ class _TestOtaState extends State<TestOtaView> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("GAIA Control Demo"),
+        title: const Text("GAIA Control"),
       ),
       body: Column(
         children: [
+          Obx(() {
+            final connected = OtaServer.to.isDeviceConnected.value;
+            final rwcpEnabled = OtaServer.to.mIsRWCPEnabled.value;
+            final mode = OtaServer.to.vendorMode.value.toUpperCase();
+            final errors = OtaServer.to.errorCount.value;
+            return Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              color:
+                  connected ? const Color(0xffE8F5E9) : const Color(0xffFBE9E7),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("连接状态: ${connected ? "已连接" : "未连接"}"),
+                  Text("RWCP模式: ${rwcpEnabled ? "已启用" : "未启用"}"),
+                  Text("Vendor模式: $mode"),
+                  Text("错误计数: $errors"),
+                ],
+              ),
+            );
+          }),
           Obx(() {
             final currentPath = OtaServer.to.firmwarePath.value;
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: const Text("Vendor模式: V3 (001D)"),
-                ),
                 Row(
                   children: [
                     Expanded(
@@ -57,8 +74,8 @@ class _TestOtaState extends State<TestOtaView> {
             return Row(
               children: [
                 Expanded(
-                    child: Slider(
-                        value: per, onChanged: (data) {}, max: 100, min: 0)),
+                    child:
+                        Slider(value: per, onChanged: null, max: 100, min: 0)),
                 SizedBox(width: 60, child: Text('${per.toStringAsFixed(2)}%'))
               ],
             );
@@ -143,7 +160,7 @@ class _TestOtaState extends State<TestOtaView> {
             return SingleChildScrollView(
                 child: Text(
               log,
-              style: const TextStyle(fontSize: 10),
+              style: const TextStyle(fontSize: 12),
             ));
           }))
         ],

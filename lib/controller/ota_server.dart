@@ -28,6 +28,14 @@ import 'package:gaia/controller/upgrade_state_machine.dart';
 
 typedef DefaultFirmwarePathResolver = Future<String> Function();
 
+enum DeviceListUiState {
+  idle,
+  scanning,
+  empty,
+  ready,
+  error,
+}
+
 class OtaServer extends GetxService
     implements RWCPListener, UpgradeStateMachineDelegate {
   // ============== 配置常量 ==============
@@ -82,7 +90,14 @@ class OtaServer extends GetxService
   final Uuid notifyUUID = BleConstants.notifyCharacteristicUuid;
   final Uuid writeUUID = BleConstants.writeCharacteristicUuid;
   final Uuid writeNoResUUID = BleConstants.writeNoResponseCharacteristicUuid;
-  bool isDeviceConnected = false;
+  RxBool isDeviceConnected = false.obs;
+  RxBool isScanning = false.obs;
+  RxBool isConnecting = false.obs;
+  RxString connectingDeviceId = "".obs;
+  Rx<DeviceListUiState> deviceListUiState = DeviceListUiState.idle.obs;
+  RxString deviceListHint = "点击“扫描蓝牙”开始搜索设备".obs;
+  RxnString userMessage = RxnString();
+  RxInt errorCount = 0.obs;
 
   /// To know if the upgrade process is currently running.
   RxBool isUpgrading = false.obs;
@@ -165,6 +180,8 @@ class OtaServer extends GetxService
   bool _pendingStartAfterVersionQuery = false;
   Timer? _postUpgradeVersionRetryTimer;
   int _postUpgradeVersionRetryCount = 0;
+  Timer? _scanWatchdogTimer;
+  Worker? _deviceListWorker;
 
   OtaServer({
     BleConnectionManager? bleManagerOverride,
@@ -205,6 +222,20 @@ class OtaServer extends GetxService
     mRWCPClient = RWCPClient(this);
     _initDefaultFirmwarePath();
     _bleManager.startBleStatusMonitor();
+    _deviceListWorker = ever<List<DiscoveredDevice>>(devices, (current) {
+      if (current.isNotEmpty) {
+        _scanWatchdogTimer?.cancel();
+        if (isScanning.value) {
+          isScanning.value = false;
+        }
+        deviceListUiState.value = DeviceListUiState.ready;
+        deviceListHint.value = "发现 ${current.length} 台设备";
+      } else if (!isScanning.value &&
+          deviceListUiState.value == DeviceListUiState.ready) {
+        deviceListUiState.value = DeviceListUiState.empty;
+        deviceListHint.value = "未发现设备，请确认设备已进入广播模式";
+      }
+    });
   }
 
   Future<void> _initDefaultFirmwarePath() async {
@@ -225,18 +256,37 @@ class OtaServer extends GetxService
     addLog("已设置固件路径$trimPath");
   }
 
+  void consumeUserMessage() {
+    userMessage.value = null;
+  }
+
+  void _notifyUser(String message) {
+    userMessage.value = message;
+    addLog(message);
+  }
+
   Future<void> connectDevice(String id) async {
     try {
+      isConnecting.value = true;
+      connectingDeviceId.value = id;
+      _scanWatchdogTimer?.cancel();
+      isScanning.value = false;
+      deviceListUiState.value = DeviceListUiState.idle;
+      deviceListHint.value = "连接中...";
       _autoReconnectEnabled = true;
       _bleManager.setAutoReconnectEnabled(_autoReconnectEnabled);
       await _bleManager.connect(
         id,
         onConnected: () async {
-          isDeviceConnected = true;
+          isConnecting.value = false;
+          connectingDeviceId.value = "";
+          isDeviceConnected.value = true;
           connectDeviceId = id;
           if (!isUpgrading.value) {
             rwcpStatusText.value = "待启用";
           }
+          deviceListUiState.value = DeviceListUiState.ready;
+          deviceListHint.value = "连接成功";
           addLog("Vendor模式固定为V3，使用${_vendorToHex(_activeVendorId)}");
           await registerNotice();
           await restPayloadSize();
@@ -245,15 +295,33 @@ class OtaServer extends GetxService
           }
         },
         onDisconnected: () {
-          isDeviceConnected = false;
+          isConnecting.value = false;
+          connectingDeviceId.value = "";
+          isDeviceConnected.value = false;
           rwcpStatusText.value = "连接断开";
+          _notifyUser("设备已断开连接");
+          deviceListUiState.value = DeviceListUiState.error;
+          deviceListHint.value = "连接断开，请重试";
           if (isUpgrading.value) {
             _enterFatalUpgradeState("升级过程中蓝牙断链");
           }
         },
+        onError: (error) {
+          isConnecting.value = false;
+          connectingDeviceId.value = "";
+          isDeviceConnected.value = false;
+          deviceListUiState.value = DeviceListUiState.error;
+          deviceListHint.value = "连接失败，请重试";
+          _notifyUser("连接失败: $error");
+        },
       );
     } catch (e) {
-      addLog('开始连接失败$e');
+      isConnecting.value = false;
+      connectingDeviceId.value = "";
+      isDeviceConnected.value = false;
+      deviceListUiState.value = DeviceListUiState.error;
+      deviceListHint.value = "连接失败，请重试";
+      _notifyUser('开始连接失败: $e');
     }
   }
 
@@ -561,7 +629,9 @@ class OtaServer extends GetxService
     isUpgrading.value = false;
     _dfuWriteInFlight = false;
     _dfuPendingChunkSize = 0;
-    if (sendDisconnect && isDeviceConnected && connectDeviceId.isNotEmpty) {
+    if (sendDisconnect &&
+        isDeviceConnected.value &&
+        connectDeviceId.isNotEmpty) {
       await Future.delayed(const Duration(milliseconds: 500));
       sendUpgradeDisconnect();
     }
@@ -738,7 +808,7 @@ class OtaServer extends GetxService
       addLog("版本查询进行中，忽略重复请求");
       return;
     }
-    if (!isDeviceConnected) {
+    if (!isDeviceConnected.value) {
       addLog("$tag版本查询失败：设备未连接");
       onFailed();
       return;
@@ -817,7 +887,7 @@ class OtaServer extends GetxService
       if (_isVersionQueryInFlight || isUpgrading.value) {
         return;
       }
-      if (!isDeviceConnected) {
+      if (!isDeviceConnected.value) {
         addLog(
             "等待设备重连后查询升级后版本($_postUpgradeVersionRetryCount/$kPostUpgradeVersionMaxRetries)");
         return;
@@ -1173,8 +1243,11 @@ class OtaServer extends GetxService
 
   void disconnect() {
     _reconnectTimer?.cancel();
+    _scanWatchdogTimer?.cancel();
     _bleManager.disconnect();
-    isDeviceConnected = false;
+    isDeviceConnected.value = false;
+    isConnecting.value = false;
+    connectingDeviceId.value = "";
   }
 
   Future<void> restPayloadSize() async {
@@ -1216,8 +1289,9 @@ class OtaServer extends GetxService
         if (!shouldLogUpgradeData) {
           return;
         }
-        final chunkLength =
-            isUpgradeData && vmuData.isNotEmpty ? vmuData.length - 1 : vmuData.length;
+        final chunkLength = isUpgradeData && vmuData.isNotEmpty
+            ? vmuData.length - 1
+            : vmuData.length;
         addLog(
             "$base VMU=${_vmuOpText(vmu.mOpCode)}(0x${vmu.mOpCode.toRadixString(16).padLeft(2, '0').toUpperCase()}) "
             "len=$chunkLength last=${isLastDataPacket ? 1 : 0} bytes=${StringUtils.byteToHexString(bytes)}");
@@ -1233,14 +1307,16 @@ class OtaServer extends GetxService
     final seq = segment.getSequenceNumber();
     final opText = _rwcpClientOpText(opCode);
     if (opCode != RWCPOpCodeClient.data) {
-      addLog("TX[RWCP] op=$opText seq=$seq bytes=${StringUtils.byteToHexString(bytes)}");
+      addLog(
+          "TX[RWCP] op=$opText seq=$seq bytes=${StringUtils.byteToHexString(bytes)}");
       return;
     }
 
     final payload = segment.getPayload();
     final gaia = GaiaPacketBLE.fromByte(payload);
     if (gaia == null) {
-      addLog("TX[RWCP] op=$opText seq=$seq bytes=${StringUtils.byteToHexString(bytes)}");
+      addLog(
+          "TX[RWCP] op=$opText seq=$seq bytes=${StringUtils.byteToHexString(bytes)}");
       return;
     }
     final cmd = gaia.getCommand();
@@ -1259,8 +1335,9 @@ class OtaServer extends GetxService
         if (!shouldLogUpgradeData) {
           return;
         }
-        final chunkLength =
-            isUpgradeData && vmuData.isNotEmpty ? vmuData.length - 1 : vmuData.length;
+        final chunkLength = isUpgradeData && vmuData.isNotEmpty
+            ? vmuData.length - 1
+            : vmuData.length;
         addLog("TX[RWCP] op=$opText seq=$seq gaia=$gaiaName "
             "vmu=${_vmuOpText(vmu.mOpCode)}(0x${vmu.mOpCode.toRadixString(16).padLeft(2, '0').toUpperCase()}) "
             "len=$chunkLength last=${isLastDataPacket ? 1 : 0} bytes=${StringUtils.byteToHexString(bytes)}");
@@ -1373,9 +1450,11 @@ class OtaServer extends GetxService
     if (_lastErrorTime == null ||
         now.difference(_lastErrorTime!).inSeconds > kErrorBurstWindowSeconds) {
       _errorBurstCount = 0;
+      errorCount.value = 0;
     }
     _lastErrorTime = now;
     _errorBurstCount += 1;
+    errorCount.value = _errorBurstCount;
     addLog("错误累计($_errorBurstCount/$kErrorBurstThreshold): $reason");
     if (triggerRecovery || _errorBurstCount >= kErrorBurstThreshold) {
       unawaited(_quickRecoverFromDeviceError("自动恢复触发: $reason"));
@@ -1407,6 +1486,7 @@ class OtaServer extends GetxService
     _isRecovering = true;
     _recoveryAttempts += 1;
     _errorBurstCount = 0;
+    errorCount.value = 0;
     recoveryStatusText.value = "恢复中";
     rwcpStatusText.value = "恢复中";
     // 手动恢复或第二次及以后的自动恢复，发送 Abort 强制重置设备状态
@@ -1416,13 +1496,13 @@ class OtaServer extends GetxService
     try {
       if (isUpgrading.value) {
         await stopUpgrade(sendAbort: shouldSendAbort);
-      } else if (shouldSendAbort && isDeviceConnected) {
+      } else if (shouldSendAbort && isDeviceConnected.value) {
         // 非升级状态但需要强制重置，直接发送 Abort
         sendAbortReq();
         await Future.delayed(const Duration(milliseconds: 300));
       }
       _bleManager.disconnect();
-      isDeviceConnected = false;
+      isDeviceConnected.value = false;
       if (connectDeviceId.isNotEmpty) {
         recoveryStatusText.value = "重连中";
         rwcpStatusText.value = "重连中";
@@ -1443,6 +1523,7 @@ class OtaServer extends GetxService
 
   @override
   void onClose() {
+    _deviceListWorker?.dispose();
     _logBuffer.dispose();
     _bleManager.dispose();
     mRWCPClient.dispose();
@@ -1452,10 +1533,71 @@ class OtaServer extends GetxService
     _versionQueryTimer?.cancel();
     _postUpgradeVersionRetryTimer?.cancel();
     _reconnectTimer?.cancel();
+    _scanWatchdogTimer?.cancel();
     super.onClose();
   }
 
   Future<void> startScan() async {
-    await _bleManager.startScan();
+    isScanning.value = true;
+    isConnecting.value = false;
+    connectingDeviceId.value = "";
+    deviceListUiState.value = DeviceListUiState.scanning;
+    deviceListHint.value = "扫描中...";
+    final result = await _bleManager.startScan();
+    switch (result) {
+      case BleScanStartResult.started:
+        _scanWatchdogTimer?.cancel();
+        _scanWatchdogTimer = Timer(const Duration(seconds: 8), () {
+          if (devices.isEmpty && isScanning.value) {
+            isScanning.value = false;
+            deviceListUiState.value = DeviceListUiState.empty;
+            deviceListHint.value = "未发现设备，请确认设备已开机并靠近手机";
+          }
+        });
+        return;
+      case BleScanStartResult.locationDenied:
+        isScanning.value = false;
+        deviceListUiState.value = DeviceListUiState.error;
+        deviceListHint.value = "缺少定位权限";
+        _notifyUser("请开启定位权限后重试");
+        return;
+      case BleScanStartResult.bluetoothScanDenied:
+        isScanning.value = false;
+        deviceListUiState.value = DeviceListUiState.error;
+        deviceListHint.value = "缺少蓝牙扫描权限";
+        _notifyUser("请开启蓝牙扫描权限后重试");
+        return;
+      case BleScanStartResult.bluetoothConnectDenied:
+        isScanning.value = false;
+        deviceListUiState.value = DeviceListUiState.error;
+        deviceListHint.value = "缺少蓝牙连接权限";
+        _notifyUser("请开启蓝牙连接权限后重试");
+        return;
+      case BleScanStartResult.bluetoothDenied:
+        isScanning.value = false;
+        deviceListUiState.value = DeviceListUiState.error;
+        deviceListHint.value = "缺少蓝牙权限";
+        _notifyUser("请开启蓝牙权限后重试");
+        return;
+      case BleScanStartResult.failed:
+        isScanning.value = false;
+        deviceListUiState.value = DeviceListUiState.error;
+        deviceListHint.value = "扫描失败，请重试";
+        _notifyUser("扫描失败，请稍后重试");
+        return;
+    }
+  }
+
+  Future<void> stopScan() async {
+    _scanWatchdogTimer?.cancel();
+    await _bleManager.stopScan();
+    isScanning.value = false;
+    if (devices.isEmpty) {
+      deviceListUiState.value = DeviceListUiState.empty;
+      deviceListHint.value = "已停止扫描，未发现设备";
+      return;
+    }
+    deviceListUiState.value = DeviceListUiState.ready;
+    deviceListHint.value = "已停止扫描";
   }
 }
