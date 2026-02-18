@@ -253,21 +253,21 @@ class BleConnectionManager {
           await Permission.bluetoothScan.status;
       final bluetoothConnect = statuses[Permission.bluetoothConnect] ??
           await Permission.bluetoothConnect.status;
-      if (location.isDenied) {
+      if (!location.isGranted) {
         _log("location deny");
         return BleScanStartResult.locationDenied;
       }
-      if (bluetoothScan.isDenied) {
+      if (!bluetoothScan.isGranted) {
         _log("bluetoothScan deny");
         return BleScanStartResult.bluetoothScanDenied;
       }
-      if (bluetoothConnect.isDenied) {
+      if (!bluetoothConnect.isGranted) {
         _log("bluetoothConnect deny");
         return BleScanStartResult.bluetoothConnectDenied;
       }
     } else {
       var bluetooth = await Permission.bluetooth.status;
-      if (bluetooth.isDenied) {
+      if (!bluetooth.isGranted) {
         _log("bluetooth deny");
         return BleScanStartResult.bluetoothDenied;
       }
@@ -320,9 +320,11 @@ class BleConnectionManager {
   }) async {
     final int generation = ++_connectionGeneration;
     _reconnectTimer?.cancel();
+    await _scanSubscription?.cancel();
     await _connectionSubscription?.cancel();
     await _notifySubscription?.cancel();
     await _rwcpSubscription?.cancel();
+    _scanSubscription = null;
     _connectionSubscription = null;
     _notifySubscription = null;
     _rwcpSubscription = null;

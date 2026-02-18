@@ -273,6 +273,7 @@ class OtaServer extends GetxService
       isScanning.value = false;
       deviceListUiState.value = DeviceListUiState.idle;
       deviceListHint.value = "连接中...";
+      await _bleManager.stopScan();
       _autoReconnectEnabled = true;
       _bleManager.setAutoReconnectEnabled(_autoReconnectEnabled);
       await _bleManager.connect(
@@ -990,13 +991,17 @@ class OtaServer extends GetxService
   void _handleDataBytesRequest(int bytesToSend, int fileOffset) {
     mBytesToSend = bytesToSend;
     addLog("本次发包: offset=$fileOffset bytesToSend=$mBytesToSend");
-    mStartOffset += (fileOffset > 0 &&
-            fileOffset + mStartOffset < (mBytesFile?.length ?? 0))
-        ? fileOffset
-        : 0;
+    final fileLength = mBytesFile?.length ?? 0;
+    if (fileOffset >= 0 && fileOffset <= fileLength) {
+      mStartOffset = fileOffset;
+    } else {
+      final clampedOffset = fileOffset < 0 ? 0 : fileLength;
+      addLog("设备请求offset越界，已修正: req=$fileOffset use=$clampedOffset");
+      mStartOffset = clampedOffset;
+    }
 
     mBytesToSend = (mBytesToSend > 0) ? mBytesToSend : 0;
-    final remainingLength = (mBytesFile?.length ?? 0) - mStartOffset;
+    final remainingLength = fileLength - mStartOffset;
     mBytesToSend =
         (mBytesToSend < remainingLength) ? mBytesToSend : remainingLength;
     if (mIsRWCPEnabled.value) {

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:gaia/controller/upgrade_state_machine.dart';
 import 'package:gaia/utils/gaia/confirmation_type.dart';
 import 'package:gaia/utils/gaia/op_codes.dart';
@@ -159,6 +160,48 @@ void main() {
 
         expect(delegate.lastBytesToSend, 0x0400); // 1024
         expect(delegate.lastStartOffset, 0);
+      });
+
+      test('handles VALIDATION_DONE_CFM with delay payload', () {
+        fakeAsync((async) {
+          machine.state = UpgradeState.validating;
+          final validationPacket = VMUPacket.get(
+            OpCodes.upgradeIsValidationDoneCfm,
+            data: [0x00, 0x64], // 100ms
+          );
+          validationPacket.mOpCode = OpCodes.upgradeIsValidationDoneCfm;
+          validationPacket.mData = [0x00, 0x64];
+
+          machine.handleVmuPacket(validationPacket);
+          expect(delegate.sentPackets, isEmpty);
+
+          async.elapse(const Duration(milliseconds: 99));
+          expect(delegate.sentPackets, isEmpty);
+
+          async.elapse(const Duration(milliseconds: 1));
+          expect(delegate.sentPackets.length, 1);
+          expect(delegate.sentPackets.first.mOpCode,
+              OpCodes.upgradeIsValidationDoneReq);
+        });
+      });
+
+      test('VALIDATION_DONE_CFM delayed callback should respect state change',
+          () {
+        fakeAsync((async) {
+          machine.state = UpgradeState.validating;
+          final validationPacket = VMUPacket.get(
+            OpCodes.upgradeIsValidationDoneCfm,
+            data: [0x00, 0x32], // 50ms
+          );
+          validationPacket.mOpCode = OpCodes.upgradeIsValidationDoneCfm;
+          validationPacket.mData = [0x00, 0x32];
+
+          machine.handleVmuPacket(validationPacket);
+          machine.state = UpgradeState.error;
+          async.elapse(const Duration(milliseconds: 50));
+
+          expect(delegate.sentPackets, isEmpty);
+        });
       });
 
       test('handles ABORT_CFM and resets to idle', () {

@@ -314,19 +314,21 @@ class UpgradeStateMachine {
   /// 处理 VALIDATION_DONE_CFM
   void _handleValidationDoneCfm(VMUPacket packet) {
     delegate.onLog("receiveValidationDoneCFM");
-    final data = packet.getBytes();
-    if (data.length == 2) {
+    final data = packet.mData ?? [];
+    if (data.length >= 2) {
       final time = _extractIntFromByteArray(data, 0, 2, false);
       Future.delayed(Duration(milliseconds: time)).then((_) {
+        if (state != UpgradeState.validating) {
+          return;
+        }
         final validationPacket =
             VMUPacket.get(OpCodes.upgradeIsValidationDoneReq);
         delegate.sendVmuPacket(validationPacket, false);
       });
-    } else {
-      final validationPacket =
-          VMUPacket.get(OpCodes.upgradeIsValidationDoneReq);
-      delegate.sendVmuPacket(validationPacket, false);
+      return;
     }
+    final validationPacket = VMUPacket.get(OpCodes.upgradeIsValidationDoneReq);
+    delegate.sendVmuPacket(validationPacket, false);
   }
 
   /// 处理 TRANSFER_COMPLETE_IND
