@@ -70,6 +70,11 @@ class _FakeBleConnectionManager extends BleConnectionManager {
   int stopScanCalled = 0;
   int connectCalled = 0;
   int startBleStatusMonitorCalled = 0;
+  int registerNotifyChannelCalled = 0;
+  bool registerNotifyChannelResult = true;
+  int cancelRwcpChannelCalled = 0;
+  int registerRwcpChannelCalled = 0;
+  bool registerRwcpChannelResult = true;
   final List<List<int>> writeWithResponsePayloads = <List<int>>[];
 
   @override
@@ -101,6 +106,23 @@ class _FakeBleConnectionManager extends BleConnectionManager {
   @override
   Future<void> writeWithResponse(List<int> data) async {
     writeWithResponsePayloads.add(List<int>.from(data));
+  }
+
+  @override
+  Future<bool> registerNotifyChannel(OnDataReceived onDataReceived) async {
+    registerNotifyChannelCalled += 1;
+    return registerNotifyChannelResult;
+  }
+
+  @override
+  Future<void> cancelRwcpChannel() async {
+    cancelRwcpChannelCalled += 1;
+  }
+
+  @override
+  Future<bool> registerRwcpChannel(OnDataReceived onDataReceived) async {
+    registerRwcpChannelCalled += 1;
+    return registerRwcpChannelResult;
   }
 }
 
@@ -180,6 +202,49 @@ void main() {
       expect(vmu!.mOpCode, OpCodes.upgradeData);
       expect(vmu.mData![0], 0x00);
       expect(vmu.mData!.sublist(1), List<int>.generate(10, (i) => 20 + i));
+    });
+
+    test(
+        'registerNotice skips register command when notify channel is not ready',
+        () async {
+      fakeBleManager.registerNotifyChannelResult = false;
+
+      await server.registerNotice();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(fakeBleManager.registerNotifyChannelCalled, 1);
+      expect(fakeBleManager.writeWithResponsePayloads, isEmpty);
+    });
+
+    test(
+        'registerRWCP marks service not ready when rwcp channel is unavailable',
+        () async {
+      fakeBleManager.isDeviceConnected = true;
+      fakeBleManager.registerRwcpChannelResult = false;
+
+      await server.registerRWCP();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(fakeBleManager.cancelRwcpChannelCalled, 1);
+      expect(fakeBleManager.registerRwcpChannelCalled, 1);
+      expect(server.rwcpStatusText.value, '服务未就绪');
+      expect(fakeBleManager.writeWithResponsePayloads, isEmpty);
+    });
+
+    test('registerRWCP sends upgrade connect when upgrading and channel ready',
+        () async {
+      fakeBleManager.isDeviceConnected = true;
+      fakeBleManager.registerRwcpChannelResult = true;
+      server.isUpgrading.value = true;
+      server.transFerComplete = false;
+
+      await server.registerRWCP();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(fakeBleManager.cancelRwcpChannelCalled, 1);
+      expect(fakeBleManager.registerRwcpChannelCalled, 1);
+      expect(server.rwcpStatusText.value, '已启用');
+      expect(fakeBleManager.writeWithResponsePayloads, isNotEmpty);
     });
   });
 }

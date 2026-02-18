@@ -432,41 +432,61 @@ class BleConnectionManager {
   }
 
   /// 注册通知通道
-  Future<void> registerNotifyChannel(OnDataReceived onDataReceived) async {
+  Future<bool> registerNotifyChannel(OnDataReceived onDataReceived) async {
     await _notifySubscription?.cancel();
+    if (connectedDeviceId.isEmpty) {
+      _log("通知注册失败：设备未连接");
+      return false;
+    }
     if (!await discoverServicesIfNeeded(connectedDeviceId)) {
       _log("通知注册失败：服务未就绪");
-      return;
+      return false;
     }
     final characteristic = QualifiedCharacteristic(
         serviceId: otaServiceUuid,
         characteristicId: notifyCharacteristicUuid,
         deviceId: connectedDeviceId);
-    _notifySubscription =
-        ble.subscribeToCharacteristic(characteristic).listen((data) {
-      onDataReceived(data);
-    }, onError: (dynamic error) {
-      _log("通知通道错误: $error");
-    });
+    try {
+      _notifySubscription =
+          ble.subscribeToCharacteristic(characteristic).listen((data) {
+        onDataReceived(data);
+      }, onError: (dynamic error) {
+        _log("通知通道错误: $error");
+      });
+      return true;
+    } catch (e) {
+      _log("通知注册异常: $e");
+      return false;
+    }
   }
 
   /// 注册 RWCP 通道
-  Future<void> registerRwcpChannel(OnDataReceived onDataReceived) async {
+  Future<bool> registerRwcpChannel(OnDataReceived onDataReceived) async {
     await _rwcpSubscription?.cancel();
+    if (connectedDeviceId.isEmpty) {
+      _log("RWCP注册失败：设备未连接");
+      return false;
+    }
     if (!await discoverServicesIfNeeded(connectedDeviceId)) {
       _log("RWCP注册失败：服务未就绪");
-      return;
+      return false;
     }
     final characteristic = QualifiedCharacteristic(
         serviceId: otaServiceUuid,
         characteristicId: writeNoResponseCharacteristicUuid,
         deviceId: connectedDeviceId);
-    _rwcpSubscription =
-        ble.subscribeToCharacteristic(characteristic).listen((data) {
-      onDataReceived(data);
-    }, onError: (dynamic error) {
-      _log("RWCP通道错误: $error");
-    });
+    try {
+      _rwcpSubscription =
+          ble.subscribeToCharacteristic(characteristic).listen((data) {
+        onDataReceived(data);
+      }, onError: (dynamic error) {
+        _log("RWCP通道错误: $error");
+      });
+      return true;
+    } catch (e) {
+      _log("RWCP注册异常: $e");
+      return false;
+    }
   }
 
   /// 取消 RWCP 通道

@@ -369,11 +369,11 @@ class OtaServer extends GetxService
     }
     rwcpStatusText.value = "建立通道中";
     await _bleManager.cancelRwcpChannel();
-    await _bleManager.registerRwcpChannel((data) {
+    final channelReady = await _bleManager.registerRwcpChannel((data) {
       //addLog("wenDataRec2>${StringUtils.byteToHexString(data)}");
       mRWCPClient.onReceiveRWCPSegment(data);
     });
-    if (!_bleManager.isDeviceConnected) {
+    if (!channelReady || !_bleManager.isDeviceConnected) {
       rwcpStatusText.value = "服务未就绪";
       _rwcpSetupInProgress = false;
       return;
@@ -395,10 +395,17 @@ class OtaServer extends GetxService
 
   //注册通知
   Future<void> registerNotice() async {
-    await _bleManager.registerNotifyChannel((data) {
+    final channelReady = await _bleManager.registerNotifyChannel((data) {
       addLog("收到通知>${StringUtils.byteToHexString(data)}");
       handleRecMsg(data);
     });
+    if (!channelReady) {
+      addLog("通知通道未就绪，跳过通知注册命令");
+      if (isUpgrading.value) {
+        _enterFatalUpgradeState("通知通道未就绪");
+      }
+      return;
+    }
     final registerPayload = [0x06];
     GaiaPacketBLE registerPacket = _buildGaiaPacket(
       _registerNotificationCommand(),

@@ -9,11 +9,12 @@ class _FakeRWCPListener implements RWCPListener {
   int progressAckCount = 0;
   bool transferFinished = false;
   bool transferFailed = false;
+  bool sendSucceeds = true;
 
   @override
   bool sendRWCPSegment(List<int> bytes) {
     sentSegments.add(List<int>.from(bytes));
-    return true;
+    return sendSucceeds;
   }
 
   @override
@@ -36,6 +37,7 @@ class _FakeRWCPListener implements RWCPListener {
     progressAckCount = 0;
     transferFinished = false;
     transferFailed = false;
+    sendSucceeds = true;
   }
 }
 
@@ -387,6 +389,45 @@ void main() {
         // rst segment: sendRSTSegment calls reset() first which sets mNextSequence=0
         // So header = (2 << 6) | 0 = 128
         expect(listener.sentSegments[0][0], 128);
+      });
+
+      test('invalid ack keeps timeout running for retry path', () {
+        client.mState = RWCPState.established;
+        client.mWindow = 10;
+        client.mCredits = 9;
+        client.mDataTimeOutMs = 1000;
+        client.mLastAckSequence = -1;
+        client.mNextSequence = 1;
+        client.mUnacknowledgedSegments
+            .add(Segment.get(RWCPOpCodeClient.data, 0));
+        client.startTimeOut(client.mDataTimeOutMs);
+
+        client.receiveDataAck(Segment.get(RWCPOpCodeServer.dataAck, 5));
+
+        expect(client.isTimeOutRunning, isTrue);
+        expect(client.mUnacknowledgedSegments.length, 1);
+        client.cancelTimeOut();
+      });
+    });
+
+    group('sendDataSegment reliability', () {
+      test('send failure keeps pending data and starts timeout for retry', () {
+        listener.sendSucceeds = false;
+        client.mState = RWCPState.established;
+        client.mWindow = 10;
+        client.mCredits = 1;
+        client.mDataTimeOutMs = 1000;
+        client.mPendingData.add([0x01, 0x02]);
+        client.mNextSequence = 7;
+
+        client.sendDataSegment();
+
+        expect(client.mPendingData.length, 1);
+        expect(client.mUnacknowledgedSegments, isEmpty);
+        expect(client.mNextSequence, 7);
+        expect(client.mCredits, 1);
+        expect(client.isTimeOutRunning, isTrue);
+        client.cancelTimeOut();
       });
     });
 

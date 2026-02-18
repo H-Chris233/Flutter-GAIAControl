@@ -217,19 +217,73 @@ void main() {
       );
       manager.connectedDeviceId = 'device-1';
 
-      await manager.registerNotifyChannel((data) {
+      final ready = await manager.registerNotifyChannel((data) {
         received.add(data);
       });
 
       fakeBle.emitCharacteristic(manager.notifyCharacteristicUuid, <int>[1, 2]);
       await Future<void>.delayed(Duration.zero);
 
+      expect(ready, isTrue);
       expect(
           received,
           equals(<List<int>>[
             <int>[1, 2]
           ]));
 
+      manager.dispose();
+    });
+
+    test('registerNotifyChannel returns false when service is not ready',
+        () async {
+      final manager = _TestableBleConnectionManager(
+        ble: fakeBle,
+        discoverResult: false,
+      );
+      manager.connectedDeviceId = 'device-1';
+
+      final ready = await manager.registerNotifyChannel((_) {});
+
+      expect(ready, isFalse);
+      manager.dispose();
+    });
+
+    test('registerRwcpChannel forwards received data', () async {
+      final received = <List<int>>[];
+      final manager = _TestableBleConnectionManager(
+        ble: fakeBle,
+        discoverResult: true,
+      );
+      manager.connectedDeviceId = 'device-1';
+
+      final ready = await manager.registerRwcpChannel((data) {
+        received.add(data);
+      });
+
+      fakeBle.emitCharacteristic(
+          manager.writeNoResponseCharacteristicUuid, <int>[0x11, 0x22]);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(ready, isTrue);
+      expect(
+          received,
+          equals(<List<int>>[
+            <int>[0x11, 0x22]
+          ]));
+      manager.dispose();
+    });
+
+    test('registerRwcpChannel returns false when service is not ready',
+        () async {
+      final manager = _TestableBleConnectionManager(
+        ble: fakeBle,
+        discoverResult: false,
+      );
+      manager.connectedDeviceId = 'device-1';
+
+      final ready = await manager.registerRwcpChannel((_) {});
+
+      expect(ready, isFalse);
       manager.dispose();
     });
 

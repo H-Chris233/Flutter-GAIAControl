@@ -448,10 +448,21 @@ class RWCPClient {
         mPendingData.isNotEmpty &&
         !mIsResendingSegments &&
         mState == RWCPState.established) {
-      List<int> data = mPendingData.removeFirst();
+      List<int> data = mPendingData.first;
       Segment segment =
           Segment.get(RWCPOpCodeClient.data, mNextSequence, payload: data);
-      sendSegment(segment, mDataTimeOutMs);
+      final sent = sendSegment(segment, mDataTimeOutMs);
+      if (!sent) {
+        Log.w(
+            tag,
+            "Failed to send data segment(sequence=${segment.getSequenceNumber()}), "
+            "keeping pending data for retry.");
+        if (!isTimeOutRunning) {
+          startTimeOut(mDataTimeOutMs);
+        }
+        break;
+      }
+      mPendingData.removeFirst();
       mUnacknowledgedSegments.add(segment);
       mNextSequence = increaseSequenceNumber(mNextSequence);
       mCredits--;
@@ -654,10 +665,10 @@ class RWCPClient {
 
     switch (mState) {
       case RWCPState.established:
-        cancelTimeOut();
         int sequence = segment.getSequenceNumber();
         int validated = validateAckSequence(RWCPOpCodeClient.data, sequence);
         if (validated >= 0) {
+          cancelTimeOut();
           _recoverTimeoutAfterSuccess(validated);
           if (mCredits > 0 && !mPendingData.isEmpty) {
             sendDataSegment();
