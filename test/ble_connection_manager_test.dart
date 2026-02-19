@@ -202,6 +202,7 @@ void main() {
 
     test('stale onError from old generation is ignored', () async {
       var disconnectedCalled = 0;
+      var onErrorCalled = 0;
       final manager = BleConnectionManager(ble: fakeBle);
       fakeBle.queuedConnectionStreams
           .add(Stream<ConnectionStateUpdate>.fromFuture(
@@ -213,14 +214,39 @@ void main() {
       unawaited(manager.connect(
         'old-device',
         onDisconnected: () => disconnectedCalled += 1,
+        onError: (_) => onErrorCalled += 1,
       ));
       await manager.connect(
         'new-device',
         onDisconnected: () => disconnectedCalled += 1,
+        onError: (_) => onErrorCalled += 1,
       );
       await Future<void>.delayed(const Duration(milliseconds: 10));
 
       expect(disconnectedCalled, 0);
+      expect(onErrorCalled, 0);
+      manager.dispose();
+    });
+
+    test('onError from current generation triggers callbacks', () async {
+      var disconnectedCalled = 0;
+      var onErrorCalled = 0;
+      final manager = BleConnectionManager(ble: fakeBle);
+      fakeBle.queuedConnectionStreams
+          .add(Stream<ConnectionStateUpdate>.fromFuture(
+        Future<ConnectionStateUpdate>.error(StateError('current error')),
+      ));
+
+      await manager.connect(
+        'device-1',
+        onDisconnected: () => disconnectedCalled += 1,
+        onError: (_) => onErrorCalled += 1,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      expect(disconnectedCalled, 1);
+      expect(onErrorCalled, 1);
+      expect(manager.isDeviceConnected, isFalse);
       manager.dispose();
     });
 

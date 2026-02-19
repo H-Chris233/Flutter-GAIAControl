@@ -168,6 +168,12 @@ void main() {
       expect(fakeBleManager.connectCalled, 1);
     });
 
+    test('connectDevice enables auto reconnect before connecting', () async {
+      await server.connectDevice('device-1');
+
+      expect(fakeBleManager.autoReconnectEnabledHistory, contains(true));
+    });
+
     test('receiveVMUPacket handles transfer complete and sends confirmation',
         () async {
       server.isUpgrading.value = true;
@@ -254,10 +260,26 @@ void main() {
       expect(fakeBleManager.writeWithResponsePayloads, isNotEmpty);
     });
 
+    test('startUpdate enables BLE auto reconnect', () async {
+      server.startUpdate();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(fakeBleManager.autoReconnectEnabledHistory, contains(true));
+    });
+
     test('onUpgradeError disables BLE auto reconnect in fatal state', () async {
       server.isUpgrading.value = true;
 
       server.onUpgradeError('fatal');
+      await Future<void>.delayed(Duration.zero);
+
+      expect(fakeBleManager.autoReconnectEnabledHistory, contains(false));
+    });
+
+    test('onUpgradeError disables auto reconnect when not upgrading', () async {
+      server.isUpgrading.value = false;
+
+      server.onUpgradeError('fatal while idle');
       await Future<void>.delayed(Duration.zero);
 
       expect(fakeBleManager.autoReconnectEnabledHistory, contains(false));
