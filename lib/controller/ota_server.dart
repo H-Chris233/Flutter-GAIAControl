@@ -160,7 +160,6 @@ class OtaServer extends GetxService
   bool _rwcpSetupInProgress = false;
   Timer? _upgradeWatchdogTimer;
   Timer? _reconnectTimer;
-  bool _autoReconnectEnabled = true;
   String _fatalUpgradeReason = "";
   static const String vendorModeV3 = "v3";
   var vendorMode = vendorModeV3.obs;
@@ -265,6 +264,10 @@ class OtaServer extends GetxService
     addLog(message);
   }
 
+  void _setAutoReconnectEnabled(bool enabled) {
+    _bleManager.setAutoReconnectEnabled(enabled);
+  }
+
   Future<void> connectDevice(String id) async {
     try {
       isConnecting.value = true;
@@ -274,8 +277,7 @@ class OtaServer extends GetxService
       deviceListUiState.value = DeviceListUiState.idle;
       deviceListHint.value = "连接中...";
       await _bleManager.stopScan();
-      _autoReconnectEnabled = true;
-      _bleManager.setAutoReconnectEnabled(_autoReconnectEnabled);
+      _setAutoReconnectEnabled(true);
       await _bleManager.connect(
         id,
         onConnected: () async {
@@ -443,7 +445,7 @@ class OtaServer extends GetxService
     _postUpgradeVersionRetryTimer?.cancel();
     _rwcpSetupInProgress = false;
     _fatalUpgradeReason = "";
-    _autoReconnectEnabled = true;
+    _setAutoReconnectEnabled(true);
     rwcpStatusText.value = "启用中";
     resetUpload();
     _armUpgradeWatchdog();
@@ -1441,7 +1443,7 @@ class OtaServer extends GetxService
       return;
     }
     _fatalUpgradeReason = reason;
-    _autoReconnectEnabled = false;
+    _setAutoReconnectEnabled(false);
     rwcpStatusText.value = "错误已退出";
     addLog("致命错误：$reason，已自动退出升级并关闭自动重连");
     final wasUpgrading = isUpgrading.value;

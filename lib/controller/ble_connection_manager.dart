@@ -362,6 +362,9 @@ class BleConnectionManager {
         onConnectionStateChanged?.call(state, deviceId);
       }
     }, onError: (Object error) {
+      if (generation != _connectionGeneration) {
+        return;
+      }
       isDeviceConnected = false;
       _log("连接异常: $error");
       onError?.call(error);

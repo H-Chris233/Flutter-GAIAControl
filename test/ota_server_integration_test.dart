@@ -76,6 +76,7 @@ class _FakeBleConnectionManager extends BleConnectionManager {
   int registerRwcpChannelCalled = 0;
   bool registerRwcpChannelResult = true;
   final List<List<int>> writeWithResponsePayloads = <List<int>>[];
+  final List<bool> autoReconnectEnabledHistory = <bool>[];
 
   @override
   void startBleStatusMonitor() {
@@ -123,6 +124,12 @@ class _FakeBleConnectionManager extends BleConnectionManager {
   Future<bool> registerRwcpChannel(OnDataReceived onDataReceived) async {
     registerRwcpChannelCalled += 1;
     return registerRwcpChannelResult;
+  }
+
+  @override
+  void setAutoReconnectEnabled(bool enabled) {
+    autoReconnectEnabledHistory.add(enabled);
+    super.setAutoReconnectEnabled(enabled);
   }
 }
 
@@ -245,6 +252,15 @@ void main() {
       expect(fakeBleManager.registerRwcpChannelCalled, 1);
       expect(server.rwcpStatusText.value, '已启用');
       expect(fakeBleManager.writeWithResponsePayloads, isNotEmpty);
+    });
+
+    test('onUpgradeError disables BLE auto reconnect in fatal state', () async {
+      server.isUpgrading.value = true;
+
+      server.onUpgradeError('fatal');
+      await Future<void>.delayed(Duration.zero);
+
+      expect(fakeBleManager.autoReconnectEnabledHistory, contains(false));
     });
   });
 }

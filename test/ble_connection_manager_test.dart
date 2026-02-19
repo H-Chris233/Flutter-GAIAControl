@@ -11,6 +11,8 @@ class _FakeBleClient implements BleClient {
       StreamController<ConnectionStateUpdate>.broadcast();
   final Map<String, StreamController<List<int>>> _characteristicControllers =
       <String, StreamController<List<int>>>{};
+  final List<Stream<ConnectionStateUpdate>> queuedConnectionStreams =
+      <Stream<ConnectionStateUpdate>>[];
 
   bool throwOnDiscoverAll = false;
   int requestMtuResult = 23;
@@ -44,6 +46,9 @@ class _FakeBleClient implements BleClient {
   }) {
     lastConnectedDeviceId = id;
     lastConnectionTimeout = connectionTimeout;
+    if (queuedConnectionStreams.isNotEmpty) {
+      return queuedConnectionStreams.removeAt(0);
+    }
     return connectionController.stream;
   }
 
@@ -192,6 +197,30 @@ void main() {
       expect(disconnectedCalled, isTrue);
       expect(stateEvents, contains(DeviceConnectionState.disconnected));
 
+      manager.dispose();
+    });
+
+    test('stale onError from old generation is ignored', () async {
+      var disconnectedCalled = 0;
+      final manager = BleConnectionManager(ble: fakeBle);
+      fakeBle.queuedConnectionStreams
+          .add(Stream<ConnectionStateUpdate>.fromFuture(
+        Future<ConnectionStateUpdate>.error(StateError('stale error')),
+      ));
+      fakeBle.queuedConnectionStreams
+          .add(const Stream<ConnectionStateUpdate>.empty());
+
+      unawaited(manager.connect(
+        'old-device',
+        onDisconnected: () => disconnectedCalled += 1,
+      ));
+      await manager.connect(
+        'new-device',
+        onDisconnected: () => disconnectedCalled += 1,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      expect(disconnectedCalled, 0);
       manager.dispose();
     });
 
