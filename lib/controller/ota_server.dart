@@ -80,6 +80,7 @@ class OtaServer extends GetxService
   final BleConnectionManager? _bleManagerOverride;
   final UpgradeStateMachine? _upgradeStateMachineOverride;
   final DefaultFirmwarePathResolver _defaultFirmwarePathResolver;
+  final DateTime Function() _nowProvider;
 
   var logText = "".obs;
   final String tag = "OtaServer";
@@ -139,7 +140,7 @@ class OtaServer extends GetxService
   var percentage = 0.0.obs;
 
   Timer? _timer;
-  static const bool _enableWriteTraceLog = false;
+  static final bool _enableWriteTraceLog = kDebugMode;
   static const int _dataPacketLogSampleInterval = 50;
 
   var timeCount = 0.obs;
@@ -186,10 +187,12 @@ class OtaServer extends GetxService
     BleConnectionManager? bleManagerOverride,
     UpgradeStateMachine? upgradeStateMachineOverride,
     DefaultFirmwarePathResolver? defaultFirmwarePathResolver,
+    DateTime Function()? nowProvider,
   })  : _bleManagerOverride = bleManagerOverride,
         _upgradeStateMachineOverride = upgradeStateMachineOverride,
         _defaultFirmwarePathResolver =
-            defaultFirmwarePathResolver ?? _resolveDefaultFirmwarePath;
+            defaultFirmwarePathResolver ?? _resolveDefaultFirmwarePath,
+        _nowProvider = nowProvider ?? DateTime.now;
 
   static Future<String> _resolveDefaultFirmwarePath() async {
     final filePath = await getApplicationDocumentsDirectory();
@@ -197,6 +200,9 @@ class OtaServer extends GetxService
   }
 
   static OtaServer get to => Get.find();
+
+  @visibleForTesting
+  BleConnectionManager get bleManager => _bleManager;
 
   @override
   void onInit() {
@@ -1460,7 +1466,7 @@ class OtaServer extends GetxService
     if (!autoRecoveryEnabled.value) {
       return;
     }
-    final now = DateTime.now();
+    final now = _nowProvider();
     if (_lastErrorTime == null ||
         now.difference(_lastErrorTime!).inSeconds > kErrorBurstWindowSeconds) {
       _errorBurstCount = 0;
@@ -1485,7 +1491,7 @@ class OtaServer extends GetxService
       addLog("恢复进行中，忽略重复触发");
       return;
     }
-    final now = DateTime.now();
+    final now = _nowProvider();
     _recoveryWindowStart ??= now;
     if (now.difference(_recoveryWindowStart!).inMinutes >=
         kRecoveryWindowMinutes) {

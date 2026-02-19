@@ -197,14 +197,14 @@ class BleConnectionManager {
   OnConnectionStateChanged? onConnectionStateChanged;
 
   /// Android 权限请求（可注入，便于测试）
-  final Future<Map<Permission, PermissionStatus>> Function()?
+  final Future<Map<Permission, PermissionStatus>> Function()
       _requestAndroidPermissions;
 
   /// 蓝牙权限查询（可注入，便于测试）
-  final Future<PermissionStatus> Function()? _bluetoothPermissionStatus;
+  final Future<PermissionStatus> Function() _bluetoothPermissionStatus;
 
   /// 平台判断（可注入，便于测试）
-  final bool Function()? _isAndroidPlatform;
+  final bool Function() _isAndroidPlatform;
 
   /// 构造函数
   BleConnectionManager({
@@ -215,9 +215,16 @@ class BleConnectionManager {
         requestAndroidPermissions,
     Future<PermissionStatus> Function()? bluetoothPermissionStatus,
     bool Function()? isAndroidPlatform,
-  })  : _requestAndroidPermissions = requestAndroidPermissions,
-        _bluetoothPermissionStatus = bluetoothPermissionStatus,
-        _isAndroidPlatform = isAndroidPlatform;
+  })  : _requestAndroidPermissions = requestAndroidPermissions ??
+            (() async => await [
+                  Permission.location,
+                  Permission.bluetooth,
+                  Permission.bluetoothScan,
+                  Permission.bluetoothConnect,
+                ].request()),
+        _bluetoothPermissionStatus =
+            bluetoothPermissionStatus ?? (() => Permission.bluetooth.status),
+        _isAndroidPlatform = isAndroidPlatform ?? (() => Platform.isAndroid);
 
   /// 便捷构造：使用 FlutterReactiveBle 实例
   factory BleConnectionManager.withFlutterReactiveBle({
@@ -256,22 +263,14 @@ class BleConnectionManager {
   /// 开始扫描设备
   Future<BleScanStartResult> startScan() async {
     devices.clear();
-    final isAndroid = _isAndroidPlatform?.call() ?? Platform.isAndroid;
+    final isAndroid = _isAndroidPlatform();
     if (isAndroid) {
-      final statuses = _requestAndroidPermissions != null
-          ? await _requestAndroidPermissions!()
-          : await [
-              Permission.location,
-              Permission.bluetooth,
-              Permission.bluetoothScan,
-              Permission.bluetoothConnect,
-            ].request();
-      final location =
-          statuses[Permission.location] ?? await Permission.location.status;
-      final bluetoothScan = statuses[Permission.bluetoothScan] ??
-          await Permission.bluetoothScan.status;
-      final bluetoothConnect = statuses[Permission.bluetoothConnect] ??
-          await Permission.bluetoothConnect.status;
+      final statuses = await _requestAndroidPermissions();
+      final location = statuses[Permission.location] ?? PermissionStatus.denied;
+      final bluetoothScan =
+          statuses[Permission.bluetoothScan] ?? PermissionStatus.denied;
+      final bluetoothConnect =
+          statuses[Permission.bluetoothConnect] ?? PermissionStatus.denied;
       if (!location.isGranted) {
         _log("location deny");
         return BleScanStartResult.locationDenied;
@@ -285,9 +284,7 @@ class BleConnectionManager {
         return BleScanStartResult.bluetoothConnectDenied;
       }
     } else {
-      var bluetooth = _bluetoothPermissionStatus != null
-          ? await _bluetoothPermissionStatus!()
-          : await Permission.bluetooth.status;
+      var bluetooth = await _bluetoothPermissionStatus();
       if (!bluetooth.isGranted) {
         _log("bluetooth deny");
         return BleScanStartResult.bluetoothDenied;

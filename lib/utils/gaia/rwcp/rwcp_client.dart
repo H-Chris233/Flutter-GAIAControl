@@ -121,28 +121,19 @@ class RWCPClient {
     // getting the segment information from the bytes
     Segment segment = Segment.parse(bytes);
     int code = segment.getOperationCode();
-    if (code == -1) {
-      Log.w(tag,
-          "onReceivedRWCPSegment failed to get a RWCP segment from given bytes: $code data->${StringUtils.byteToHexString(bytes)}");
-      return false;
-    }
 
     Log.d(tag, "onReceiveRWCPSegment code$code");
-    // handling of a segment depends on the operation code.
-    switch (code) {
-      case RWCPOpCodeServer.synAck:
-        return receiveSynAck(segment);
-      case RWCPOpCodeServer.dataAck:
-        return receiveDataAck(segment);
-      case RWCPOpCodeServer.rst:
-        /*case RWCP.OpCode.Server.rstAck:*/
-        return receiveRST(segment);
-      case RWCPOpCodeServer.gap:
-        return receiveGAP(segment);
-      default:
-        Log.w(tag, "Received unknown operation code: $code");
-        return false;
+    // operation code occupies 2 bits, valid values are 0..3
+    if (code == RWCPOpCodeServer.synAck) {
+      return receiveSynAck(segment);
     }
+    if (code == RWCPOpCodeServer.dataAck) {
+      return receiveDataAck(segment);
+    }
+    if (code == RWCPOpCodeServer.rst) {
+      return receiveRST(segment);
+    }
+    return receiveGAP(segment);
   }
 
   int getInitialWindowSize() {

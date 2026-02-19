@@ -477,7 +477,8 @@ void main() {
         expect(client.mPendingData, isNotEmpty);
       });
 
-      test('sendData sends immediately in established state without timeout', () {
+      test('sendData sends immediately in established state without timeout',
+          () {
         client.mState = RWCPState.established;
         client.mCredits = 1;
 
@@ -506,7 +507,8 @@ void main() {
         expect(client.mState, RWCPState.listen);
       });
 
-      test('cancelTransfer handles rst send failure by terminating session', () {
+      test('cancelTransfer handles rst send failure by terminating session',
+          () {
         listener.sendSucceeds = false;
         client.mState = RWCPState.established;
 
@@ -699,7 +701,8 @@ void main() {
         expect(handled, isTrue);
       });
 
-      test('decreaseWindow clamps to 1 when computed value is out of range', () {
+      test('decreaseWindow clamps to 1 when computed value is out of range',
+          () {
         client.mWindow = 100;
         client.mMaximumWindow = 10;
 
@@ -716,6 +719,149 @@ void main() {
 
         expect(client.mState, RWCPState.listen);
         expect(client.mPendingData, isEmpty);
+      });
+
+      test('onReceiveRWCPSegment dispatches by opcode', () {
+        client.mState = RWCPState.synSent;
+        client.mLastAckSequence = -1;
+        client.mNextSequence = 1;
+        client.mUnacknowledgedSegments
+            .add(Segment.get(RWCPOpCodeClient.syn, 0));
+        expect(client.onReceiveRWCPSegment(<int>[0x40]), isTrue);
+
+        client.mState = RWCPState.established;
+        client.mLastAckSequence = -1;
+        client.mNextSequence = 1;
+        client.mCredits = 0;
+        client.mWindow = 10;
+        client.mUnacknowledgedSegments
+            .add(Segment.get(RWCPOpCodeClient.data, 0));
+        expect(client.onReceiveRWCPSegment(<int>[0x00]), isTrue);
+
+        client.mState = RWCPState.synSent;
+        expect(client.onReceiveRWCPSegment(<int>[0x80]), isTrue);
+
+        client.mState = RWCPState.established;
+        client.mLastAckSequence = 0;
+        client.mNextSequence = 2;
+        client.mUnacknowledgedSegments
+            .add(Segment.get(RWCPOpCodeClient.data, 1, payload: <int>[0x01]));
+        expect(client.onReceiveRWCPSegment(<int>[0xC1]), isTrue);
+      });
+
+      test('setMaximumWindowSize updates current window when needed', () {
+        client.mState = RWCPState.listen;
+        client.mInitialWindow = 5;
+        client.mWindow = 10;
+
+        final ok = client.setMaximumWindowSize(6);
+
+        expect(ok, isTrue);
+        expect(client.mWindow, 6);
+        expect(client.mMaximumWindow, 6);
+      });
+
+      test('resendSegment sends syn rst and data with computed delay', () {
+        client.mState = RWCPState.synSent;
+        client.mWindow = 3;
+        client.mCredits = 0;
+        client.mUnacknowledgedSegments
+            .add(Segment.get(RWCPOpCodeClient.syn, 0));
+        client.mUnacknowledgedSegments
+            .add(Segment.get(RWCPOpCodeClient.rst, 1));
+        client.mUnacknowledgedSegments
+            .add(Segment.get(RWCPOpCodeClient.data, 2, payload: <int>[0x01]));
+
+        client.resendSegment();
+
+        expect(listener.sentSegments.length, 3);
+      });
+
+      test('resendDataSegment moves overflowing data back to pending queue',
+          () {
+        client.mState = RWCPState.established;
+        client.mWindow = 1;
+        client.mCredits = 0;
+        client.mNextSequence = 2;
+        client.mUnacknowledgedSegments
+            .add(Segment.get(RWCPOpCodeClient.data, 0, payload: <int>[0x11]));
+        client.mUnacknowledgedSegments
+            .add(Segment.get(RWCPOpCodeClient.data, 1, payload: <int>[0x22]));
+
+        client.resendDataSegment();
+
+        expect(client.mUnacknowledgedSegments.length, 1);
+        expect(client.mPendingData.first, <int>[0x22]);
+      });
+
+      test('receiveSynAck sends pending data when session established', () {
+        client.mState = RWCPState.synSent;
+        client.mLastAckSequence = -1;
+        client.mNextSequence = 1;
+        client.mCredits = 1;
+        client.mUnacknowledgedSegments
+            .add(Segment.get(RWCPOpCodeClient.syn, 0));
+        client.mPendingData.add(<int>[0xAB]);
+
+        final handled =
+            client.receiveSynAck(Segment.get(RWCPOpCodeServer.synAck, 0));
+
+        expect(handled, isTrue);
+        expect(client.mUnacknowledgedSegments.isNotEmpty, isTrue);
+      });
+
+      test('validateAckSequence logs when acknowledged segment is missing', () {
+        client.mLastAckSequence = -1;
+        client.mNextSequence = 3;
+        client.mWindow = 10;
+
+        final validated = client.validateAckSequence(RWCPOpCodeClient.data, 1);
+
+        expect(validated, 0);
+      });
+
+      test('receiveDataAck clamps recovered timeout to default', () {
+        client.mState = RWCPState.established;
+        client.mDataTimeOutMs = 150;
+        client.mWindow = 10;
+        client.mCredits = 0;
+        client.mLastAckSequence = -1;
+        client.mNextSequence = 8;
+        for (int i = 0; i < 8; i++) {
+          client.mUnacknowledgedSegments
+              .add(Segment.get(RWCPOpCodeClient.data, i));
+        }
+
+        client.receiveDataAck(Segment.get(RWCPOpCodeServer.dataAck, 7));
+
+        expect(client.mDataTimeOutMs, RWCP.dataTimeoutMsDefault);
+      });
+
+      test('removeSegmentFromQueue removes existing entry', () {
+        client.mUnacknowledgedSegments
+            .add(Segment.get(RWCPOpCodeClient.data, 3));
+
+        final removed = client.removeSegmentFromQueue(RWCPOpCodeClient.data, 3);
+
+        expect(removed, isTrue);
+        expect(client.mUnacknowledgedSegments, isEmpty);
+      });
+
+      test('receiveDataAck timeout branch hits credits equals zero path', () {
+        client.mState = RWCPState.established;
+        client.mWindow = 10;
+        client.mCredits = 0;
+        client.mDataTimeOutMs = 100;
+        client.mLastAckSequence = -1;
+        client.mNextSequence = 0;
+        client.mPendingData.add(<int>[0x01]);
+
+        final handled =
+            client.receiveDataAck(Segment.get(RWCPOpCodeServer.dataAck, 0));
+
+        expect(handled, isTrue);
+        expect(client.isTimeOutRunning, isTrue);
+        client.cancelTimeOut();
       });
     });
   });

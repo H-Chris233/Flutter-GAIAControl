@@ -2,12 +2,14 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gaia/controller/ble_connection_manager.dart';
 import 'package:gaia/controller/gaia_command_builder.dart';
 import 'package:gaia/controller/ota_server.dart';
+import 'package:gaia/controller/upgrade_state_machine.dart';
 import 'package:gaia/utils/gaia/gaia.dart';
 import 'package:gaia/utils/gaia/gaia_packet_ble.dart';
 import 'package:gaia/utils/gaia/confirmation_type.dart';
@@ -15,8 +17,13 @@ import 'package:gaia/utils/gaia/op_codes.dart';
 import 'package:gaia/utils/gaia/resume_points.dart';
 import 'package:gaia/utils/gaia/vmu_packet.dart';
 import 'package:gaia/utils/gaia/rwcp/rwcp.dart';
+import 'package:gaia/utils/gaia/rwcp/rwcp_client.dart';
 import 'package:gaia/utils/gaia/rwcp/segment.dart';
 import 'package:get/get.dart';
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:plugin_platform_interface/plugin_platform_interface.dart';
+import 'package:reactive_ble_platform_interface/reactive_ble_platform_interface.dart'
+    as reactive_ble;
 
 class _NoopBleClient implements BleClient {
   @override
@@ -192,6 +199,69 @@ class _CoverageBleConnectionManager extends BleConnectionManager {
   }
 }
 
+class _FakePathProviderPlatform extends PathProviderPlatform
+    with MockPlatformInterfaceMixin {
+  _FakePathProviderPlatform(this.documentsPath);
+
+  final String? documentsPath;
+
+  @override
+  Future<String?> getApplicationDocumentsPath() async {
+    return documentsPath;
+  }
+}
+
+class _FakeReactiveBlePlatform extends reactive_ble.ReactiveBlePlatform
+    with MockPlatformInterfaceMixin {
+  final StreamController<reactive_ble.BleStatus> _statusController =
+      StreamController<reactive_ble.BleStatus>.broadcast();
+
+  @override
+  Stream<reactive_ble.BleStatus> get bleStatusStream =>
+      _statusController.stream;
+
+  @override
+  Future<void> initialize() async {
+    _statusController.add(reactive_ble.BleStatus.ready);
+  }
+
+  @override
+  Future<void> deinitialize() async {
+    await _statusController.close();
+  }
+}
+
+class _ThrowingUpgradeStateMachine extends UpgradeStateMachine {
+  _ThrowingUpgradeStateMachine({required super.delegate});
+
+  @override
+  void handleVmuPacket(VMUPacket? packet) {
+    throw StateError('state machine failed');
+  }
+}
+
+class _ControlledRWCPClient extends RWCPClient {
+  _ControlledRWCPClient(super.mListener,
+      {this.sendReturns = true, this.throwOnSend = false});
+
+  bool sendReturns;
+  bool throwOnSend;
+  bool cancelCalled = false;
+
+  @override
+  bool sendData(List<int> bytes) {
+    if (throwOnSend) {
+      throw StateError('rwcp send throws');
+    }
+    return sendReturns;
+  }
+
+  @override
+  void cancelTransfer() {
+    cancelCalled = true;
+  }
+}
+
 void main() {
   group('OtaServer coverage flows', () {
     late OtaServer server;
@@ -199,6 +269,8 @@ void main() {
     late GaiaCommandBuilder cmdBuilder;
     late Directory tempDir;
     late String firmwarePath;
+    late PathProviderPlatform originalPathProvider;
+    late reactive_ble.ReactiveBlePlatform originalReactiveBlePlatform;
 
     List<int> v3Packet({
       required int feature,
@@ -226,6 +298,8 @@ void main() {
 
     setUp(() async {
       Get.testMode = true;
+      originalPathProvider = PathProviderPlatform.instance;
+      originalReactiveBlePlatform = reactive_ble.ReactiveBlePlatform.instance;
       tempDir = await Directory.systemTemp.createTemp('gaia_cov_');
       firmwarePath = '${tempDir.path}/firmware.bin';
       bleManager = _CoverageBleConnectionManager();
@@ -240,6 +314,8 @@ void main() {
     });
 
     tearDown(() async {
+      PathProviderPlatform.instance = originalPathProvider;
+      reactive_ble.ReactiveBlePlatform.instance = originalReactiveBlePlatform;
       Get.reset();
       server.onClose();
       if (await tempDir.exists()) {
@@ -1080,6 +1156,295 @@ void main() {
 
       expect(server.deviceListUiState.value, DeviceListUiState.ready);
       expect(server.deviceListHint.value, '已停止扫描');
+    });
+
+    test('default firmware resolver success and default manager callback path',
+        () async {
+      server.onClose();
+      final docsDir = await Directory.systemTemp.createTemp('gaia_docs_');
+      PathProviderPlatform.instance = _FakePathProviderPlatform(docsDir.path);
+      reactive_ble.ReactiveBlePlatform.instance = _FakeReactiveBlePlatform();
+      final defaultServer = OtaServer();
+      defaultServer.onInit();
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+
+      defaultServer.bleManager.onConnectionStateChanged
+          ?.call(DeviceConnectionState.connecting, 'device-connect');
+      defaultServer.bleManager.onConnectionStateChanged
+          ?.call(DeviceConnectionState.connected, 'device-ready');
+
+      expect(defaultServer.firmwarePath.value, '${docsDir.path}/1.bin');
+      expect(defaultServer.connectDeviceId, 'device-ready');
+      defaultServer.onClose();
+      await docsDir.delete(recursive: true);
+    });
+
+    test('default firmware resolver failure logs error', () async {
+      server.onClose();
+      final failingServer = OtaServer(
+        bleManagerOverride: _CoverageBleConnectionManager(),
+        defaultFirmwarePathResolver: () async => throw StateError('path fail'),
+      );
+      failingServer.onInit();
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+
+      expect(failingServer.logText.value, contains('初始化默认固件路径失败'));
+      failingServer.onClose();
+    });
+
+    test('upgrade control response and endpoint mode error branches', () async {
+      server.isUpgrading.value = true;
+      server.handleRecMsg(v3Packet(
+        feature: GaiaCommandBuilder.v3FeatureUpgrade,
+        packetType: GaiaCommandBuilder.v3PacketTypeResponse,
+        commandId: GaiaCommandBuilder.v3CmdUpgradeControl,
+      ));
+      server.handleRecMsg(v3Packet(
+        feature: GaiaCommandBuilder.v3FeatureUpgrade,
+        packetType: GaiaCommandBuilder.v3PacketTypeError,
+        commandId: GaiaCommandBuilder.v3CmdSetDataEndpointMode,
+        payload: <int>[GAIA.incorrectState],
+      ));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(server.isUpgrading.value, isFalse);
+      expect(bleManager.autoReconnectEnabledHistory, contains(false));
+    });
+
+    test('upgrade control and disconnect error branches enter fatal state',
+        () async {
+      server.isUpgrading.value = true;
+      server.handleRecMsg(v3Packet(
+        feature: GaiaCommandBuilder.v3FeatureUpgrade,
+        packetType: GaiaCommandBuilder.v3PacketTypeError,
+        commandId: GaiaCommandBuilder.v3CmdUpgradeControl,
+        payload: <int>[GAIA.incorrectState],
+      ));
+      server.isUpgrading.value = true;
+      server.handleRecMsg(v3Packet(
+        feature: GaiaCommandBuilder.v3FeatureUpgrade,
+        packetType: GaiaCommandBuilder.v3PacketTypeError,
+        commandId: GaiaCommandBuilder.v3CmdUpgradeDisconnect,
+        payload: <int>[GAIA.incorrectState],
+      ));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(server.isUpgrading.value, isFalse);
+    });
+
+    test('DFU next packet covers commit and small-chunk branches', () async {
+      server.isUpgrading.value = true;
+      server.mBytesFile = List<int>.generate(4, (i) => i);
+      server.mStartOffset = 4;
+      server.sendNextDfuPacket();
+      await Future<void>.delayed(Duration.zero);
+
+      server.isUpgrading.value = true;
+      server.mPayloadSizeMax = 10;
+      server.mStartOffset = 0;
+      server.mBytesFile = List<int>.generate(5, (i) => i);
+      server.sendNextDfuPacket();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(bleManager.writeWithResponsePayloads, isNotEmpty);
+    });
+
+    test('post-upgrade query timeout branch after max retries', () {
+      fakeAsync((async) {
+        server.isDeviceConnected.value = false;
+        server.isUpgrading.value = true;
+        server.onUpgradeComplete();
+        async.elapse(Duration(
+            seconds: OtaServer.kPostUpgradeVersionRetryIntervalSeconds *
+                (OtaServer.kPostUpgradeVersionMaxRetries + 1)));
+        async.elapse(const Duration(milliseconds: 200));
+        async.flushMicrotasks();
+      });
+
+      expect(server.logText.value, contains('升级后版本查询超时'));
+    });
+
+    test('post-upgrade query onFailed branch after repeated timeouts', () {
+      fakeAsync((async) {
+        server.isDeviceConnected.value = true;
+        server.isUpgrading.value = true;
+        server.onUpgradeComplete();
+        async.elapse(const Duration(seconds: 80));
+        async.elapse(const Duration(milliseconds: 200));
+        async.flushMicrotasks();
+      });
+
+      expect(server.logText.value, contains('升级后版本查询失败'));
+    });
+
+    test('sendVMUPacket rwcp failure and exception branches', () async {
+      final controlled = _ControlledRWCPClient(server, sendReturns: false);
+      server.mRWCPClient = controlled;
+      server.mIsRWCPEnabled.value = true;
+      server.sendVMUPacket(
+          VMUPacket.get(OpCodes.upgradeData, data: <int>[0x00, 0x11]), true);
+      await Future<void>.delayed(Duration.zero);
+
+      controlled.throwOnSend = true;
+      server.sendVMUPacket(
+          VMUPacket.get(OpCodes.upgradeData, data: <int>[0x00, 0x22]), true);
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+
+      expect(server.logText.value, contains('Fail to send GAIA packet'));
+      expect(server.logText.value, contains('Exception when attempting'));
+    });
+
+    test('receiveVMUPacket catch branch handles parser exception', () async {
+      server.receiveVMUPacket(<int>[0x01, -1, -1]);
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+
+      expect(server.logText.value, contains('receiveVMUPacket'));
+    });
+
+    test('receiveVMUPacket catches state machine exception', () async {
+      final throwingServer = OtaServer(
+        bleManagerOverride: _CoverageBleConnectionManager(),
+        upgradeStateMachineOverride: _ThrowingUpgradeStateMachine(
+          delegate: server,
+        ),
+        defaultFirmwarePathResolver: () async => firmwarePath,
+      );
+      throwingServer.onInit();
+      throwingServer.isUpgrading.value = true;
+      final packet = VMUPacket.get(OpCodes.upgradeStartReq, data: <int>[0x00]);
+      throwingServer.receiveVMUPacket(packet.getBytes());
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+
+      expect(throwingServer.logText.value, contains('state machine failed'));
+      throwingServer.onClose();
+    });
+
+    test('abortUpgrade cancels rwcp session when running', () {
+      final controlled = _ControlledRWCPClient(server);
+      controlled.mState = RWCPState.established;
+      server.mRWCPClient = controlled;
+      server.abortUpgrade();
+
+      expect(controlled.cancelCalled, isTrue);
+    });
+
+    test('last packet path logs and marks final data packet', () async {
+      server.isUpgrading.value = true;
+      server.mIsRWCPEnabled.value = false;
+      server.mBytesFile = <int>[0x01, 0x02, 0x03];
+      server.mBytesToSend = 3;
+      server.mStartOffset = 0;
+      server.mMaxLengthForDataTransfer = 16;
+      server.sendNextDataPacket();
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+
+      expect(server.mBytesToSend, 0);
+      expect(server.logText.value, contains('lastPackettrue'));
+    });
+
+    test('writeData trace logs and rwcp catch-upgrading branch', () async {
+      await server.writeData(<int>[0x00, 0x1D, 0x0C, 0x00]);
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      expect(server.logText.value, contains('writeData start'));
+      expect(server.logText.value, contains('writeData end'));
+
+      server.isUpgrading.value = true;
+      bleManager.throwWriteWithoutResponse = true;
+      await server.writeMsgRWCP(<int>[0x80, 0x00]);
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      expect(bleManager.autoReconnectEnabledHistory, contains(false));
+    });
+
+    test('gaia and rwcp logging sample branches are covered', () async {
+      server.mIsRWCPEnabled.value = false;
+      server.sendPkgCount = 49;
+      server.sendData(false, <int>[0x11, 0x22, 0x33]);
+      await Future<void>.delayed(Duration.zero);
+
+      final nonDataVmu =
+          VMUPacket.get(OpCodes.upgradeAbortReq, data: <int>[0x01]);
+      final controlPacket = GaiaPacketBLE(
+        cmdBuilder.upgradeControlCommand(),
+        mPayload: nonDataVmu.getBytes(),
+      ).getBytes();
+      await server.writeMsgRWCP(
+          Segment.get(RWCPOpCodeClient.data, 6, payload: controlPacket)
+              .getBytes());
+
+      expect(bleManager.writeWithoutResponsePayloads, isNotEmpty);
+    });
+
+    test('watchdog timeout enters fatal state', () {
+      fakeAsync((async) {
+        server.startUpdate();
+        async.elapse(
+            Duration(seconds: OtaServer.kUpgradeWatchdogTimeoutSeconds + 1));
+        async.flushMicrotasks();
+      });
+
+      expect(server.logText.value, contains('升级超时'));
+    });
+
+    test('error burst window reset and recovery in-progress branch', () {
+      fakeAsync((async) {
+        server.autoRecoveryEnabled.value = true;
+        server.onUpgradeError('first');
+        async.elapse(Duration(seconds: OtaServer.kErrorBurstWindowSeconds + 1));
+        server.onUpgradeError('second');
+
+        server.connectDeviceId = 'device-1';
+        server.quickRecoverNow();
+        server.quickRecoverNow();
+        async.elapse(const Duration(milliseconds: 200));
+        async.elapse(const Duration(milliseconds: 10));
+        async.flushMicrotasks();
+      });
+
+      expect(server.logText.value, contains('恢复进行中，忽略重复触发'));
+    });
+
+    test('recovery window reset and upgrading-stop branch', () {
+      fakeAsync((async) {
+        server.isUpgrading.value = true;
+        server.connectDeviceId = '';
+        server.quickRecoverNow();
+        async.flushMicrotasks();
+        async.elapse(const Duration(milliseconds: 10));
+        expect(server.isUpgrading.value, isFalse);
+
+        server.quickRecoverNow();
+        async.flushMicrotasks();
+        async.elapse(
+            Duration(minutes: OtaServer.kRecoveryWindowMinutes, seconds: 1));
+        server.quickRecoverNow();
+        async.flushMicrotasks();
+      });
+      expect(server.recoveryStatusText.value, isNot('恢复受限'));
+    });
+
+    test('recovery attempts reset after recovery window elapsed', () async {
+      DateTime now = DateTime(2025, 1, 1, 0, 0, 0);
+      final recoveryServer = OtaServer(
+        bleManagerOverride: _CoverageBleConnectionManager(),
+        defaultFirmwarePathResolver: () async => firmwarePath,
+        nowProvider: () => now,
+      );
+      recoveryServer.onInit();
+      recoveryServer.connectDeviceId = '';
+
+      for (int i = 0; i < OtaServer.kMaxRecoveryAttemptsPerWindow + 1; i++) {
+        recoveryServer.quickRecoverNow();
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+      }
+      expect(recoveryServer.recoveryStatusText.value, '恢复受限');
+
+      now = now
+          .add(Duration(minutes: OtaServer.kRecoveryWindowMinutes, seconds: 1));
+      recoveryServer.quickRecoverNow();
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+
+      expect(recoveryServer.recoveryStatusText.value, isNot('恢复受限'));
+      recoveryServer.onClose();
     });
 
     test('sendRWCPSegment writes bytes and returns true', () {

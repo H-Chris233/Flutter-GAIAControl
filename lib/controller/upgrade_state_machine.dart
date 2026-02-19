@@ -171,11 +171,7 @@ class UpgradeStateMachine {
     if (data.length >= 6) {
       int step = data[0];
       delegate.onLog("上次传输步骤 step $step");
-      if (step == ResumePoints.inProgress) {
-        resumePoint = step;
-      } else {
-        resumePoint = step;
-      }
+      resumePoint = step;
     } else {
       if (resumePoint < 0) {
         resumePoint = ResumePoints.dataTransfer;
@@ -294,7 +290,7 @@ class UpgradeStateMachine {
         VMUPacket.get(OpCodes.upgradeErrorWarnRes, data: data);
     delegate.sendVmuPacket(errorConfirmPacket, false);
 
-    int returnCode = _extractIntFromByteArray(data, 0, 2, false);
+    int returnCode = _extractIntFromByteArray(data, 0, 2);
     delegate
         .onLog("receiveErrorWarnIND 升级失败 错误码0x${returnCode.toRadixString(16)}");
 
@@ -316,7 +312,7 @@ class UpgradeStateMachine {
     delegate.onLog("receiveValidationDoneCFM");
     final data = packet.mData ?? [];
     if (data.length >= 2) {
-      final time = _extractIntFromByteArray(data, 0, 2, false);
+      final time = _extractIntFromByteArray(data, 0, 2);
       Future.delayed(Duration(milliseconds: time)).then((_) {
         if (state != UpgradeState.validating) {
           return;
@@ -388,17 +384,10 @@ class UpgradeStateMachine {
   }
 
   /// 从字节数组提取整数
-  int _extractIntFromByteArray(
-      List<int> source, int offset, int length, bool reverse) {
+  int _extractIntFromByteArray(List<int> source, int offset, int length) {
     int result = 0;
-    if (reverse) {
-      for (int i = length - 1; i >= 0; i--) {
-        result = (result << 8) | (source[offset + i] & 0xFF);
-      }
-    } else {
-      for (int i = 0; i < length; i++) {
-        result = (result << 8) | (source[offset + i] & 0xFF);
-      }
+    for (int i = 0; i < length; i++) {
+      result = (result << 8) | (source[offset + i] & 0xFF);
     }
     return result;
   }

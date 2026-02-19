@@ -260,6 +260,30 @@ void main() {
     expect(server.loggedMessages, contains('固件路径未设置'));
   });
 
+  testWidgets('固件路径非法时开始升级显示错误并阻止升级', (tester) async {
+    final server = _SpyOtaServer(manager: _ViewBleConnectionManager());
+    final missingPath =
+        '${Directory.systemTemp.path}/missing_${DateTime.now().millisecondsSinceEpoch}.bin';
+
+    await _pumpOtaView(tester, server);
+    server.firmwarePath.value = missingPath;
+    await tester.pump();
+    final startButton = tester.widget<MaterialButton>(
+      _materialButtonWithTextPrefix('开始升级'),
+    );
+    expect(startButton.onPressed, isNotNull);
+
+    await tester.runAsync(() async {
+      startButton.onPressed?.call();
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+    });
+    await tester.pump();
+
+    expect(server.startUpdateWithVersionCheckCallCount, 0);
+    expect(server.loggedMessages.any((m) => m.contains('固件文件不存在')), isTrue);
+    expect(find.textContaining('固件文件不存在'), findsWidgets);
+  });
+
   testWidgets('固件有效时点击开始升级触发版本检查流程', (tester) async {
     final server = _SpyOtaServer(manager: _ViewBleConnectionManager());
     final tempDir = await tester.runAsync(
