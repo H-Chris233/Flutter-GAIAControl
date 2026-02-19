@@ -277,5 +277,256 @@ void main() {
       machine.setWasLastPacket(true);
       expect(machine.wasLastPacket, isTrue);
     });
+
+    test('VmuPacketResult factories build success and error objects', () {
+      final success = VmuPacketResult.success(nextState: UpgradeState.starting);
+      final error = VmuPacketResult.error('boom');
+
+      expect(success.success, isTrue);
+      expect(success.nextState, UpgradeState.starting);
+      expect(error.success, isFalse);
+      expect(error.errorMessage, 'boom');
+    });
+
+    test('handleVmuPacket ignores null packet', () {
+      machine.state = UpgradeState.transferring;
+      machine.handleVmuPacket(null);
+      expect(machine.state, UpgradeState.transferring);
+    });
+
+    test('SYNC_CFM with short payload uses fallback resume point', () {
+      machine.resumePoint = -1;
+      final packet = VMUPacket.get(OpCodes.upgradeSyncCfm, data: <int>[0x01]);
+      packet.mOpCode = OpCodes.upgradeSyncCfm;
+      packet.mData = <int>[0x01];
+
+      machine.handleVmuPacket(packet);
+
+      expect(machine.resumePoint, ResumePoints.dataTransfer);
+      expect(machine.state, UpgradeState.starting);
+      expect(delegate.sentPackets.last.mOpCode, OpCodes.upgradeStartReq);
+      expect(delegate.logs.any((log) => log.contains('SYNC_CFM 数据不足')), isTrue);
+    });
+
+    test('START_CFM with empty payload enters error state', () {
+      final packet = VMUPacket.get(OpCodes.upgradeStartCfm, data: <int>[]);
+      packet.mOpCode = OpCodes.upgradeStartCfm;
+      packet.mData = <int>[];
+
+      machine.handleVmuPacket(packet);
+
+      expect(machine.state, UpgradeState.error);
+      expect(delegate.upgradeError, contains('数据为空'));
+    });
+
+    test('START_CFM retry callback sends start request when still starting', () {
+      fakeAsync((async) {
+        machine.state = UpgradeState.starting;
+        final packet = VMUPacket.get(OpCodes.upgradeStartCfm,
+            data: <int>[UpgradeStartCFMStatus.errorAppNotReady]);
+        packet.mOpCode = OpCodes.upgradeStartCfm;
+        packet.mData = <int>[UpgradeStartCFMStatus.errorAppNotReady];
+
+        machine.handleVmuPacket(packet);
+        expect(delegate.sentPackets, isEmpty);
+
+        async.elapse(const Duration(milliseconds: 500));
+        expect(delegate.sentPackets.length, 1);
+        expect(delegate.sentPackets.first.mOpCode, OpCodes.upgradeStartReq);
+      });
+    });
+
+    test('START_CFM retry callback skips resend when state changed', () {
+      fakeAsync((async) {
+        machine.state = UpgradeState.starting;
+        final packet = VMUPacket.get(OpCodes.upgradeStartCfm,
+            data: <int>[UpgradeStartCFMStatus.errorAppNotReady]);
+        packet.mOpCode = OpCodes.upgradeStartCfm;
+        packet.mData = <int>[UpgradeStartCFMStatus.errorAppNotReady];
+
+        machine.handleVmuPacket(packet);
+        machine.state = UpgradeState.error;
+        async.elapse(const Duration(milliseconds: 500));
+
+        expect(delegate.sentPackets, isEmpty);
+      });
+    });
+
+    test('START_CFM exceeds retry limit and reports error', () {
+      machine.state = UpgradeState.starting;
+      machine.startAttempts = UpgradeStateMachine.maxStartNotReadyRetries;
+      final packet = VMUPacket.get(OpCodes.upgradeStartCfm,
+          data: <int>[UpgradeStartCFMStatus.errorAppNotReady]);
+      packet.mOpCode = OpCodes.upgradeStartCfm;
+      packet.mData = <int>[UpgradeStartCFMStatus.errorAppNotReady];
+
+      machine.handleVmuPacket(packet);
+
+      expect(machine.state, UpgradeState.error);
+      expect(delegate.upgradeError, contains('超过重试上限'));
+    });
+
+    test('START_CFM unknown status enters error state', () {
+      machine.state = UpgradeState.starting;
+      final packet = VMUPacket.get(OpCodes.upgradeStartCfm, data: <int>[0x7F]);
+      packet.mOpCode = OpCodes.upgradeStartCfm;
+      packet.mData = <int>[0x7F];
+
+      machine.handleVmuPacket(packet);
+
+      expect(machine.state, UpgradeState.error);
+      expect(delegate.upgradeError, contains('异常状态'));
+    });
+
+    test('START_CFM success with commit resume point requests commit confirm',
+        () {
+      machine.state = UpgradeState.starting;
+      machine.resumePoint = ResumePoints.commit;
+      final packet = VMUPacket.get(OpCodes.upgradeStartCfm,
+          data: <int>[UpgradeStartCFMStatus.success]);
+      packet.mOpCode = OpCodes.upgradeStartCfm;
+      packet.mData = <int>[UpgradeStartCFMStatus.success];
+
+      machine.handleVmuPacket(packet);
+
+      expect(delegate.lastConfirmationType, ConfirmationType.commit);
+    });
+
+    test(
+        'START_CFM success with transferComplete resume point requests transfer complete confirm',
+        () {
+      machine.state = UpgradeState.starting;
+      machine.resumePoint = ResumePoints.transferComplete;
+      final packet = VMUPacket.get(OpCodes.upgradeStartCfm,
+          data: <int>[UpgradeStartCFMStatus.success]);
+      packet.mOpCode = OpCodes.upgradeStartCfm;
+      packet.mData = <int>[UpgradeStartCFMStatus.success];
+
+      machine.handleVmuPacket(packet);
+
+      expect(
+          delegate.lastConfirmationType, ConfirmationType.transferComplete);
+    });
+
+    test('START_CFM success with inProgress resume point requests inProgress',
+        () {
+      machine.state = UpgradeState.starting;
+      machine.resumePoint = ResumePoints.inProgress;
+      final packet = VMUPacket.get(OpCodes.upgradeStartCfm,
+          data: <int>[UpgradeStartCFMStatus.success]);
+      packet.mOpCode = OpCodes.upgradeStartCfm;
+      packet.mData = <int>[UpgradeStartCFMStatus.success];
+
+      machine.handleVmuPacket(packet);
+
+      expect(delegate.lastConfirmationType, ConfirmationType.inProgress);
+    });
+
+    test('START_CFM success with validation resume point sends validation req',
+        () {
+      machine.state = UpgradeState.starting;
+      machine.resumePoint = ResumePoints.validation;
+      final packet = VMUPacket.get(OpCodes.upgradeStartCfm,
+          data: <int>[UpgradeStartCFMStatus.success]);
+      packet.mOpCode = OpCodes.upgradeStartCfm;
+      packet.mData = <int>[UpgradeStartCFMStatus.success];
+
+      machine.handleVmuPacket(packet);
+
+      expect(machine.state, UpgradeState.validating);
+      expect(delegate.sentPackets.single.mOpCode,
+          OpCodes.upgradeIsValidationDoneReq);
+    });
+
+    test('DATA_BYTES_REQ invalid length sends abort request', () {
+      final packet =
+          VMUPacket.get(OpCodes.upgradeDataBytesReq, data: <int>[0x00, 0x01]);
+      packet.mOpCode = OpCodes.upgradeDataBytesReq;
+      packet.mData = <int>[0x00, 0x01];
+
+      machine.handleVmuPacket(packet);
+
+      expect(delegate.logs.any((log) => log.contains('数据传输失败')), isTrue);
+      expect(delegate.sentPackets.single.mOpCode, OpCodes.upgradeAbortReq);
+    });
+
+    test('ERROR_WARN_IND with short payload sets error state', () {
+      final packet =
+          VMUPacket.get(OpCodes.upgradeErrorWarnInd, data: <int>[0x81]);
+      packet.mOpCode = OpCodes.upgradeErrorWarnInd;
+      packet.mData = <int>[0x81];
+
+      machine.handleVmuPacket(packet);
+
+      expect(machine.state, UpgradeState.error);
+      expect(delegate.logs.any((log) => log.contains('错误码长度不足')), isTrue);
+    });
+
+    test('ERROR_WARN_IND 0x81 asks warning confirmation', () {
+      final packet =
+          VMUPacket.get(OpCodes.upgradeErrorWarnInd, data: <int>[0x00, 0x81]);
+      packet.mOpCode = OpCodes.upgradeErrorWarnInd;
+      packet.mData = <int>[0x00, 0x81];
+
+      machine.handleVmuPacket(packet);
+
+      expect(delegate.sentPackets.first.mOpCode, OpCodes.upgradeErrorWarnRes);
+      expect(delegate.lastConfirmationType,
+          ConfirmationType.warningFileIsDifferent);
+    });
+
+    test('ERROR_WARN_IND 0x21 reports battery low error', () {
+      final packet =
+          VMUPacket.get(OpCodes.upgradeErrorWarnInd, data: <int>[0x00, 0x21]);
+      packet.mOpCode = OpCodes.upgradeErrorWarnInd;
+      packet.mData = <int>[0x00, 0x21];
+
+      machine.handleVmuPacket(packet);
+
+      expect(machine.state, UpgradeState.error);
+      expect(delegate.upgradeError, contains('电量过低'));
+    });
+
+    test('ERROR_WARN_IND other code reports generic error', () {
+      final packet =
+          VMUPacket.get(OpCodes.upgradeErrorWarnInd, data: <int>[0x01, 0x23]);
+      packet.mOpCode = OpCodes.upgradeErrorWarnInd;
+      packet.mData = <int>[0x01, 0x23];
+
+      machine.handleVmuPacket(packet);
+
+      expect(machine.state, UpgradeState.error);
+      expect(delegate.upgradeError, contains('0x123'));
+    });
+
+    test('VALIDATION_DONE_CFM without delay payload sends request immediately',
+        () {
+      final packet =
+          VMUPacket.get(OpCodes.upgradeIsValidationDoneCfm, data: <int>[0x00]);
+      packet.mOpCode = OpCodes.upgradeIsValidationDoneCfm;
+      packet.mData = <int>[0x00];
+
+      machine.handleVmuPacket(packet);
+
+      expect(delegate.sentPackets.single.mOpCode,
+          OpCodes.upgradeIsValidationDoneReq);
+    });
+
+    test('onSuccessfulTransmission sends abort when hasToAbort is true', () {
+      machine.hasToAbort = true;
+      machine.onSuccessfulTransmission();
+
+      expect(machine.hasToAbort, isFalse);
+      expect(delegate.sentPackets.single.mOpCode, OpCodes.upgradeAbortReq);
+    });
+
+    test('onSuccessfulTransmission does nothing for non-dataTransfer last packet',
+        () {
+      machine.wasLastPacket = true;
+      machine.resumePoint = ResumePoints.validation;
+      machine.onSuccessfulTransmission();
+
+      expect(delegate.sentPackets, isEmpty);
+    });
   });
 }

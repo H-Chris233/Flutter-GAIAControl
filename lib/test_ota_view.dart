@@ -170,7 +170,9 @@ class _TestOtaState extends State<TestOtaView> {
 
   @override
   void dispose() {
-    OtaServer.to.disconnect();
+    if (Get.isRegistered<OtaServer>()) {
+      OtaServer.to.disconnect();
+    }
     super.dispose();
   }
 

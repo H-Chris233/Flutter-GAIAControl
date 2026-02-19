@@ -77,6 +77,9 @@ class _FakeBleConnectionManager extends BleConnectionManager {
   bool registerRwcpChannelResult = true;
   final List<List<int>> writeWithResponsePayloads = <List<int>>[];
   final List<bool> autoReconnectEnabledHistory = <bool>[];
+  VoidCallback? latestOnConnected;
+  VoidCallback? latestOnDisconnected;
+  void Function(Object error)? latestOnError;
 
   @override
   void startBleStatusMonitor() {
@@ -102,6 +105,9 @@ class _FakeBleConnectionManager extends BleConnectionManager {
     void Function(Object error)? onError,
   }) async {
     connectCalled += 1;
+    latestOnConnected = onConnected;
+    latestOnDisconnected = onDisconnected;
+    latestOnError = onError;
   }
 
   @override
@@ -130,6 +136,18 @@ class _FakeBleConnectionManager extends BleConnectionManager {
   void setAutoReconnectEnabled(bool enabled) {
     autoReconnectEnabledHistory.add(enabled);
     super.setAutoReconnectEnabled(enabled);
+  }
+
+  void emitConnected() {
+    latestOnConnected?.call();
+  }
+
+  void emitDisconnected() {
+    latestOnDisconnected?.call();
+  }
+
+  void emitConnectError(Object error) {
+    latestOnError?.call(error);
   }
 }
 
@@ -172,6 +190,30 @@ void main() {
       await server.connectDevice('device-1');
 
       expect(fakeBleManager.autoReconnectEnabledHistory, contains(true));
+    });
+
+    test('disconnect during upgrade enters fatal and disables auto reconnect',
+        () async {
+      server.autoRecoveryEnabled.value = false;
+      server.isUpgrading.value = true;
+      await server.connectDevice('device-1');
+
+      fakeBleManager.emitDisconnected();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(server.isUpgrading.value, isFalse);
+      expect(fakeBleManager.autoReconnectEnabledHistory, contains(false));
+    });
+
+    test('disconnect when not upgrading keeps auto reconnect enabled', () async {
+      server.autoRecoveryEnabled.value = false;
+      await server.connectDevice('device-1');
+
+      fakeBleManager.emitDisconnected();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(server.rwcpStatusText.value, '连接断开');
+      expect(fakeBleManager.autoReconnectEnabledHistory, isNot(contains(false)));
     });
 
     test('receiveVMUPacket handles transfer complete and sends confirmation',
