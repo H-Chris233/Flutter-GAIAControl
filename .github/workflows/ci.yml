@@ -30,6 +30,7 @@ jobs:
         env:
           FILE_NAME: lib/common/config/ignoreConfig.dart
           FILE_DATA: class NetConfig { static const CLIENT_ID = "${{ secrets.CLIENT_ID }}"; static const CLIENT_SECRET = "${{ secrets.CLIENT_SECRET }}";}
+          GRADLE_OPTS: -Xmx4g
       - run: flutter pub get
       - run: flutter build apk --release
 
@@ -52,6 +53,7 @@ jobs:
         env:
           FILE_NAME: lib/common/config/ignoreConfig.dart
           FILE_DATA: class NetConfig { static const CLIENT_ID = "${{ secrets.CLIENT_ID }}"; static const CLIENT_SECRET = "${{ secrets.CLIENT_SECRET }}";}
+          GRADLE_OPTS: -Xmx4g
       - run: flutter pub get
       - run: flutter build apk --release
       - name: Upload APK
