@@ -132,10 +132,12 @@ class _TestOtaState extends State<TestOtaView> {
             );
           }),
           Obx(() {
+            final connected = OtaServer.to.isDeviceConnected.value;
             final upgrading = OtaServer.to.isUpgrading.value;
             final rwcpStatus = OtaServer.to.rwcpStatusText.value;
             final recoveryStatus = OtaServer.to.recoveryStatusText.value;
-            final canRecover = upgrading ||
+            final canRecover = connected ||
+                upgrading ||
                 rwcpStatus.contains("错误") ||
                 recoveryStatus != "空闲";
             return MaterialButton(

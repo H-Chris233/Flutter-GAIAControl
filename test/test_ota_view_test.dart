@@ -341,9 +341,10 @@ void main() {
     expect(server.stopUpgradeCallCount, 1);
   });
 
-  testWidgets('快速恢复按钮按条件启用并触发 quickRecoverNow', (tester) async {
+  testWidgets('快速恢复按钮在连接或错误状态可用并触发 quickRecoverNow', (tester) async {
     final server = _SpyOtaServer(manager: _ViewBleConnectionManager());
     server.isUpgrading.value = false;
+    server.isDeviceConnected.value = false;
     server.rwcpStatusText.value = '待启用';
     server.recoveryStatusText.value = '空闲';
 
@@ -354,6 +355,17 @@ void main() {
     );
     expect(button.onPressed, isNull);
 
+    server.isDeviceConnected.value = true;
+    await tester.pump();
+    button = tester.widget<MaterialButton>(
+      find.widgetWithText(MaterialButton, '快速恢复'),
+    );
+    expect(button.onPressed, isNotNull);
+    button.onPressed?.call();
+    await tester.pump();
+    expect(server.quickRecoverNowCallCount, 1);
+
+    server.isDeviceConnected.value = false;
     server.rwcpStatusText.value = '错误已退出';
     await tester.pump();
 
@@ -364,7 +376,7 @@ void main() {
 
     button.onPressed?.call();
     await tester.pump();
-    expect(server.quickRecoverNowCallCount, 1);
+    expect(server.quickRecoverNowCallCount, 2);
   });
 
   testWidgets('点击清空LOG会清空日志内容', (tester) async {

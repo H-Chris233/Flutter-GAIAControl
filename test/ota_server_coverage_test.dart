@@ -1070,6 +1070,19 @@ void main() {
       expect(bleManager.writeWithResponsePayloads, isNotEmpty);
     });
 
+    test('auto recovery first attempt sends abort when device still connected',
+        () async {
+      server.autoRecoveryEnabled.value = true;
+      server.connectDeviceId = '';
+      server.isDeviceConnected.value = true;
+      server.isUpgrading.value = true;
+
+      server.onUpgradeError('设备返回升级错误码0x23');
+      await Future<void>.delayed(const Duration(milliseconds: 420));
+
+      expect(bleManager.writeWithResponsePayloads, isNotEmpty);
+    });
+
     test('quick recovery catches disconnect exception', () async {
       server.connectDeviceId = '';
       bleManager.throwOnDisconnect = true;
@@ -1086,6 +1099,24 @@ void main() {
           Duration(seconds: OtaServer.kRecoveryDelaySeconds + 1));
 
       expect(bleManager.latestOnConnected, isNotNull);
+    });
+
+    test('quick recovery keeps retrying when reconnect is still unavailable',
+        () {
+      fakeAsync((async) {
+        server.connectDeviceId = 'device-1';
+        server.isDeviceConnected.value = true;
+        server.quickRecoverNow();
+        async.elapse(const Duration(milliseconds: 400));
+        async.flushMicrotasks();
+        async.elapse(Duration(
+            seconds: OtaServer.kRecoveryDelaySeconds +
+                OtaServer.kRecoveryReconnectCheckSeconds +
+                2));
+        async.flushMicrotasks();
+      });
+
+      expect(bleManager.disconnectCalled, greaterThanOrEqualTo(2));
     });
 
     test('post-upgrade version query waits for reconnect when disconnected',

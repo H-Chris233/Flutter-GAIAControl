@@ -60,6 +60,9 @@ class OtaServer extends GetxService
   /// 快速恢复前的延迟时间（秒）
   static const int kRecoveryDelaySeconds = 2;
 
+  /// 重连后恢复校验延迟（秒）
+  static const int kRecoveryReconnectCheckSeconds = 7;
+
   /// 错误累计触发恢复的阈值
   static const int kErrorBurstThreshold = 3;
 
@@ -182,6 +185,7 @@ class OtaServer extends GetxService
   Timer? _postUpgradeVersionRetryTimer;
   int _postUpgradeVersionRetryCount = 0;
   Timer? _scanWatchdogTimer;
+  Timer? _recoveryRetryTimer;
   Worker? _deviceListWorker;
 
   OtaServer({
@@ -306,6 +310,7 @@ class OtaServer extends GetxService
           connectingDeviceId.value = "";
           isDeviceConnected.value = true;
           connectDeviceId = id;
+          _cancelRecoveryRetryTimer();
           recoveryStatusText.value = "空闲";
           if (!isUpgrading.value) {
             rwcpStatusText.value = "待启用";
@@ -1291,6 +1296,7 @@ class OtaServer extends GetxService
   void disconnect() {
     _reconnectTimer?.cancel();
     _scanWatchdogTimer?.cancel();
+    _cancelRecoveryRetryTimer();
     _bleManager.disconnect();
     isDeviceConnected.value = false;
     isConnecting.value = false;
@@ -1512,6 +1518,32 @@ class OtaServer extends GetxService
     unawaited(_quickRecoverFromDeviceError("手动快速恢复", forceAbort: true));
   }
 
+  void _cancelRecoveryRetryTimer() {
+    _recoveryRetryTimer?.cancel();
+    _recoveryRetryTimer = null;
+  }
+
+  void _scheduleRecoveryRetryCheck(String reason) {
+    _cancelRecoveryRetryTimer();
+    _recoveryRetryTimer =
+        Timer(Duration(seconds: kRecoveryReconnectCheckSeconds), () {
+      _recoveryRetryTimer = null;
+      if (_isRecovering || isDeviceConnected.value || connectDeviceId.isEmpty) {
+        return;
+      }
+      if (_recoveryAttempts >= kMaxRecoveryAttemptsPerWindow) {
+        recoveryStatusText.value = "恢复受限";
+        addLog('$kRecoveryWindowMinutes分钟内恢复次数过多，暂停自动恢复');
+        return;
+      }
+      addLog("重连仍未恢复，继续执行快速恢复");
+      unawaited(_quickRecoverFromDeviceError(
+        "重连校验失败: $reason",
+        forceAbort: true,
+      ));
+    });
+  }
+
   Future<void> _quickRecoverFromDeviceError(String reason,
       {bool forceAbort = false}) async {
     if (_isRecovering) {
@@ -1536,8 +1568,12 @@ class OtaServer extends GetxService
     errorCount.value = 0;
     recoveryStatusText.value = "恢复中";
     rwcpStatusText.value = "恢复中";
-    // 手动恢复或第二次及以后的自动恢复，发送 Abort 强制重置设备状态
-    final shouldSendAbort = forceAbort || _recoveryAttempts >= 2;
+    _cancelRecoveryRetryTimer();
+    // 设备已连接或升级进行中时，首次恢复也强制发送 Abort 清设备异常态
+    final shouldSendAbort = forceAbort ||
+        isUpgrading.value ||
+        isDeviceConnected.value ||
+        _recoveryAttempts >= 2;
     addLog(
         "执行快速恢复($_recoveryAttempts/$kMaxRecoveryAttemptsPerWindow): $reason${shouldSendAbort ? ' [含Abort]' : ''}");
     try {
@@ -1555,6 +1591,7 @@ class OtaServer extends GetxService
         rwcpStatusText.value = "重连中";
         await Future.delayed(Duration(seconds: kRecoveryDelaySeconds));
         await connectDevice(connectDeviceId);
+        _scheduleRecoveryRetryCheck(reason);
       } else {
         addLog("无连接设备ID，无法自动重连");
         recoveryStatusText.value = "恢复失败";
@@ -1581,6 +1618,7 @@ class OtaServer extends GetxService
     _postUpgradeVersionRetryTimer?.cancel();
     _reconnectTimer?.cancel();
     _scanWatchdogTimer?.cancel();
+    _recoveryRetryTimer?.cancel();
     super.onClose();
   }
 
