@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - '*'
+  pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.txt'
+      - '**/*.png'
+      - '**/*.jpg'
+
+# 【关键修复】明确赋予 GITHUB_TOKEN 创建 Tag 和 Release 的写入权限
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+    steps:
+      # 升级到 v4 避免 Node.js 兼容性警告
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Create Config File
+        uses: finnp/create-file-action@master
+        env:
+          FILE_NAME: lib/common/config/ignoreConfig.dart
+          FILE_DATA: class NetConfig { static const CLIENT_ID = "${{ secrets.CLIENT_ID }}"; static const CLIENT_SECRET = "${{ secrets.CLIENT_SECRET }}";}
+          GRADLE_OPTS: -Xmx4g
+
+      - name: Flutter Pub Get
+        run: flutter pub get
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      # 每次 push/PR 都会运行到这里并生成 APK 产物
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-apk
+          # 使用通配符兼容不同 Flutter 版本可能导致的输出路径差异
+          path: build/app/outputs/**/*.apk 
+
+  release:
+    name: Auto Release
+    needs: build
+    # 仅在推送到 main 分支或打 Tag 时执行，排除 PR
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download APK from build
+        uses: actions/download-artifact@v4
+        with:
+          name: app-apk
+          path: ./apk-output
+
+      - name: Determine Tag Name
+        id: determine_tag
+        run: |
+          # 核心逻辑：判断当前是否是 Tag 触发
+          if [[ ${{ github.ref }} == refs/tags/* ]]; then
+            # 如果是你手动推了 Tag (例如 v1.0.0)，就直接用你的 Tag
+            echo "TAG_NAME=${{ github.ref_name }}" >> $GITHUB_ENV
+          else
+            # 如果只是普通的 Push (没有 Tag)，自动用 流水线编号 生成一个，比如 build-123
+            echo "TAG_NAME=build-${{ github.run_number }}" >> $GITHUB_ENV
+          fi
+
+      # 【关键修复】使用最新且官方推荐的 Release 插件，它会自动创建不存在的 Tag
+      - name: Create Release and Upload
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          name: Release ${{ env.TAG_NAME }}
+          files: ./apk-output/**/*.apk
+          generate_release_notes: true # 自动生成变更日志（非常推荐）
