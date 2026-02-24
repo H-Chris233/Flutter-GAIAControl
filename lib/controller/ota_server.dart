@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -38,6 +39,9 @@ enum DeviceListUiState {
 
 class OtaServer extends GetxService
     implements RWCPListener, UpgradeStateMachineDelegate {
+  static const MethodChannel _systemBluetoothChannel =
+      MethodChannel('gaia/system_bluetooth');
+
   // ============== 配置常量 ==============
   /// 升级看门狗超时时间（秒）
   static const int kUpgradeWatchdogTimeoutSeconds = 15;
@@ -59,6 +63,9 @@ class OtaServer extends GetxService
 
   /// 快速恢复前的延迟时间（秒）
   static const int kRecoveryDelaySeconds = 2;
+
+  /// Abort 确认等待超时（秒）
+  static const int kAbortConfirmTimeoutSeconds = 2;
 
   /// 重连后恢复校验延迟（秒）
   static const int kRecoveryReconnectCheckSeconds = 7;
@@ -97,6 +104,8 @@ class OtaServer extends GetxService
   RxBool isDeviceConnected = false.obs;
   RxBool isScanning = false.obs;
   RxBool isConnecting = false.obs;
+  RxList<String> systemConnectedDeviceIds = <String>[].obs;
+  RxList<String> systemConnectedDeviceNames = <String>[].obs;
   RxString connectingDeviceId = "".obs;
   Rx<DeviceListUiState> deviceListUiState = DeviceListUiState.idle.obs;
   RxString deviceListHint = "点击“扫描蓝牙”开始搜索设备".obs;
@@ -186,6 +195,10 @@ class OtaServer extends GetxService
   int _postUpgradeVersionRetryCount = 0;
   Timer? _scanWatchdogTimer;
   Timer? _recoveryRetryTimer;
+  Timer? _abortConfirmTimer;
+  DateTime? _abortSentAt;
+  String _abortReason = "";
+  bool _waitingAbortConfirm = false;
   Worker? _deviceListWorker;
 
   OtaServer({
@@ -278,6 +291,85 @@ class OtaServer extends GetxService
       return "";
     }
     return normalizedPath.substring(0, splitIndex);
+  }
+
+  String normalizeBluetoothId(String rawId) {
+    final trimmed = rawId.trim();
+    if (trimmed.isEmpty) {
+      return "";
+    }
+    final upper = trimmed.toUpperCase();
+    final compact = upper.replaceAll(RegExp(r'[^0-9A-F]'), '');
+    if (compact.length == 12) {
+      return compact;
+    }
+    return upper;
+  }
+
+  String _normalizeDeviceName(String name) {
+    return name.trim().toLowerCase();
+  }
+
+  bool isSystemConnectedScanDevice(DiscoveredDevice device) {
+    final normalizedId = normalizeBluetoothId(device.id);
+    if (normalizedId.isNotEmpty &&
+        systemConnectedDeviceIds.contains(normalizedId)) {
+      return true;
+    }
+    final normalizedName = _normalizeDeviceName(device.name);
+    if (normalizedName.isEmpty) {
+      return false;
+    }
+    return systemConnectedDeviceNames.contains(normalizedName);
+  }
+
+  Future<void> refreshSystemConnectedDevices() async {
+    if (!Platform.isAndroid) {
+      systemConnectedDeviceIds.clear();
+      systemConnectedDeviceNames.clear();
+      return;
+    }
+    try {
+      final rawDevices = await _systemBluetoothChannel
+          .invokeMethod<List<dynamic>>('getConnectedDevices');
+      final ids = <String>{};
+      final names = <String>{};
+      for (final item in rawDevices ?? const <dynamic>[]) {
+        if (item is Map) {
+          final rawId = item['id'];
+          final rawName = item['name'];
+          if (rawId is String) {
+            final normalizedId = normalizeBluetoothId(rawId);
+            if (normalizedId.isNotEmpty) {
+              ids.add(normalizedId);
+            }
+          }
+          if (rawName is String) {
+            final normalizedName = _normalizeDeviceName(rawName);
+            if (normalizedName.isNotEmpty) {
+              names.add(normalizedName);
+            }
+          }
+          continue;
+        }
+        if (item is String) {
+          final normalizedId = normalizeBluetoothId(item);
+          if (normalizedId.isNotEmpty) {
+            ids.add(normalizedId);
+          }
+        }
+      }
+      systemConnectedDeviceIds
+        ..clear()
+        ..addAll(ids);
+      systemConnectedDeviceNames
+        ..clear()
+        ..addAll(names);
+    } catch (e) {
+      systemConnectedDeviceIds.clear();
+      systemConnectedDeviceNames.clear();
+      addLog("读取系统已连接设备失败: $e");
+    }
   }
 
   void consumeUserMessage() {
@@ -1007,6 +1099,9 @@ class OtaServer extends GetxService
             "receiveVMUPacket 无法解析VMU包: ${StringUtils.byteToHexString(data)}");
         return;
       }
+      if (packet.mOpCode == OpCodes.upgradeAbortCfm) {
+        _markAbortConfirmed();
+      }
       if (isUpgrading.value || packet.mOpCode == OpCodes.upgradeAbortCfm) {
         _upgradeStateMachine.handleVmuPacket(packet);
       } else {
@@ -1058,12 +1153,56 @@ class OtaServer extends GetxService
       mRWCPClient.cancelTransfer();
     }
     mProgressQueue.clear();
-    sendAbortReq();
+    sendAbortReq(reason: "停止升级");
     isUpgrading.value = false;
   }
 
-  void sendAbortReq() {
+  void _startAbortConfirmWatch(String reason) {
+    _abortConfirmTimer?.cancel();
+    _abortSentAt = _nowProvider();
+    _abortReason = reason;
+    _waitingAbortConfirm = true;
+    addLog("已发送Abort，等待设备确认($reason)");
+    _abortConfirmTimer =
+        Timer(Duration(seconds: kAbortConfirmTimeoutSeconds), () {
+      if (!_waitingAbortConfirm) {
+        return;
+      }
+      _waitingAbortConfirm = false;
+      addLog("Abort确认超时(${kAbortConfirmTimeoutSeconds}s): $reason");
+    });
+  }
+
+  void _markAbortConfirmed() {
+    if (!_waitingAbortConfirm) {
+      return;
+    }
+    _waitingAbortConfirm = false;
+    _abortConfirmTimer?.cancel();
+    _abortConfirmTimer = null;
+    final sentAt = _abortSentAt;
+    final reason = _abortReason;
+    _abortSentAt = null;
+    _abortReason = "";
+    if (sentAt == null) {
+      addLog("收到Abort确认");
+      return;
+    }
+    final elapsedMs = _nowProvider().difference(sentAt).inMilliseconds;
+    addLog("收到Abort确认，耗时${elapsedMs}ms($reason)");
+  }
+
+  void _clearAbortConfirmWatch() {
+    _abortConfirmTimer?.cancel();
+    _abortConfirmTimer = null;
+    _abortSentAt = null;
+    _abortReason = "";
+    _waitingAbortConfirm = false;
+  }
+
+  void sendAbortReq({String reason = "通用"}) {
     VMUPacket packet = VMUPacket.get(OpCodes.upgradeAbortReq);
+    _startAbortConfirmWatch(reason);
     sendVMUPacket(packet, false);
   }
 
@@ -1297,6 +1436,7 @@ class OtaServer extends GetxService
     _reconnectTimer?.cancel();
     _scanWatchdogTimer?.cancel();
     _cancelRecoveryRetryTimer();
+    _clearAbortConfirmWatch();
     _bleManager.disconnect();
     isDeviceConnected.value = false;
     isConnecting.value = false;
@@ -1422,6 +1562,8 @@ class OtaServer extends GetxService
         return "upgradeData";
       case OpCodes.upgradeAbortReq:
         return "upgradeAbortReq";
+      case OpCodes.upgradeAbortCfm:
+        return "upgradeAbortCfm";
       case OpCodes.upgradeTransferCompleteRes:
         return "upgradeTransferCompleteRes";
       case OpCodes.upgradeInProgressRes:
@@ -1581,7 +1723,7 @@ class OtaServer extends GetxService
         await stopUpgrade(sendAbort: shouldSendAbort);
       } else if (shouldSendAbort && isDeviceConnected.value) {
         // 非升级状态但需要强制重置，直接发送 Abort
-        sendAbortReq();
+        sendAbortReq(reason: "快速恢复");
         await Future.delayed(const Duration(milliseconds: 300));
       }
       _bleManager.disconnect();
@@ -1618,6 +1760,7 @@ class OtaServer extends GetxService
     _postUpgradeVersionRetryTimer?.cancel();
     _reconnectTimer?.cancel();
     _scanWatchdogTimer?.cancel();
+    _clearAbortConfirmWatch();
     _recoveryRetryTimer?.cancel();
     super.onClose();
   }
@@ -1631,6 +1774,7 @@ class OtaServer extends GetxService
     final result = await _bleManager.startScan();
     switch (result) {
       case BleScanStartResult.started:
+        unawaited(refreshSystemConnectedDevices());
         _scanWatchdogTimer?.cancel();
         _scanWatchdogTimer = Timer(const Duration(seconds: 8), () {
           if (devices.isEmpty && isScanning.value) {

@@ -566,6 +566,48 @@ void main() {
       expect(failed, isTrue);
     });
 
+    test('abort confirm watch logs confirmed and timeout states', () {
+      fakeAsync((async) {
+        server.sendAbortReq(reason: '测试确认');
+        server.receiveVMUPacket(
+            VMUPacket.get(OpCodes.upgradeAbortCfm).getBytes());
+        async.elapse(const Duration(milliseconds: 150));
+        async.flushMicrotasks();
+        expect(server.logText.value, contains('收到Abort确认'));
+
+        server.sendAbortReq(reason: '测试超时');
+        async.elapse(
+            Duration(seconds: OtaServer.kAbortConfirmTimeoutSeconds + 1));
+        async.elapse(const Duration(milliseconds: 150));
+        async.flushMicrotasks();
+      });
+
+      expect(server.logText.value, contains('Abort确认超时'));
+    });
+
+    test('system connected matcher supports id and name fallback', () {
+      server.systemConnectedDeviceIds.assignAll(<String>['AABBCCDDEEFF']);
+      server.systemConnectedDeviceNames
+          .assignAll(<String>['earfun air pro 4+']);
+
+      final matchedById = discoveredDevice(
+        'AA:BB:CC:DD:EE:FF',
+        name: 'Random Device',
+      );
+      final matchedByName = discoveredDevice(
+        '11:22:33:44:55:66',
+        name: 'EarFun Air Pro 4+',
+      );
+      final notMatched = discoveredDevice(
+        '00:11:22:33:44:55',
+        name: 'Other Device',
+      );
+
+      expect(server.isSystemConnectedScanDevice(matchedById), isTrue);
+      expect(server.isSystemConnectedScanDevice(matchedByName), isTrue);
+      expect(server.isSystemConnectedScanDevice(notMatched), isFalse);
+    });
+
     test('askForConfirmation sends expected packets for normal types',
         () async {
       server.askForConfirmation(ConfirmationType.commit);

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -150,7 +149,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       OtaServer.to.isDeviceConnected.value &&
                           OtaServer.to.connectDeviceId == device.id;
                   final phoneConnectedThis = appConnectedThis ||
-                      device.connectable == Connectable.unavailable;
+                      OtaServer.to.isSystemConnectedScanDevice(device);
                   return InkWell(
                     onTap: isConnecting
                         ? null
