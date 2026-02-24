@@ -751,6 +751,35 @@ void main() {
       manager.dispose();
     });
 
+    test('connect logs failure details when disconnected with failure',
+        () async {
+      final logs = <String>[];
+      final manager = BleConnectionManager(
+        ble: fakeBle,
+        onLog: logs.add,
+      );
+
+      await manager.connect('device-1');
+      fakeBle.connectionController.add(const ConnectionStateUpdate(
+        deviceId: 'device-1',
+        connectionState: DeviceConnectionState.disconnected,
+        failure: GenericFailure<ConnectionError>(
+          code: ConnectionError.failedToConnect,
+          message: 'gatt 133',
+        ),
+      ));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        logs.any((log) =>
+            log.contains('断开连接:') &&
+            log.contains('failedToConnect') &&
+            log.contains('gatt 133')),
+        isTrue,
+      );
+      manager.dispose();
+    });
+
     test('discoverServicesIfNeeded succeeds after retry discovers OTA service',
         () {
       final manager = BleConnectionManager(ble: fakeBle);

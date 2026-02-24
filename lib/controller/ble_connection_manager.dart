@@ -345,6 +345,7 @@ class BleConnectionManager {
         return;
       }
       final state = connectionState.connectionState;
+      final failure = connectionState.failure;
       if (state == DeviceConnectionState.connected) {
         _reconnectTimer?.cancel();
         isDeviceConnected = true;
@@ -354,7 +355,11 @@ class BleConnectionManager {
         onConnected?.call();
       } else if (state == DeviceConnectionState.disconnected) {
         isDeviceConnected = false;
-        _log('断开连接');
+        if (failure != null) {
+          _log('断开连接: $failure');
+        } else {
+          _log('断开连接');
+        }
         onConnectionStateChanged?.call(state, deviceId);
         onDisconnected?.call();
         if (_autoReconnectEnabled && connectedDeviceId.isNotEmpty) {
@@ -364,7 +369,11 @@ class BleConnectionManager {
         }
       } else {
         isDeviceConnected = false;
-        _log('连接状态变更: $state');
+        if (failure != null) {
+          _log('连接状态变更: $state failure=$failure');
+        } else {
+          _log('连接状态变更: $state');
+        }
         onConnectionStateChanged?.call(state, deviceId);
       }
     }, onError: (Object error) {

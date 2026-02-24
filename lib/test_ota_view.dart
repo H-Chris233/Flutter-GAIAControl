@@ -45,6 +45,7 @@ class _TestOtaState extends State<TestOtaView> {
           }),
           Obx(() {
             final currentPath = OtaServer.to.firmwarePath.value;
+            final fileName = _extractFileName(currentPath);
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -61,10 +62,8 @@ class _TestOtaState extends State<TestOtaView> {
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Text(
-                      "当前固件: ${currentPath.isEmpty ? '未设置' : currentPath}",
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis),
+                  child: Text("当前固件: $fileName",
+                      maxLines: 2, overflow: TextOverflow.ellipsis),
                 ),
               ],
             );
@@ -178,11 +177,13 @@ class _TestOtaState extends State<TestOtaView> {
 
   Future<void> _chooseFirmwareFile() async {
     if (!mounted) return;
+    final initialDirectory = OtaServer.to.lastFirmwareDirectory.value.trim();
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ["bin"],
       allowMultiple: false,
       withData: false,
+      initialDirectory: initialDirectory.isEmpty ? null : initialDirectory,
     );
     if (result == null || result.files.isEmpty) {
       return;
@@ -226,6 +227,18 @@ class _TestOtaState extends State<TestOtaView> {
       return;
     }
     OtaServer.to.setFirmwarePath(usePath);
+  }
+
+  String _extractFileName(String rawPath) {
+    final normalizedPath = rawPath.trim().replaceAll("\\", "/");
+    if (normalizedPath.isEmpty) {
+      return "未设置";
+    }
+    final splitIndex = normalizedPath.lastIndexOf("/");
+    if (splitIndex < 0 || splitIndex == normalizedPath.length - 1) {
+      return normalizedPath;
+    }
+    return normalizedPath.substring(splitIndex + 1);
   }
 
   Future<String?> _validateFirmwareFile(String path) async {

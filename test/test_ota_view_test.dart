@@ -137,6 +137,7 @@ class _SpyOtaServer extends OtaServer {
 
 class _FakeFilePicker extends FilePicker with MockPlatformInterfaceMixin {
   FilePickerResult? nextResult;
+  String? lastInitialDirectory;
 
   @override
   Future<FilePickerResult?> pickFiles({
@@ -153,6 +154,7 @@ class _FakeFilePicker extends FilePicker with MockPlatformInterfaceMixin {
     bool lockParentWindow = false,
     bool readSequential = false,
   }) async {
+    lastInitialDirectory = initialDirectory;
     return nextResult;
   }
 }
@@ -243,6 +245,16 @@ void main() {
     expect(find.textContaining('升级后版本: 2.0.0'), findsOneWidget);
     expect(find.textContaining('版本对比: 已变化'), findsOneWidget);
     expect(find.text('hello'), findsOneWidget);
+  });
+
+  testWidgets('固件展示仅显示文件名', (tester) async {
+    final server = _SpyOtaServer(manager: _ViewBleConnectionManager());
+    await _pumpOtaView(tester, server);
+    server.firmwarePath.value = '/tmp/fw/path/demo.bin';
+    await tester.pump();
+
+    expect(find.textContaining('当前固件: demo.bin'), findsOneWidget);
+    expect(find.textContaining('/tmp/fw/path/demo.bin'), findsNothing);
   });
 
   testWidgets('固件路径为空时开始升级会被拦截并记日志', (tester) async {
@@ -512,6 +524,25 @@ void main() {
     expect(server.firmwarePath.value, goodBin.path);
 
     await tester.runAsync(() => tempDir.delete(recursive: true));
+  });
+
+  testWidgets('文件选择器会使用上次目录作为初始目录', (tester) async {
+    final server = _SpyOtaServer(manager: _ViewBleConnectionManager());
+    fakeFilePicker.nextResult = null;
+
+    await _pumpOtaView(tester, server);
+    server.lastFirmwareDirectory.value = '/tmp/fw/last_dir';
+    await tester.pump();
+    final chooseButton = tester.widget<MaterialButton>(
+      find.widgetWithText(MaterialButton, '选择本地固件(.bin)'),
+    );
+    await tester.runAsync(() async {
+      chooseButton.onPressed?.call();
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pump();
+
+    expect(fakeFilePicker.lastInitialDirectory, '/tmp/fw/last_dir');
   });
 
   testWidgets('页面销毁会调用 disconnect', (tester) async {

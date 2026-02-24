@@ -135,6 +135,7 @@ class OtaServer extends GetxService
 
   String fileMd5 = "";
   var firmwarePath = "".obs;
+  RxString lastFirmwareDirectory = "".obs;
   var rwcpStatusText = "未启用".obs;
 
   var percentage = 0.0.obs;
@@ -246,6 +247,7 @@ class OtaServer extends GetxService
   Future<void> _initDefaultFirmwarePath() async {
     try {
       firmwarePath.value = await _defaultFirmwarePathResolver();
+      lastFirmwareDirectory.value = _extractDirectoryPath(firmwarePath.value);
     } catch (e) {
       addLog("初始化默认固件路径失败$e");
     }
@@ -258,7 +260,20 @@ class OtaServer extends GetxService
       return;
     }
     firmwarePath.value = trimPath;
+    lastFirmwareDirectory.value = _extractDirectoryPath(trimPath);
     addLog("已设置固件路径$trimPath");
+  }
+
+  String _extractDirectoryPath(String fullPath) {
+    final normalizedPath = fullPath.trim().replaceAll("\\", "/");
+    if (normalizedPath.isEmpty) {
+      return "";
+    }
+    final splitIndex = normalizedPath.lastIndexOf("/");
+    if (splitIndex <= 0) {
+      return "";
+    }
+    return normalizedPath.substring(0, splitIndex);
   }
 
   void consumeUserMessage() {

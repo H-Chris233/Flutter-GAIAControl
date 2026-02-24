@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -145,6 +146,11 @@ class _MyHomePageState extends State<MyHomePage> {
                   final device = devices[index];
                   final connectingThis =
                       isConnecting && connectingId == device.id;
+                  final appConnectedThis =
+                      OtaServer.to.isDeviceConnected.value &&
+                          OtaServer.to.connectDeviceId == device.id;
+                  final phoneConnectedThis = appConnectedThis ||
+                      device.connectable == Connectable.unavailable;
                   return InkWell(
                     onTap: isConnecting
                         ? null
@@ -156,10 +162,15 @@ class _MyHomePageState extends State<MyHomePage> {
                           const EdgeInsets.only(left: 10, right: 10, bottom: 8),
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: phoneConnectedThis
+                            ? const Color(0xffE8F5E9)
+                            : Colors.white,
                         borderRadius:
                             const BorderRadius.all(Radius.circular(6)),
-                        border: Border.all(color: const Color(0xffE4E7EE)),
+                        border: Border.all(
+                            color: phoneConnectedThis
+                                ? const Color(0xff81C784)
+                                : const Color(0xffE4E7EE)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -177,6 +188,26 @@ class _MyHomePageState extends State<MyHomePage> {
                                       fontWeight: FontWeight.bold),
                                 ),
                               ),
+                              if (phoneConnectedThis)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: appConnectedThis
+                                        ? const Color(0xff2E7D32)
+                                        : const Color(0xffF57C00),
+                                    borderRadius: const BorderRadius.all(
+                                        Radius.circular(10)),
+                                  ),
+                                  child: Text(
+                                    appConnectedThis ? '本机已连接' : '手机已连接',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
                               if (connectingThis)
                                 const SizedBox(
                                   width: 16,
