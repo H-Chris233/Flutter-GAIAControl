@@ -319,7 +319,8 @@ void main() {
       expect(delegate.upgradeError, contains('数据为空'));
     });
 
-    test('START_CFM retry callback sends start request when still starting', () {
+    test('START_CFM retry callback sends start request when still starting',
+        () {
       fakeAsync((async) {
         machine.state = UpgradeState.starting;
         final packet = VMUPacket.get(OpCodes.upgradeStartCfm,
@@ -404,8 +405,7 @@ void main() {
 
       machine.handleVmuPacket(packet);
 
-      expect(
-          delegate.lastConfirmationType, ConfirmationType.transferComplete);
+      expect(delegate.lastConfirmationType, ConfirmationType.transferComplete);
     });
 
     test('START_CFM success with inProgress resume point requests inProgress',
@@ -460,6 +460,7 @@ void main() {
 
       expect(machine.state, UpgradeState.error);
       expect(delegate.logs.any((log) => log.contains('错误码长度不足')), isTrue);
+      expect(delegate.upgradeError, contains('错误码长度不足'));
     });
 
     test('ERROR_WARN_IND 0x81 asks warning confirmation', () {
@@ -520,7 +521,8 @@ void main() {
       expect(delegate.sentPackets.single.mOpCode, OpCodes.upgradeAbortReq);
     });
 
-    test('onSuccessfulTransmission does nothing for non-dataTransfer last packet',
+    test(
+        'onSuccessfulTransmission does nothing for non-dataTransfer last packet',
         () {
       machine.wasLastPacket = true;
       machine.resumePoint = ResumePoints.validation;

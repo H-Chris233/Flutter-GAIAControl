@@ -583,11 +583,12 @@ void main() {
       expect(server.isUpgrading.value, isFalse);
 
       server.isUpgrading.value = true;
-      server.askForConfirmation(1 << 30); // unknown -> fallback path
+      final writesBefore = bleManager.writeWithResponsePayloads.length;
+      server.askForConfirmation(1 << 30); // unknown -> ignored
       await Future<void>.delayed(Duration.zero);
 
       expect(server.isUpgrading.value, isTrue);
-      expect(bleManager.writeWithResponsePayloads, isNotEmpty);
+      expect(bleManager.writeWithResponsePayloads.length, writesBefore);
     });
 
     test('sendErrorConfirmation sends VMU error response', () async {
@@ -692,6 +693,7 @@ void main() {
     });
 
     test('connectDevice onConnected callback updates states', () async {
+      server.recoveryStatusText.value = '重连中';
       await server.connectDevice('device-ok');
       bleManager.latestOnConnected?.call();
       await Future<void>.delayed(const Duration(milliseconds: 120));
@@ -700,6 +702,7 @@ void main() {
       expect(server.isDeviceConnected.value, isTrue);
       expect(server.connectingDeviceId.value, '');
       expect(server.deviceListHint.value, '连接成功');
+      expect(server.recoveryStatusText.value, '空闲');
       expect(bleManager.registerNotifyCalled, greaterThan(0));
     });
 

@@ -291,6 +291,7 @@ class OtaServer extends GetxService
           connectingDeviceId.value = "";
           isDeviceConnected.value = true;
           connectDeviceId = id;
+          recoveryStatusText.value = "空闲";
           if (!isUpgrading.value) {
             rwcpStatusText.value = "待启用";
           }
@@ -319,6 +320,10 @@ class OtaServer extends GetxService
           isConnecting.value = false;
           connectingDeviceId.value = "";
           isDeviceConnected.value = false;
+          if (_isRecovering || recoveryStatusText.value == "重连中") {
+            recoveryStatusText.value = "恢复失败";
+            rwcpStatusText.value = "未连接";
+          }
           deviceListUiState.value = DeviceListUiState.error;
           deviceListHint.value = "连接失败，请重试";
           _notifyUser("连接失败: $error");
@@ -1146,6 +1151,13 @@ class OtaServer extends GetxService
           stopUpgrade();
         }
         return;
+      default:
+        addLog("askForConfirmation 未知类型: $type，忽略");
+        return;
+    }
+    if (code < 0) {
+      addLog("askForConfirmation 无效确认码: type=$type code=$code，忽略");
+      return;
     }
     addLog("askForConfirmation ConfirmationType type $type $code");
     VMUPacket packet = VMUPacket.get(code, data: [0]);

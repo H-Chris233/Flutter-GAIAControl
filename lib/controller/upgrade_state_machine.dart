@@ -282,6 +282,7 @@ class UpgradeStateMachine {
     if (data.length < 2) {
       delegate.onLog("receiveErrorWarnIND 升级失败，设备返回异常：错误码长度不足");
       state = UpgradeState.error;
+      delegate.onUpgradeError("设备返回升级异常：错误码长度不足");
       return;
     }
 
