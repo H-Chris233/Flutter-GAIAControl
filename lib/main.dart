@@ -168,7 +168,9 @@ class _MyHomePageState extends State<MyHomePage> {
                             children: [
                               Expanded(
                                 child: Text(
-                                  device.name,
+                                  device.name.isNotEmpty
+                                      ? device.name
+                                      : '未命名设备',
                                   style: const TextStyle(
                                       color: Color(0xff373F50),
                                       fontSize: 18,

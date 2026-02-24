@@ -495,12 +495,9 @@ void main() {
       manager.dispose();
     });
 
-    test('startScan returns locationDenied on Android when location denied',
-        () async {
-      final logs = <String>[];
+    test('startScan ignores location denial on Android', () async {
       final manager = BleConnectionManager(
         ble: fakeBle,
-        onLog: logs.add,
         isAndroidPlatform: () => true,
         requestAndroidPermissions: () async => <Permission, PermissionStatus>{
           Permission.location: PermissionStatus.denied,
@@ -511,8 +508,7 @@ void main() {
 
       final result = await manager.startScan();
 
-      expect(result, BleScanStartResult.locationDenied);
-      expect(logs, contains('location deny'));
+      expect(result, BleScanStartResult.started);
       manager.dispose();
     });
 
@@ -536,11 +532,9 @@ void main() {
       manager.dispose();
     });
 
-    test('startScan returns bluetoothConnectDenied on Android', () async {
-      final logs = <String>[];
+    test('startScan ignores bluetoothConnect denial on Android', () async {
       final manager = BleConnectionManager(
         ble: fakeBle,
-        onLog: logs.add,
         isAndroidPlatform: () => true,
         requestAndroidPermissions: () async => <Permission, PermissionStatus>{
           Permission.location: PermissionStatus.granted,
@@ -551,8 +545,7 @@ void main() {
 
       final result = await manager.startScan();
 
-      expect(result, BleScanStartResult.bluetoothConnectDenied);
-      expect(logs, contains('bluetoothConnect deny'));
+      expect(result, BleScanStartResult.started);
       manager.dispose();
     });
 
@@ -608,9 +601,9 @@ void main() {
 
       final result = await manager.startScan();
       expect(result, BleScanStartResult.started);
-      expect(fakeBle.lastScanServices, equals(<Uuid>[manager.otaServiceUuid]));
+      expect(fakeBle.lastScanServices, isEmpty);
       expect(fakeBle.lastScanMode, ScanMode.lowLatency);
-      expect(fakeBle.lastRequireLocationServicesEnabled, isTrue);
+      expect(fakeBle.lastRequireLocationServicesEnabled, isFalse);
 
       fakeBle.scanController.add(DiscoveredDevice(
         id: 'dev-empty',
@@ -639,9 +632,12 @@ void main() {
       fakeBle.scanController.addError(StateError('scan stream error'));
       await Future<void>.delayed(Duration.zero);
 
-      expect(manager.devices.length, 1);
-      expect(manager.devices.first.id, 'dev-1');
-      expect(manager.devices.first.rssi, -20);
+      expect(manager.devices.length, 2);
+      final emptyNameDevice =
+          manager.devices.firstWhere((d) => d.id == 'dev-empty');
+      final updatedDevice = manager.devices.firstWhere((d) => d.id == 'dev-1');
+      expect(emptyNameDevice.name, isEmpty);
+      expect(updatedDevice.rssi, -20);
       expect(logs.any((log) => log.contains('扫描失败')), isTrue);
       manager.dispose();
     });

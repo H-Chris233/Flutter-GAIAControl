@@ -266,22 +266,12 @@ class BleConnectionManager {
     final isAndroid = _isAndroidPlatform();
     if (isAndroid) {
       final statuses = await _requestAndroidPermissions();
-      final location = statuses[Permission.location] ?? PermissionStatus.denied;
-      final bluetoothScan =
-          statuses[Permission.bluetoothScan] ?? PermissionStatus.denied;
-      final bluetoothConnect =
-          statuses[Permission.bluetoothConnect] ?? PermissionStatus.denied;
-      if (!location.isGranted) {
-        _log("location deny");
-        return BleScanStartResult.locationDenied;
-      }
+      final bluetoothScan = statuses[Permission.bluetoothScan] ??
+          statuses[Permission.bluetooth] ??
+          PermissionStatus.granted;
       if (!bluetoothScan.isGranted) {
         _log("bluetoothScan deny");
         return BleScanStartResult.bluetoothScanDenied;
-      }
-      if (!bluetoothConnect.isGranted) {
-        _log("bluetoothConnect deny");
-        return BleScanStartResult.bluetoothConnectDenied;
       }
     } else {
       var bluetooth = await _bluetoothPermissionStatus();
@@ -298,16 +288,14 @@ class BleConnectionManager {
     }
     try {
       _scanSubscription = ble.scanForDevices(
-          withServices: [otaServiceUuid],
+          withServices: const <Uuid>[],
           scanMode: ScanMode.lowLatency,
-          requireLocationServicesEnabled: true).listen((device) {
-        if (device.name.isNotEmpty) {
-          final knownDeviceIndex = devices.indexWhere((d) => d.id == device.id);
-          if (knownDeviceIndex >= 0) {
-            devices[knownDeviceIndex] = device;
-          } else {
-            devices.add(device);
-          }
+          requireLocationServicesEnabled: false).listen((device) {
+        final knownDeviceIndex = devices.indexWhere((d) => d.id == device.id);
+        if (knownDeviceIndex >= 0) {
+          devices[knownDeviceIndex] = device;
+        } else {
+          devices.add(device);
         }
       }, onError: (dynamic error) {
         _log("扫描失败: $error");
