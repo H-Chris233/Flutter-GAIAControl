@@ -238,7 +238,7 @@ void main() {
       expect(fakeBleManager.writeWithResponsePayloads, isNotEmpty);
     });
 
-    test('onRequestNextDataPacket uses absolute file offset', () async {
+    test('onRequestNextDataPacket uses moveBy relative offset', () async {
       server.isUpgrading.value = true;
       server.mIsRWCPEnabled.value = false;
       server.mBytesFile = List<int>.generate(100, (index) => index);
@@ -256,7 +256,7 @@ void main() {
       expect(vmu, isNotNull);
       expect(vmu!.mOpCode, OpCodes.upgradeData);
       expect(vmu.mData![0], 0x00);
-      expect(vmu.mData!.sublist(1), List<int>.generate(10, (i) => 20 + i));
+      expect(vmu.mData!.sublist(1), List<int>.generate(10, (i) => 70 + i));
     });
 
     test(

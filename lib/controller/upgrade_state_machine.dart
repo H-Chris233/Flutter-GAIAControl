@@ -48,7 +48,9 @@ abstract class UpgradeStateMachineDelegate {
   void onUpgradeError(String reason);
 
   /// 请求发送下一个数据包
-  void onRequestNextDataPacket(int bytesToSend, int startOffset);
+  /// @param moveBy
+  ///        DATA_BYTES_REQ 的第二个 u32 字段（Big-Endian），语义为 move_by（相对当前游标的移动量）。
+  void onRequestNextDataPacket(int bytesToSend, int moveBy);
 
   /// 请求确认
   void onRequestConfirmation(int confirmationType);
@@ -263,10 +265,10 @@ class UpgradeStateMachine {
     // 解析请求的字节数和偏移量
     // 约定：多字节整数为 Big-Endian。
     final bytesToSend = _extractIntFromByteArray(data, 0, 4);
-    final fileOffset = _extractIntFromByteArray(data, 4, 4);
+    final moveBy = _extractIntFromByteArray(data, 4, 4);
 
-    delegate.onLog("本次发包: offset=$fileOffset bytesToSend=$bytesToSend");
-    delegate.onRequestNextDataPacket(bytesToSend, fileOffset);
+    delegate.onLog("DATA_BYTES_REQ: moveBy=$moveBy bytesToSend=$bytesToSend");
+    delegate.onRequestNextDataPacket(bytesToSend, moveBy);
   }
 
   /// 处理 ABORT_CFM

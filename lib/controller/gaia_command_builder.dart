@@ -170,6 +170,8 @@ class GaiaCommandBuilder {
         return "电量过低";
       case 0x23:
         return "设备处于错误状态(ERROR_IN_ERROR_STATE)";
+      case 0x32:
+        return "升级头长度错误(ERROR_BAD_LENGTH_UPGRADE_HEADER)";
       case 0x81:
         return "文件校验不通过";
       default:

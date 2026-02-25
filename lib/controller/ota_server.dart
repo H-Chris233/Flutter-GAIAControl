@@ -1224,17 +1224,21 @@ class OtaServer extends GetxService
     writeMsg(packet.getBytes());
   }
 
-  void _handleDataBytesRequest(int bytesToSend, int fileOffset) {
+  void _handleDataBytesRequest(int bytesToSend, int moveBy) {
     mBytesToSend = bytesToSend;
-    addLog("本次发包: offset=$fileOffset bytesToSend=$mBytesToSend");
     final fileLength = mBytesFile?.length ?? 0;
-    if (fileOffset >= 0 && fileOffset <= fileLength) {
-      mStartOffset = fileOffset;
+
+    // 文档对齐：DATA_BYTES_REQ 的第二个 u32 为 move_by（相对偏移），mStartOffset 维护当前游标。
+    final desiredOffset = mStartOffset + moveBy;
+    if (desiredOffset >= 0 && desiredOffset <= fileLength) {
+      mStartOffset = desiredOffset;
     } else {
-      final clampedOffset = fileOffset < 0 ? 0 : fileLength;
-      addLog("设备请求offset越界，已修正: req=$fileOffset use=$clampedOffset");
+      final clampedOffset = desiredOffset < 0 ? 0 : fileLength;
+      addLog(
+          "设备请求offset越界，已修正: cursor=$mStartOffset moveBy=$moveBy req=$desiredOffset use=$clampedOffset");
       mStartOffset = clampedOffset;
     }
+    addLog("本次发包: moveBy=$moveBy offset=$mStartOffset bytesToSend=$mBytesToSend");
 
     mBytesToSend = (mBytesToSend > 0) ? mBytesToSend : 0;
     final remainingLength = fileLength - mStartOffset;
@@ -1516,8 +1520,8 @@ class OtaServer extends GetxService
   }
 
   @override
-  void onRequestNextDataPacket(int bytesToSend, int startOffset) {
-    _handleDataBytesRequest(bytesToSend, startOffset);
+  void onRequestNextDataPacket(int bytesToSend, int moveBy) {
+    _handleDataBytesRequest(bytesToSend, moveBy);
   }
 
   @override
