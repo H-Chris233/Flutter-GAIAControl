@@ -496,7 +496,7 @@ class OtaServer extends GetxService
     rwcpStatusText.value = "建立通道中";
     await _bleManager.cancelRwcpChannel();
     final channelReady = await _bleManager.registerRwcpChannel((data) {
-      //addLog("wenDataRec2>${StringUtils.byteToHexString(data)}");
+      _logRwcpRxPacket(data);
       mRWCPClient.onReceiveRWCPSegment(data);
     });
     if (!channelReady || !_bleManager.isDeviceConnected) {
@@ -522,7 +522,6 @@ class OtaServer extends GetxService
   //注册通知
   Future<void> registerNotice() async {
     final channelReady = await _bleManager.registerNotifyChannel((data) {
-      addLog("收到通知>${StringUtils.byteToHexString(data)}");
       handleRecMsg(data);
     });
     if (!channelReady) {
@@ -606,16 +605,91 @@ class OtaServer extends GetxService
 
   void handleRecMsg(List<int> data) async {
     _touchUpgradeWatchdog();
+    // 保持历史日志关键字，避免测试/外部解析依赖被破坏。
+    addLog("收到通知>${StringUtils.byteToHexString(data)}");
     final packet = GaiaPacketBLE.fromByte(data);
     if (packet == null) {
-      addLog("数据包解析失败: 长度=${data.length}");
+      // 保持历史日志关键字，避免测试/外部解析依赖被破坏。
+      addLog("数据包解析失败");
+      addLog(
+          "RX[GAIA] 解析失败 len=${data.length} bytes=${StringUtils.byteToHexString(data)}");
       return;
     }
+    _logGaiaRxPacket(packet);
     if (packet.mVendorId != 0x001D) {
       addLog("忽略非V3 Vendor包: ${_vendorToHex(packet.mVendorId)}");
       return;
     }
     _handleV3Packet(packet);
+  }
+
+  void _logGaiaRxPacket(GaiaPacketBLE packet) {
+    final cmd = packet.getCommand();
+    final feature = _v3CommandFeature(cmd);
+    final packetType = _v3CommandType(cmd);
+    final commandId = _v3CommandId(cmd);
+    final payload = packet.mPayload ?? [];
+    final cmdText = _cmdBuilder.gaiaCommandText(cmd);
+    final base =
+        "RX[GAIA] $cmdText(cmd=0x${cmd.toRadixString(16).padLeft(4, '0').toUpperCase()} "
+        "feature=0x${feature.toRadixString(16).padLeft(2, '0').toUpperCase()} "
+        "type=$packetType id=0x${commandId.toRadixString(16).padLeft(2, '0').toUpperCase()})";
+
+    if (cmd == _upgradeControlCommand()) {
+      final vmu = VMUPacket.getPackageFromByte(payload);
+      if (vmu != null) {
+        final vmuData = vmu.mData ?? [];
+        addLog(
+            "$base VMU=${_vmuOpText(vmu.mOpCode)}(0x${vmu.mOpCode.toRadixString(16).padLeft(2, '0').toUpperCase()}) "
+            "len=${vmuData.length} bytes=${StringUtils.byteToHexString(packet.mBytes ?? [])}");
+        return;
+      }
+    }
+
+    addLog(
+        "$base len=${payload.length} bytes=${StringUtils.byteToHexString(packet.mBytes ?? [])}");
+  }
+
+  void _logRwcpRxPacket(List<int> bytes) {
+    if (bytes.isEmpty) {
+      addLog("RX[RWCP] empty");
+      return;
+    }
+    final segment = Segment.parse(bytes);
+    final opCode = segment.getOperationCode();
+    final seq = segment.getSequenceNumber();
+    final opText = _rwcpServerOpText(opCode);
+    final payload = segment.getPayload();
+    if (payload.isEmpty) {
+      addLog(
+          "RX[RWCP] op=$opText seq=$seq bytes=${StringUtils.byteToHexString(bytes)}");
+      return;
+    }
+    final gaia = GaiaPacketBLE.fromByte(payload);
+    if (gaia == null) {
+      addLog(
+          "RX[RWCP] op=$opText seq=$seq payloadLen=${payload.length} bytes=${StringUtils.byteToHexString(bytes)}");
+      return;
+    }
+    final cmd = gaia.getCommand();
+    final cmdText = _cmdBuilder.gaiaCommandText(cmd);
+    addLog(
+        "RX[RWCP] op=$opText seq=$seq gaia=$cmdText bytes=${StringUtils.byteToHexString(bytes)}");
+  }
+
+  String _rwcpServerOpText(int opCode) {
+    switch (opCode) {
+      case RWCPOpCodeServer.dataAck:
+        return "DATA_ACK";
+      case RWCPOpCodeServer.synAck:
+        return "SYN_ACK";
+      case RWCPOpCodeServer.rstAck:
+        return "RST_ACK";
+      case RWCPOpCodeServer.gap:
+        return "GAP";
+      default:
+        return "UNKNOWN";
+    }
   }
 
   void _handleV3Packet(GaiaPacketBLE packet) {
