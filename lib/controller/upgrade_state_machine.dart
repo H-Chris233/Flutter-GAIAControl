@@ -261,10 +261,9 @@ class UpgradeStateMachine {
     }
 
     // 解析请求的字节数和偏移量
-    var lengthByte = [data[0], data[1], data[2], data[3]];
-    var fileByte = [data[4], data[5], data[6], data[7]];
-    int bytesToSend = int.parse(_byteToHexString(lengthByte), radix: 16);
-    int fileOffset = int.parse(_byteToHexString(fileByte), radix: 16);
+    // 约定：多字节整数为 Big-Endian。
+    final bytesToSend = _extractIntFromByteArray(data, 0, 4);
+    final fileOffset = _extractIntFromByteArray(data, 4, 4);
 
     delegate.onLog("本次发包: offset=$fileOffset bytesToSend=$bytesToSend");
     delegate.onRequestNextDataPacket(bytesToSend, fileOffset);
@@ -377,11 +376,6 @@ class UpgradeStateMachine {
   /// 设置最后一个包标志
   void setWasLastPacket(bool value) {
     wasLastPacket = value;
-  }
-
-  /// 字节数组转十六进制字符串
-  String _byteToHexString(List<int> bytes) {
-    return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
   }
 
   /// 从字节数组提取整数

@@ -954,6 +954,8 @@ void main() {
 
     test('sendVMUPacket rwcp path and sendVmuPacket delegate', () async {
       server.mIsRWCPEnabled.value = true;
+      server.isDeviceConnected.value = true;
+      server.rwcpStatusText.value = "已启用";
       server.mTransferStartTime = 0;
       server.sendVMUPacket(
           VMUPacket.get(OpCodes.upgradeData, data: <int>[0x00, 0xAA]), true);
@@ -962,7 +964,7 @@ void main() {
 
       expect(server.mTransferStartTime, greaterThan(0));
       expect(bleManager.writeWithoutResponsePayloads, isNotEmpty);
-      expect(bleManager.writeWithResponsePayloads, isNotEmpty);
+      expect(bleManager.writeWithResponsePayloads, isEmpty);
     });
 
     test('receiveVMUPacket handles parse fail and non-upgrading packet',
@@ -1357,6 +1359,8 @@ void main() {
       final controlled = _ControlledRWCPClient(server, sendReturns: false);
       server.mRWCPClient = controlled;
       server.mIsRWCPEnabled.value = true;
+      server.isDeviceConnected.value = true;
+      server.rwcpStatusText.value = "已启用";
       server.sendVMUPacket(
           VMUPacket.get(OpCodes.upgradeData, data: <int>[0x00, 0x11]), true);
       await Future<void>.delayed(Duration.zero);

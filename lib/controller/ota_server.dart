@@ -172,6 +172,7 @@ class OtaServer extends GetxService
   bool _dfuWriteInFlight = false;
   Timer? _dfuResultTimer;
   bool _rwcpSetupInProgress = false;
+  bool _upgradePaused = false;
   Timer? _upgradeWatchdogTimer;
   Timer? _reconnectTimer;
   String _fatalUpgradeReason = "";
@@ -664,6 +665,18 @@ class OtaServer extends GetxService
       if (feature == GaiaCommandBuilder.v3FeatureUpgrade &&
           commandId == GaiaCommandBuilder.v3CmdUpgradeNotification) {
         receiveVMUPacket(payload);
+        return;
+      }
+      // GAIA STOP/START notifications (feature=0x06, type=Notification, id=0x01/0x02).
+      if (feature == GaiaCommandBuilder.v3FeatureUpgrade && commandId == 0x01) {
+        _upgradePaused = true;
+        addLog("收到GAIA STOP通知，暂停发送升级数据");
+        return;
+      }
+      if (feature == GaiaCommandBuilder.v3FeatureUpgrade && commandId == 0x02) {
+        _upgradePaused = false;
+        addLog("收到GAIA START通知，恢复发送升级数据");
+        _resumeUpgradeDataIfPossible();
       }
       return;
     }
@@ -740,6 +753,7 @@ class OtaServer extends GetxService
     transFerComplete = false;
     mBytesToSend = 0;
     mStartOffset = 0;
+    _upgradePaused = false;
   }
 
   Future<void> stopUpgrade(
@@ -1064,26 +1078,39 @@ class OtaServer extends GetxService
   ///              True if the packet is about transferring the file data, false for any other packet.
   void sendVMUPacket(VMUPacket packet, bool isTransferringData) {
     List<int> bytes = packet.getBytes();
-    if (isTransferringData && mIsRWCPEnabled.value) {
-      final gaiaPacket =
-          _buildGaiaPacket(_upgradeControlCommand(), payload: bytes);
+    final gaiaPacket =
+        _buildGaiaPacket(_upgradeControlCommand(), payload: bytes);
+    List<int> gaiaBytes;
+    try {
+      gaiaBytes = gaiaPacket.getBytes();
+    } catch (e) {
+      addLog("Exception when attempting to create GAIA packet: $e");
+      return;
+    }
+
+    // 对齐文档：RWCP 就绪后，所有 Upgrade Control 的 GAIA PDU 都走 RWCP(Data Char)。
+    if (_shouldSendUpgradeControlOverRwcp()) {
+      if (!isTransferringData) {
+        // 控制包也会占用一个 RWCP DATA segment 的 ACK，放一个占位进度避免队列错位。
+        mProgressQueue.add(updatePer.value);
+      }
+      if (mTransferStartTime <= 0) {
+        mTransferStartTime = DateTime.now().millisecondsSinceEpoch;
+      }
       try {
-        List<int> gaiaBytes = gaiaPacket.getBytes();
-        if (mTransferStartTime <= 0) {
-          mTransferStartTime = DateTime.now().millisecondsSinceEpoch;
-        }
-        bool success = mRWCPClient.sendData(gaiaBytes);
+        final success = mRWCPClient.sendData(gaiaBytes);
         if (!success) {
           addLog(
               "Fail to send GAIA packet for GAIA command: ${gaiaPacket.getCommandId()}");
         }
       } catch (e) {
-        addLog("Exception when attempting to create GAIA packet: $e");
+        addLog("Exception when attempting to send GAIA packet: $e");
       }
-    } else {
-      final pkg = _buildGaiaPacket(_upgradeControlCommand(), payload: bytes);
-      writeMsg(pkg.getBytes());
+      return;
     }
+
+    // RWCP 未就绪时（Stage A），按文档写 Command Char（纯 GAIA PDU）。
+    writeMsg(gaiaBytes);
   }
 
   @override
@@ -1140,12 +1167,14 @@ class OtaServer extends GetxService
     mBytesToSend =
         (mBytesToSend < remainingLength) ? mBytesToSend : remainingLength;
     if (mIsRWCPEnabled.value) {
-      while (mBytesToSend > 0) {
+      while (mBytesToSend > 0 && !_upgradePaused) {
         sendNextDataPacket();
       }
       return;
     }
-    sendNextDataPacket();
+    if (!_upgradePaused) {
+      sendNextDataPacket();
+    }
   }
 
   void abortUpgrade() {
@@ -1212,6 +1241,9 @@ class OtaServer extends GetxService
       stopUpgrade();
       return;
     }
+    if (_upgradePaused) {
+      return;
+    }
     // inform listeners about evolution
     onFileUploadProgress();
     int bytesToSend = mBytesToSend < mMaxLengthForDataTransfer - 1
@@ -1238,6 +1270,32 @@ class OtaServer extends GetxService
     }
 
     sendData(lastPacket, dataToSend);
+  }
+
+  void _resumeUpgradeDataIfPossible() {
+    if (_upgradePaused || !isUpgrading.value) {
+      return;
+    }
+    if (_upgradeStateMachine.resumePoint != ResumePoints.dataTransfer) {
+      return;
+    }
+    if (mBytesToSend <= 0) {
+      return;
+    }
+
+    if (mIsRWCPEnabled.value) {
+      while (mBytesToSend > 0 && !_upgradePaused) {
+        sendNextDataPacket();
+      }
+      return;
+    }
+    sendNextDataPacket();
+  }
+
+  bool _shouldSendUpgradeControlOverRwcp() {
+    return mIsRWCPEnabled.value &&
+        isDeviceConnected.value &&
+        rwcpStatusText.value == "已启用";
   }
 
   //计算进度
@@ -1445,12 +1503,28 @@ class OtaServer extends GetxService
 
   Future<void> restPayloadSize() async {
     int mtu = await _bleManager.requestMtu(256);
-    if (!mIsRWCPEnabled.value) {
-      mtu = 23;
+    final rwcpEnabled = mIsRWCPEnabled.value;
+    // 非 RWCP 模式下保持历史行为：按 23 计算，避免设备未协商 MTU 时超限。
+    final effectiveMtu = rwcpEnabled ? mtu : 23;
+    final maxAttrLen = effectiveMtu - 3;
+
+    // 纯 GAIA PDU（vendor+cmd 4字节开销）可用 payload 上限。
+    mPayloadSizeMax = maxAttrLen - 4;
+
+    // UPGRADE_DATA 的 GAIA PDU 固定开销：
+    // vendor+cmd(4) + opcode(1) + len(2) + is_end(1) = 8 bytes
+    // RWCP 额外 header(1) 会占用 attribute 空间。
+    final maxGaiaPduLenForUpgrade = maxAttrLen - (rwcpEnabled ? 1 : 0);
+    final maxUpgradeDataLen = maxGaiaPduLenForUpgrade - 8; // 即 MTU - 12
+    final clampedUpgradeDataLen = maxUpgradeDataLen < 0 ? 0 : maxUpgradeDataLen;
+    // mMaxLengthForDataTransfer 表示 VMU data 长度上限（含 is_end 1字节）。
+    mMaxLengthForDataTransfer = clampedUpgradeDataLen + 1;
+    if (mMaxLengthForDataTransfer < 2) {
+      mMaxLengthForDataTransfer = 2;
     }
-    int dataSize = mtu - 3;
-    mPayloadSizeMax = dataSize - 4;
-    addLog("协商mtu $mtu mPayloadSizeMax $mPayloadSizeMax");
+
+    addLog("协商mtu $effectiveMtu mPayloadSizeMax $mPayloadSizeMax "
+        "mMaxLengthForDataTransfer $mMaxLengthForDataTransfer");
   }
 
   /// 添加日志（代理到 LogBuffer）

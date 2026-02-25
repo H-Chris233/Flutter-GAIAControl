@@ -702,19 +702,18 @@ class RWCPClient {
 
     switch (mState) {
       case RWCPState.established:
-        if (mLastAckSequence > segment.getSequenceNumber()) {
+        final gapSequence = segment.getSequenceNumber();
+        // Sequence numbers are 6-bit and wrap (0..63). Avoid raw integer comparisons here.
+        if (!_isSequenceWithinAckWindow(gapSequence)) {
           Log.i(tag,
-              "Ignoring gap (${segment.getSequenceNumber()}) as last ack sequence is $mLastAckSequence.");
+              "Ignoring gap ($gapSequence) as it is out of ACK window: last=$mLastAckSequence next=$mNextSequence.");
           return true;
         }
-        if (mLastAckSequence <= segment.getSequenceNumber()) {
-          // Sequence number in gap implies lost DATA_ACKs
-          // adjust window
-          decreaseWindow();
-          // validate the acknowledged segments if not known.
-          validateAckSequence(
-              RWCPOpCodeClient.data, segment.getSequenceNumber());
-        }
+
+        // Sequence number in gap implies lost DATA_ACKs.
+        // Adjust window and validate the acknowledged segments if not known.
+        decreaseWindow();
+        validateAckSequence(RWCPOpCodeClient.data, gapSequence);
 
         cancelTimeOut();
         resendDataSegment();
