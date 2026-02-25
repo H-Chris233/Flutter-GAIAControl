@@ -168,6 +168,8 @@ class GaiaCommandBuilder {
     switch (returnCode) {
       case 0x21:
         return "电量过低";
+      case 0x23:
+        return "设备处于错误状态(ERROR_IN_ERROR_STATE)";
       case 0x81:
         return "文件校验不通过";
       default:

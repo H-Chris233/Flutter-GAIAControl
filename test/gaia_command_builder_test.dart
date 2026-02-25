@@ -77,6 +77,7 @@ void main() {
 
     test('upgradeErrorText returns correct text', () {
       expect(builder.upgradeErrorText(0x21), '电量过低');
+      expect(builder.upgradeErrorText(0x23), '设备处于错误状态(ERROR_IN_ERROR_STATE)');
       expect(builder.upgradeErrorText(0x81), '文件校验不通过');
       expect(builder.upgradeErrorText(0xFF), '未知升级错误');
     });

@@ -301,6 +301,9 @@ class UpgradeStateMachine {
       delegate.onLog("设备电量过低，停止升级");
       state = UpgradeState.error;
       delegate.onUpgradeError("设备电量过低");
+    } else if (returnCode == 0x23) {
+      state = UpgradeState.error;
+      delegate.onUpgradeError("设备处于错误状态(0x23)，建议断开重连后重新开始升级");
     } else {
       state = UpgradeState.error;
       delegate.onUpgradeError("设备返回升级错误码0x${returnCode.toRadixString(16)}");

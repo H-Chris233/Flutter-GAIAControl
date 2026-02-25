@@ -243,6 +243,18 @@ A: OtaServer 连接设备后会尝试注册 RWCP 写入特征。如果注册成�
 
 ---
 
+## 升级错误码速记
+
+以下错误码来自设备上报的 `upgradeErrorWarnInd (opcode=0x11)`，其内容为 2 字节 ReturnCode（BE）。
+
+| ReturnCode | 名称 | 含义 | 处理建议 |
+|-----------:|------|------|----------|
+| `0x0023` | `ERROR_IN_ERROR_STATE` | 设备升级库处于错误状态（拒绝继续升级） | 先回 `upgradeErrorWarnRes (0x1F)` 确认，再执行 Abort/断开重连，重新 `Connect + SYNC` 开始 |
+
+参考实现来源：`gaia-client-src/android_src/lib-upgrade/.../messages/ErrorCodes.java`。
+
+---
+
 ## 相关文件清单
 
 - `lib/controller/ota_server.dart` -- 核心协调器
