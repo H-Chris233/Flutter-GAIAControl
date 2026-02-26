@@ -1,11 +1,27 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'controller/ota_server.dart';
+import 'utils/crash_reporter.dart';
 
-void main() {
-  runApp(const MyApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await CrashReporter.init();
+    CrashReporter.maybeInstance?.installGlobalHandlers();
+  } catch (_) {}
+  runZonedGuarded(
+    () {
+      runApp(const MyApp());
+    },
+    (error, stack) {
+      CrashReporter.maybeInstance
+          ?.recordError(error, stack, context: "runZonedGuarded");
+    },
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -56,11 +72,21 @@ class _MyHomePageState extends State<MyHomePage> {
         ));
       ota.consumeUserMessage();
     });
+
+    unawaited(() async {
+      final last =
+          await CrashReporter.maybeInstance?.consumePendingReportPath();
+      if (!mounted || last == null) {
+        return;
+      }
+      ota.userMessage.value = "检测到上次异常退出，崩溃日志已保存: $last";
+    }());
   }
 
   @override
   void dispose() {
     _messageWorker?.dispose();
+    CrashReporter.maybeInstance?.dispose();
     super.dispose();
   }
 

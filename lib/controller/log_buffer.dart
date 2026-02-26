@@ -86,6 +86,22 @@ class LogBuffer {
     _logFlushTimer = null;
   }
 
+  String snapshotText({int maxChars = 60000}) {
+    final lines = <String>[];
+    lines.addAll(_lines);
+    if (_pendingLogs.isNotEmpty) {
+      lines.addAll(_pendingLogs);
+    }
+    if (_lastLogRepeat > 1) {
+      lines.add("↳ 上一条重复 ${_lastLogRepeat - 1} 次");
+    }
+    var text = lines.join('\n');
+    if (text.length > maxChars) {
+      text = text.substring(text.length - maxChars);
+    }
+    return text;
+  }
+
   /// 归一化日志 key（去除时间戳前缀）
   String _normalizeLogKey(String message) {
     final withoutTimestamp = message.replaceFirst(

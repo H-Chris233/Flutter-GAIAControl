@@ -26,6 +26,7 @@ import 'package:gaia/controller/log_buffer.dart';
 import 'package:gaia/controller/gaia_command_builder.dart';
 import 'package:gaia/controller/ble_connection_manager.dart';
 import 'package:gaia/controller/upgrade_state_machine.dart';
+import 'package:gaia/utils/crash_reporter.dart';
 
 typedef DefaultFirmwarePathResolver = Future<String> Function();
 
@@ -234,6 +235,28 @@ class OtaServer extends GetxService
     super.onInit();
     // 初始化组件
     _logBuffer = LogBuffer(logText: logText);
+    final crash = CrashReporter.maybeInstance;
+    crash?.setLogSnapshotProvider(
+        () => _logBuffer.snapshotText(maxChars: 60000));
+    crash?.setContextProvider(() {
+      return <String, Object?>{
+        "isUpgrading": isUpgrading.value,
+        "isDeviceConnected": isDeviceConnected.value,
+        "rwcpStatusText": rwcpStatusText.value,
+        "recoveryStatusText": recoveryStatusText.value,
+        "vendorMode": vendorMode.value,
+        "upgradeState": _upgradeStateMachine.state.name,
+        "resumePoint": _upgradeStateMachine.resumePoint,
+        "transferComplete": transFerComplete,
+        "upgradePaused": _upgradePaused,
+        "offset": mStartOffset,
+        "bytesToSend": mBytesToSend,
+        "fileLength": mBytesFile?.length ?? 0,
+        "progressQueueSize": mProgressQueue.length,
+        "payloadSizeMax": mPayloadSizeMax,
+        "maxLengthForDataTransfer": mMaxLengthForDataTransfer,
+      };
+    });
     _cmdBuilder = GaiaCommandBuilder();
     _bleManager = _bleManagerOverride ??
         BleConnectionManager(
