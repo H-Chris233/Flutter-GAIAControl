@@ -743,13 +743,36 @@ class OtaServer extends GetxService
       }
       // GAIA STOP/START notifications (feature=0x06, type=Notification, id=0x01/0x02).
       if (feature == GaiaCommandBuilder.v3FeatureUpgrade && commandId == 0x01) {
+        final action = payload.isNotEmpty ? payload.first : 0x01;
         _upgradePaused = true;
-        addLog("收到GAIA STOP通知，暂停发送升级数据");
+        if (action == 0x00) {
+          addLog("收到GAIA STOP通知(action=0x00)，断开升级通道");
+          disconnectUpgrade();
+        } else if (action == 0x01) {
+          addLog("收到GAIA STOP通知(action=0x01)，暂停发送升级数据");
+        } else {
+          addLog(
+              "收到GAIA STOP通知(action=0x${action.toRadixString(16).padLeft(2, '0')})，按暂停处理");
+        }
         return;
       }
       if (feature == GaiaCommandBuilder.v3FeatureUpgrade && commandId == 0x02) {
+        final action = payload.isNotEmpty ? payload.first : 0x01;
+        if (action == 0x00) {
+          _upgradePaused = false;
+          addLog("收到GAIA START通知(action=0x00)，重新连接升级通道");
+          sendUpgradeConnect();
+          return;
+        }
+        if (action == 0x01) {
+          _upgradePaused = false;
+          addLog("收到GAIA START通知(action=0x01)，恢复发送升级数据");
+          _resumeUpgradeDataIfPossible();
+          return;
+        }
         _upgradePaused = false;
-        addLog("收到GAIA START通知，恢复发送升级数据");
+        addLog(
+            "收到GAIA START通知(action=0x${action.toRadixString(16).padLeft(2, '0')})，按恢复处理");
         _resumeUpgradeDataIfPossible();
       }
       return;

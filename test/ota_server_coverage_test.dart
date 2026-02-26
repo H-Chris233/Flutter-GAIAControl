@@ -244,7 +244,7 @@ class _ControlledRWCPClient extends RWCPClient {
   _ControlledRWCPClient(super.mListener, {this.sendReturns = true});
 
   bool sendReturns;
-  bool throwOnSend;
+  bool throwOnSend = false;
   bool cancelCalled = false;
 
   @override

@@ -326,5 +326,30 @@ void main() {
 
       expect(fakeBleManager.autoReconnectEnabledHistory, contains(false));
     });
+
+    test('GAIA STOP/START notifications follow action semantics', () async {
+      server.isUpgrading.value = true;
+
+      // STOP action=0x00 => disconnect upgrade
+      final stopCmd = ((0x06 & 0x7F) << 9) | ((0x01 & 0x03) << 7) | 0x01;
+      final stopPacket =
+          GaiaPacketBLE(stopCmd, mPayload: <int>[0x00], mVendorId: 0x001D);
+      server.handleRecMsg(stopPacket.getBytes());
+      await Future<void>.delayed(Duration.zero);
+
+      expect(fakeBleManager.writeWithResponsePayloads, isNotEmpty);
+      expect(fakeBleManager.writeWithResponsePayloads.last,
+          <int>[0x00, 0x1D, 0x0C, 0x01]);
+
+      // START action=0x00 => reconnect upgrade
+      final startCmd = ((0x06 & 0x7F) << 9) | ((0x01 & 0x03) << 7) | 0x02;
+      final startPacket =
+          GaiaPacketBLE(startCmd, mPayload: <int>[0x00], mVendorId: 0x001D);
+      server.handleRecMsg(startPacket.getBytes());
+      await Future<void>.delayed(Duration.zero);
+
+      expect(fakeBleManager.writeWithResponsePayloads.last,
+          <int>[0x00, 0x1D, 0x0C, 0x00]);
+    });
   });
 }
