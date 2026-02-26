@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -59,14 +60,23 @@ class _MyHomePageState extends State<MyHomePage> {
       if (message == null || message.isEmpty || !mounted) {
         return;
       }
+      final isCrashReport = message.contains("崩溃日志已保存:");
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(
           content: Text(message),
           action: SnackBarAction(
-            label: '去设置',
+            label: isCrashReport ? '复制路径' : '去设置',
             onPressed: () {
-              openAppSettings();
+              if (!isCrashReport) {
+                openAppSettings();
+                return;
+              }
+              final path = message.split("崩溃日志已保存:").last.trim();
+              if (path.isEmpty) {
+                return;
+              }
+              Clipboard.setData(ClipboardData(text: path));
             },
           ),
         ));

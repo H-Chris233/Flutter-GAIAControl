@@ -3,6 +3,7 @@ import 'package:gaia/utils/gaia/op_codes.dart';
 import 'package:gaia/utils/gaia/resume_points.dart';
 import 'package:gaia/utils/gaia/upgrade_start_cfm_status.dart';
 import 'package:gaia/utils/gaia/vmu_packet.dart';
+import 'dart:async';
 
 /// 升级状态枚举
 enum UpgradeState {
@@ -108,11 +109,17 @@ class UpgradeStateMachine {
   /// 是否需要中止
   bool hasToAbort = false;
 
+  static const int _kValidationPollMinDelayMs = 80;
+  static const int _kValidationPollMaxDelayMs = 5000;
+  Timer? _validationPollTimer;
+
   /// 构造函数
   UpgradeStateMachine({required this.delegate});
 
   /// 重置状态机
   void reset() {
+    _validationPollTimer?.cancel();
+    _validationPollTimer = null;
     state = UpgradeState.idle;
     resumePoint = -1;
     startAttempts = 0;
@@ -316,20 +323,40 @@ class UpgradeStateMachine {
   void _handleValidationDoneCfm(VMUPacket packet) {
     delegate.onLog("receiveValidationDoneCFM");
     final data = packet.mData ?? [];
-    if (data.length >= 2) {
-      final time = _extractIntFromByteArray(data, 0, 2);
-      Future.delayed(Duration(milliseconds: time)).then((_) {
-        if (state != UpgradeState.validating) {
-          return;
-        }
-        final validationPacket =
-            VMUPacket.get(OpCodes.upgradeIsValidationDoneReq);
-        delegate.sendVmuPacket(validationPacket, false);
+    if (data.length < 2) {
+      // 兼容旧行为：当 payload 不包含延迟信息时，立即发起下一次轮询。
+      // 同时用最小间隔做节流，避免异常重复通知导致瞬时刷屏。
+      if (_validationPollTimer != null) {
+        return;
+      }
+      final validationPacket =
+          VMUPacket.get(OpCodes.upgradeIsValidationDoneReq);
+      delegate.sendVmuPacket(validationPacket, false);
+      _validationPollTimer =
+          Timer(const Duration(milliseconds: _kValidationPollMinDelayMs), () {
+        _validationPollTimer = null;
       });
       return;
     }
-    final validationPacket = VMUPacket.get(OpCodes.upgradeIsValidationDoneReq);
-    delegate.sendVmuPacket(validationPacket, false);
+
+    _validationPollTimer?.cancel();
+    _validationPollTimer = null;
+    var delayMs = _kValidationPollMinDelayMs;
+    delayMs = _extractIntFromByteArray(data, 0, 2);
+    if (delayMs < _kValidationPollMinDelayMs) {
+      delayMs = _kValidationPollMinDelayMs;
+    } else if (delayMs > _kValidationPollMaxDelayMs) {
+      delayMs = _kValidationPollMaxDelayMs;
+    }
+    _validationPollTimer = Timer(Duration(milliseconds: delayMs), () {
+      _validationPollTimer = null;
+      if (state != UpgradeState.validating) {
+        return;
+      }
+      final validationPacket =
+          VMUPacket.get(OpCodes.upgradeIsValidationDoneReq);
+      delegate.sendVmuPacket(validationPacket, false);
+    });
   }
 
   /// 处理 TRANSFER_COMPLETE_IND

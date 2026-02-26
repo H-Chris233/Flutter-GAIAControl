@@ -28,7 +28,15 @@ class CrashReporter {
 
   static Future<void> init() async {
     final docs = await getApplicationDocumentsDirectory();
-    final reportsDir = Directory("${docs.path}/crash_reports");
+    var baseDir = docs;
+    try {
+      final external = await getExternalStorageDirectory();
+      if (external != null) {
+        baseDir = external;
+      }
+    } catch (_) {}
+
+    final reportsDir = Directory("${baseDir.path}/crash_reports");
     if (!await reportsDir.exists()) {
       await reportsDir.create(recursive: true);
     }
