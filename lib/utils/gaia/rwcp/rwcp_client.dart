@@ -710,10 +710,12 @@ class RWCPClient {
           return true;
         }
 
-        // Sequence number in gap implies lost DATA_ACKs.
-        // Adjust window and validate the acknowledged segments if not known.
+        // GAP 通常表示对端检测到缺口/乱序，希望从 gapSequence 回退重传。
+        // 实务上把 GAP 视为 “下一期待序号=gapSequence”，因此累计确认到 gapSequence-1 最稳，
+        // 可避免误删 gapSequence 对应 segment 导致无法重传。
         decreaseWindow();
-        validateAckSequence(RWCPOpCodeClient.data, gapSequence);
+        final ackUpTo = decreaseSequenceNumber(gapSequence, 1);
+        validateAckSequence(RWCPOpCodeClient.data, ackUpTo);
 
         cancelTimeOut();
         resendDataSegment();

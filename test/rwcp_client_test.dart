@@ -224,6 +224,35 @@ void main() {
         expect(client.mWindow, 8);
       });
 
+      test('receiveGAP keeps gap sequence segment for retransmission', () {
+        client.mState = RWCPState.established;
+        client.mWindow = 8;
+        client.mMaximumWindow = 32;
+        client.mCredits = 0;
+        client.mLastAckSequence = 10;
+        client.mNextSequence = 14;
+
+        // unacked: 11,12,13
+        for (int i = 11; i <= 13; i++) {
+          client.mUnacknowledgedSegments
+              .add(Segment.get(RWCPOpCodeClient.data, i, payload: [i]));
+        }
+
+        listener.reset();
+        final handled =
+            client.receiveGAP(Segment.get(RWCPOpCodeServer.gap, 12));
+
+        expect(handled, isTrue);
+        // GAP 视为 nextExpected=12，因此累计确认到 11。
+        expect(client.mLastAckSequence, 11);
+        expect(
+            client.mUnacknowledgedSegments
+                .any((s) => s.getSequenceNumber() == 12),
+            isTrue);
+        // 触发重传
+        expect(listener.sentSegments, isNotEmpty);
+      });
+
       test('receiveGAP ignores stale gap with sequence before lastAck', () {
         client.mState = RWCPState.established;
         client.mWindow = 16;
