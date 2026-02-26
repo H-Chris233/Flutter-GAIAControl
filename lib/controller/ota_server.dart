@@ -82,6 +82,12 @@ class OtaServer extends GetxService
   /// 恢复窗口内最大恢复次数
   static const int kMaxRecoveryAttemptsPerWindow = 3;
 
+  /// RWCP 发送节流：每次泵最多入队的 UpgradeData 包数。
+  ///
+  /// 背景：原实现会在收到 DATA_BYTES_REQ 后用 while 一次性把大量数据切片入队到 RWCP 的 pending 队列，
+  /// 在设备端进入校验/写闪存导致 ACK 变慢时，pending 会快速膨胀，引发内存峰值甚至 OOM 闪退。
+  static const int _kRwcpPumpMaxPacketsPerTick = 24;
+
   // 组件实例
   late final LogBuffer _logBuffer;
   late final GaiaCommandBuilder _cmdBuilder;
@@ -891,26 +897,46 @@ class OtaServer extends GetxService
   }
 
   Future<bool> loadFirmwareFile() async {
-    String usePath = firmwarePath.value;
-    if (usePath.isEmpty) {
-      usePath = await _defaultFirmwarePathResolver();
-      firmwarePath.value = usePath;
-    }
-    final selectedFile = File(usePath);
-    file = selectedFile;
-    if (!await selectedFile.exists()) {
-      addLog("升级文件不存在：$usePath");
+    try {
+      String usePath = firmwarePath.value;
+      if (usePath.isEmpty) {
+        usePath = await _defaultFirmwarePathResolver();
+        firmwarePath.value = usePath;
+      }
+      final selectedFile = File(usePath);
+      file = selectedFile;
+      if (!await selectedFile.exists()) {
+        addLog("升级文件不存在：$usePath");
+        return false;
+      }
+      mBytesFile = await selectedFile.readAsBytes();
+      if ((mBytesFile ?? []).isEmpty) {
+        addLog("升级文件为空：$usePath");
+        return false;
+      }
+      fileMd5 = StringUtils.file2md5(mBytesFile ?? []).toUpperCase();
+      addLog("读取到文件:$usePath");
+      addLog("读取到文件MD5$fileMd5");
+      return true;
+    } catch (e) {
+      addLog("读取升级文件失败: error=$e");
+      mBytesFile = null;
+      fileMd5 = "";
       return false;
     }
-    mBytesFile = await selectedFile.readAsBytes();
-    if ((mBytesFile ?? []).isEmpty) {
-      addLog("升级文件为空：$usePath");
-      return false;
+  }
+
+  List<int>? _getMd5TailBytes() {
+    final md5Text = fileMd5.trim();
+    if (md5Text.length < 8) {
+      return null;
     }
-    fileMd5 = StringUtils.file2md5(mBytesFile ?? []).toUpperCase();
-    addLog("读取到文件:$usePath");
-    addLog("读取到文件MD5$fileMd5");
-    return true;
+    final tailHex = md5Text.substring(md5Text.length - 8);
+    final bytes = StringUtils.hexStringToBytes(tailHex);
+    if (bytes.length != 4) {
+      return null;
+    }
+    return bytes;
   }
 
   Future<void> sendSyncReq() async {
@@ -918,10 +944,15 @@ class OtaServer extends GetxService
     //000A0642130004BB08ADE4
     final loaded = await loadFirmwareFile();
     if (!loaded) {
-      stopUpgrade();
+      await stopUpgrade();
       return;
     }
-    final endMd5 = StringUtils.hexStringToBytes(fileMd5.substring(24));
+    final endMd5 = _getMd5TailBytes();
+    if (endMd5 == null) {
+      addLog("固件MD5异常，无法构建SYNC_REQ: md5=$fileMd5");
+      await stopUpgrade();
+      return;
+    }
     _upgradeStateMachine.startUpgrade();
     VMUPacket packet = VMUPacket.get(OpCodes.upgradeSyncReq, data: endMd5);
     sendVMUPacket(packet, false);
@@ -950,7 +981,12 @@ class OtaServer extends GetxService
       (fileLength >> 8) & 0xFF,
       fileLength & 0xFF
     ];
-    final digest = StringUtils.hexStringToBytes(fileMd5.substring(24));
+    final digest = _getMd5TailBytes();
+    if (digest == null) {
+      addLog("DFU_BEGIN失败：固件MD5异常 md5=$fileMd5");
+      stopUpgrade(sendAbort: false);
+      return;
+    }
     final payload = [...fileLengthBytes, ...digest];
     addLog(
         "发送DFU_BEGIN length=$fileLength digest=${StringUtils.byteToHexString(digest)}");
@@ -1283,9 +1319,7 @@ class OtaServer extends GetxService
     mBytesToSend =
         (mBytesToSend < remainingLength) ? mBytesToSend : remainingLength;
     if (mIsRWCPEnabled.value) {
-      while (mBytesToSend > 0 && !_upgradePaused) {
-        sendNextDataPacket();
-      }
+      _pumpRwcpData(force: true);
       return;
     }
     if (!_upgradePaused) {
@@ -1360,32 +1394,71 @@ class OtaServer extends GetxService
     if (_upgradePaused) {
       return;
     }
+    final bytes = mBytesFile;
+    if (bytes == null || bytes.isEmpty) {
+      _enterFatalUpgradeState("固件数据为空，无法继续发包");
+      return;
+    }
+    if (mStartOffset < 0 || mStartOffset > bytes.length) {
+      _enterFatalUpgradeState("发包offset异常: $mStartOffset/${bytes.length}");
+      return;
+    }
     // inform listeners about evolution
     onFileUploadProgress();
     int bytesToSend = mBytesToSend < mMaxLengthForDataTransfer - 1
         ? mBytesToSend
         : mMaxLengthForDataTransfer - 1;
     // to know if we are sending the last data packet.
-    bool lastPacket = (mBytesFile ?? []).length - mStartOffset <= bytesToSend;
+    final available = bytes.length - mStartOffset;
+    if (bytesToSend > available) {
+      bytesToSend = available;
+    }
+    if (bytesToSend <= 0) {
+      return;
+    }
+    bool lastPacket = available <= bytesToSend;
     if (lastPacket) {
       addLog(
           "mMaxLengthForDataTransfer$mMaxLengthForDataTransfer bytesToSend$bytesToSend lastPacket$lastPacket");
     }
-    List<int> dataToSend = [];
-    for (int i = 0; i < bytesToSend; i++) {
-      dataToSend.add((mBytesFile ?? [])[mStartOffset + i]);
-    }
+    final end = mStartOffset + bytesToSend;
+    final dataToSend = bytes.sublist(mStartOffset, end);
 
     if (lastPacket) {
       _upgradeStateMachine.setWasLastPacket(true);
       mBytesToSend = 0;
     } else {
       _upgradeStateMachine.setWasLastPacket(false);
-      mStartOffset += bytesToSend;
-      mBytesToSend -= bytesToSend;
+      mStartOffset = end;
+      mBytesToSend = mBytesToSend - bytesToSend;
     }
 
     sendData(lastPacket, dataToSend);
+  }
+
+  void _pumpRwcpData({bool force = false}) {
+    if (!mIsRWCPEnabled.value || _upgradePaused) {
+      return;
+    }
+    if (!isUpgrading.value) {
+      return;
+    }
+    if (!force &&
+        _upgradeStateMachine.resumePoint != ResumePoints.dataTransfer) {
+      return;
+    }
+    if (mBytesToSend <= 0) {
+      return;
+    }
+
+    var pumped = 0;
+    while (pumped < _kRwcpPumpMaxPacketsPerTick &&
+        mBytesToSend > 0 &&
+        !_upgradePaused &&
+        isUpgrading.value) {
+      sendNextDataPacket();
+      pumped += 1;
+    }
   }
 
   void _resumeUpgradeDataIfPossible() {
@@ -1400,9 +1473,7 @@ class OtaServer extends GetxService
     }
 
     if (mIsRWCPEnabled.value) {
-      while (mBytesToSend > 0 && !_upgradePaused) {
-        sendNextDataPacket();
-      }
+      _pumpRwcpData();
       return;
     }
     sendNextDataPacket();
@@ -1446,6 +1517,9 @@ class OtaServer extends GetxService
         _upgradeStateMachine.resumePoint == ResumePoints.dataTransfer &&
         !mIsRWCPEnabled.value) {
       sendNextDataPacket();
+    }
+    if (mIsRWCPEnabled.value) {
+      _pumpRwcpData();
     }
   }
 
@@ -1539,6 +1613,7 @@ class OtaServer extends GetxService
     if (consumed) {
       updatePer.value = percentage;
     }
+    _pumpRwcpData();
   }
 
   @override
@@ -1630,7 +1705,12 @@ class OtaServer extends GetxService
   }
 
   Future<void> restPayloadSize() async {
-    int mtu = await _bleManager.requestMtu(256);
+    int mtu = 23;
+    try {
+      mtu = await _bleManager.requestMtu(256);
+    } catch (e) {
+      addLog("请求MTU失败，使用默认MTU=23: $e");
+    }
     final rwcpEnabled = mIsRWCPEnabled.value;
     // 非 RWCP 模式下保持历史行为：按 23 计算，避免设备未协商 MTU 时超限。
     final effectiveMtu = rwcpEnabled ? mtu : 23;

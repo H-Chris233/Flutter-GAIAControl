@@ -180,13 +180,22 @@ class _TestOtaState extends State<TestOtaView> {
   Future<void> _chooseFirmwareFile() async {
     if (!mounted) return;
     final initialDirectory = OtaServer.to.lastFirmwareDirectory.value.trim();
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ["bin"],
-      allowMultiple: false,
-      withData: false,
-      initialDirectory: initialDirectory.isEmpty ? null : initialDirectory,
-    );
+    FilePickerResult? result;
+    try {
+      result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ["bin"],
+        allowMultiple: false,
+        withData: false,
+        initialDirectory: initialDirectory.isEmpty ? null : initialDirectory,
+      );
+    } catch (e) {
+      OtaServer.to.addLog("选择固件失败: $e");
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("选择固件失败: $e")));
+      return;
+    }
     if (result == null || result.files.isEmpty) {
       return;
     }
@@ -250,13 +259,17 @@ class _TestOtaState extends State<TestOtaView> {
     if (!path.toLowerCase().endsWith(".bin")) {
       return "仅支持 .bin 固件文件";
     }
-    final checkFile = File(path);
-    if (!await checkFile.exists()) {
-      return "固件文件不存在: $path";
-    }
-    final length = await checkFile.length();
-    if (length <= 0) {
-      return "固件文件为空: $path";
+    try {
+      final checkFile = File(path);
+      if (!await checkFile.exists()) {
+        return "固件文件不存在: $path";
+      }
+      final length = await checkFile.length();
+      if (length <= 0) {
+        return "固件文件为空: $path";
+      }
+    } catch (e) {
+      return "读取固件文件失败: $e";
     }
     return null;
   }

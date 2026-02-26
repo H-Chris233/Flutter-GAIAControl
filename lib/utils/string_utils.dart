@@ -33,7 +33,12 @@ class StringUtils {
     List<int> ret = [];
     for (int i = 0; i < hexString.length; i += 2) {
       var hex = hexString.substring(i, i + 2);
-      ret.add(int.parse(hex, radix: 16));
+      try {
+        ret.add(int.parse(hex, radix: 16));
+      } catch (e) {
+        log("hexStringToBytes 转换异常: $e hex=$hexString");
+        return [];
+      }
     }
     return ret;
   }
@@ -71,7 +76,10 @@ class StringUtils {
   /// @return The extracted <code>int</code>.
   static int extractIntFromByteArray(
       List<int> source, int offset, int length, bool reverse) {
-    if (length < 0 || length > 8) {
+    if (offset < 0 || length < 0 || length > 8) {
+      return 0;
+    }
+    if (offset + length > source.length) {
       return 0;
     }
     int result = 0;
@@ -104,6 +112,9 @@ class StringUtils {
   }
 
   static int byteListToInt(List<int> hex) {
+    if (hex.length < 2) {
+      return 0;
+    }
     return ((hex[0] & 0xFF) << 8) | (hex[1] & 0xFF);
   }
 }
