@@ -14,6 +14,36 @@ class TestOtaView extends StatefulWidget {
 }
 
 class _TestOtaState extends State<TestOtaView> {
+  Worker? _upgradeSuccessWorker;
+
+  @override
+  void initState() {
+    super.initState();
+    _upgradeSuccessWorker = ever<int>(
+      OtaServer.to.upgradeSuccessCounter,
+      (_) async {
+        if (!mounted) return;
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) {
+            return AlertDialog(
+              title: const Text('升级成功'),
+              content: Text(
+                '固件升级已完成。\n升级后版本：${OtaServer.to.versionAfterUpgrade.value}',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('确定'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -171,6 +201,7 @@ class _TestOtaState extends State<TestOtaView> {
 
   @override
   void dispose() {
+    _upgradeSuccessWorker?.dispose();
     if (Get.isRegistered<OtaServer>()) {
       OtaServer.to.disconnect();
     }

@@ -123,6 +123,11 @@ class OtaServer extends GetxService
   /// To know if the upgrade process is currently running.
   RxBool isUpgrading = false.obs;
 
+  /// 升级成功次数计数（用于 UI 触发一次性弹窗/提示）。
+  ///
+  /// 设计：用“自增计数”比用 bool 更易表达事件语义，避免在 UI 层处理重复/重置。
+  final RxInt upgradeSuccessCounter = 0.obs;
+
   bool transFerComplete = false;
 
   /// To know how many times we try to start the upgrade.
@@ -1690,6 +1695,7 @@ class OtaServer extends GetxService
     isUpgrading.value = false;
     _timer?.cancel();
     addLog("receiveCompleteIND 升级完成");
+    upgradeSuccessCounter.value += 1;
     // 升级结束后清空 RWCP 会话状态，避免后续流程复用旧 session。
     mRWCPClient.reset(true);
     mRWCPClient.setCloseSessionWhenIdle(true);

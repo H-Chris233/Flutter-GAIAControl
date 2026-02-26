@@ -557,6 +557,25 @@ void main() {
     expect(fakeFilePicker.lastInitialDirectory, '/tmp/fw/last_dir');
   });
 
+  testWidgets('升级成功后弹窗提醒', (tester) async {
+    final server = _SpyOtaServer(manager: _ViewBleConnectionManager());
+
+    await _pumpOtaView(tester, server);
+    expect(find.text('升级成功'), findsNothing);
+
+    server.versionAfterUpgrade.value = 'V2';
+    server.upgradeSuccessCounter.value += 1;
+    await tester.pump();
+
+    expect(find.text('升级成功'), findsOneWidget);
+    expect(find.textContaining('升级后版本：V2'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(TextButton, '确定'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('升级成功'), findsNothing);
+  });
+
   testWidgets('页面销毁会调用 disconnect', (tester) async {
     final manager = _ViewBleConnectionManager();
     final server = _SpyOtaServer(manager: manager);
