@@ -12,6 +12,9 @@ class LogBuffer {
   /// UI 绑定的日志文本
   final RxString logText;
 
+  /// 已显示的日志行（不含换行符）
+  final ListQueue<String> _lines = ListQueue();
+
   /// 待刷新的日志队列
   final ListQueue<String> _pendingLogs = ListQueue();
 
@@ -72,6 +75,7 @@ class LogBuffer {
   void clear() {
     logText.value = "";
     _pendingLogs.clear();
+    _lines.clear();
     _lastLogDedupKey = "";
     _lastLogRepeat = 0;
   }
@@ -114,17 +118,17 @@ class LogBuffer {
     if (_pendingLogs.isEmpty) {
       return;
     }
-    final builder = StringBuffer();
+
+    // 将 pending 写入行队列，避免每次 flush 都对完整字符串 split（高频日志下会非常耗 CPU/内存）。
     while (_pendingLogs.isNotEmpty) {
-      builder.writeln(_pendingLogs.removeFirst());
+      _lines.add(_pendingLogs.removeFirst());
     }
-    final merged = (logText.value + builder.toString());
-    final lines = merged.split('\n');
-    if (lines.length <= maxLogLines) {
-      logText.value = merged;
-      return;
+
+    while (_lines.length > maxLogLines) {
+      _lines.removeFirst();
     }
-    final start = lines.length - maxLogLines;
-    logText.value = lines.sublist(start).join('\n');
+
+    // 保持末尾换行，兼容历史展示/测试用例的 split 行为。
+    logText.value = "${_lines.join('\n')}\n";
   }
 }
