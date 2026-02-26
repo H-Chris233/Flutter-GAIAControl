@@ -429,7 +429,7 @@ void main() {
       server.handleRecMsg(v3Packet(
         feature: GaiaCommandBuilder.v3FeatureUpgrade,
         packetType: GaiaCommandBuilder.v3PacketTypeNotification,
-        commandId: GaiaCommandBuilder.v3CmdUpgradeNotification,
+        commandId: GaiaCommandBuilder.v3NtfUpgradeDataIndication,
         payload: vmu.getBytes(),
       ));
       await Future<void>.delayed(Duration.zero);

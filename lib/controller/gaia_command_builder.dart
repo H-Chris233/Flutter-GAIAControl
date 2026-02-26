@@ -15,11 +15,17 @@ class GaiaCommandBuilder {
   static const int v3CmdAppVersion = 0x05;
   static const int v3CmdRegisterNotification = 0x07;
   static const int v3CmdCancelNotification = 0x08;
-  static const int v3CmdUpgradeNotification = 0x00;
   static const int v3CmdUpgradeConnect = 0x00;
   static const int v3CmdUpgradeDisconnect = 0x01;
   static const int v3CmdUpgradeControl = 0x02;
+  static const int v3CmdGetDataEndpointMode = 0x03;
   static const int v3CmdSetDataEndpointMode = 0x04;
+
+  // Upgrade feature notifications (Feature ID 0x06).
+  // Ref: official GAIA client V3UpgradePlugin (V1: data indication, V2+: stop/start request).
+  static const int v3NtfUpgradeDataIndication = 0x00;
+  static const int v3NtfUpgradeStopRequest = 0x01;
+  static const int v3NtfUpgradeStartRequest = 0x02;
 
   // V3 Vendor ID
   static const int vendorIdV3 = 0x001D;
@@ -113,28 +119,19 @@ class GaiaCommandBuilder {
   }
 
   /// GAIA 命令码转文本
-  String gaiaCommandText(int cmd) {
-    if (cmd == setDataEndpointModeCommand()) {
-      return "SET_DATA_ENDPOINT_MODE";
+  String gaiaCommandText(int cmd, {int? vendorId}) {
+    if (vendorId == vendorIdV3) {
+      final v3 = _gaiaV3CommandText(cmd);
+      if (v3 != "UNKNOWN_COMMAND") {
+        return v3;
+      }
+      // 兜底：部分功能（如 DFU）在工程里仍使用 GAIA legacy 常量做识别。
+      return _gaiaLegacyCommandText(cmd & GAIA.commandMask);
     }
-    if (cmd == upgradeConnectCommand()) {
-      return "VM_UPGRADE_CONNECT";
-    }
-    if (cmd == upgradeControlCommand()) {
-      return "VM_UPGRADE_CONTROL";
-    }
-    if (cmd == upgradeDisconnectCommand()) {
-      return "VM_UPGRADE_DISCONNECT";
-    }
-    if (cmd == getApplicationVersionCommand()) {
-      return "GET_APPLICATION_VERSION";
-    }
-    if (cmd == registerNotificationCommand()) {
-      return "REGISTER_NOTIFICATION";
-    }
-    if (cmd == cancelNotificationCommand()) {
-      return "CANCEL_NOTIFICATION";
-    }
+    return _gaiaLegacyCommandText(cmd & GAIA.commandMask);
+  }
+
+  String _gaiaLegacyCommandText(int cmd) {
     switch (cmd) {
       case GAIA.commandDfuRequest:
         return "DFU_REQUEST";
@@ -148,6 +145,77 @@ class GaiaCommandBuilder {
         return "DFU_GET_RESULT";
       default:
         return "UNKNOWN_COMMAND";
+    }
+  }
+
+  String _gaiaV3CommandText(int cmd) {
+    final feature = v3CommandFeature(cmd);
+    final packetType = v3CommandType(cmd);
+    final commandId = v3CommandId(cmd);
+
+    switch (feature) {
+      case v3FeatureFramework:
+        return _gaiaV3FrameworkCommandText(packetType, commandId);
+      case v3FeatureUpgrade:
+        return _gaiaV3UpgradeCommandText(packetType, commandId);
+      default:
+        return "UNKNOWN_COMMAND";
+    }
+  }
+
+  String _gaiaV3FrameworkCommandText(int packetType, int commandId) {
+    final base = switch (commandId) {
+      v3CmdAppVersion => "GET_APPLICATION_VERSION",
+      v3CmdRegisterNotification => "REGISTER_NOTIFICATION",
+      v3CmdCancelNotification => "CANCEL_NOTIFICATION",
+      _ => null,
+    };
+    if (base == null) {
+      return "UNKNOWN_COMMAND";
+    }
+    return _decorateV3CommandText(base, packetType);
+  }
+
+  String _gaiaV3UpgradeCommandText(int packetType, int commandId) {
+    if (packetType == v3PacketTypeNotification) {
+      final base = switch (commandId) {
+        v3NtfUpgradeDataIndication => "UPGRADE_DATA_INDICATION",
+        v3NtfUpgradeStopRequest => "UPGRADE_STOP_REQUEST",
+        v3NtfUpgradeStartRequest => "UPGRADE_START_REQUEST",
+        _ => null,
+      };
+      if (base == null) {
+        return "UNKNOWN_COMMAND";
+      }
+      return _decorateV3CommandText(base, packetType);
+    }
+
+    final base = switch (commandId) {
+      v3CmdUpgradeConnect => "VM_UPGRADE_CONNECT",
+      v3CmdUpgradeDisconnect => "VM_UPGRADE_DISCONNECT",
+      v3CmdUpgradeControl => "VM_UPGRADE_CONTROL",
+      v3CmdGetDataEndpointMode => "GET_DATA_ENDPOINT_MODE",
+      v3CmdSetDataEndpointMode => "SET_DATA_ENDPOINT_MODE",
+      _ => null,
+    };
+    if (base == null) {
+      return "UNKNOWN_COMMAND";
+    }
+    return _decorateV3CommandText(base, packetType);
+  }
+
+  String _decorateV3CommandText(String base, int packetType) {
+    switch (packetType) {
+      case v3PacketTypeCommand:
+        return base;
+      case v3PacketTypeNotification:
+        return "${base}_NTF";
+      case v3PacketTypeResponse:
+        return "${base}_RSP";
+      case v3PacketTypeError:
+        return "${base}_ERR";
+      default:
+        return base;
     }
   }
 

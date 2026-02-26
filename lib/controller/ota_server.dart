@@ -627,12 +627,13 @@ class OtaServer extends GetxService
   }
 
   void _logGaiaRxPacket(GaiaPacketBLE packet) {
-    final cmd = packet.getCommand();
+    final cmd = packet.getCommandId();
     final feature = _v3CommandFeature(cmd);
     final packetType = _v3CommandType(cmd);
     final commandId = _v3CommandId(cmd);
     final payload = packet.mPayload ?? [];
-    final cmdText = _cmdBuilder.gaiaCommandText(cmd);
+    final cmdText =
+        _cmdBuilder.gaiaCommandText(cmd, vendorId: packet.mVendorId);
     final base =
         "RX[GAIA] $cmdText(cmd=0x${cmd.toRadixString(16).padLeft(4, '0').toUpperCase()} "
         "feature=0x${feature.toRadixString(16).padLeft(2, '0').toUpperCase()} "
@@ -674,8 +675,8 @@ class OtaServer extends GetxService
           "RX[RWCP] op=$opText seq=$seq payloadLen=${payload.length} bytes=${StringUtils.byteToHexString(bytes)}");
       return;
     }
-    final cmd = gaia.getCommand();
-    final cmdText = _cmdBuilder.gaiaCommandText(cmd);
+    final cmd = gaia.getCommandId();
+    final cmdText = _cmdBuilder.gaiaCommandText(cmd, vendorId: gaia.mVendorId);
     addLog(
         "RX[RWCP] op=$opText seq=$seq gaia=$cmdText bytes=${StringUtils.byteToHexString(bytes)}");
   }
@@ -696,7 +697,7 @@ class OtaServer extends GetxService
   }
 
   void _handleV3Packet(GaiaPacketBLE packet) {
-    final cmd = packet.getCommand();
+    final cmd = packet.getCommandId();
     final feature = _v3CommandFeature(cmd);
     final packetType = _v3CommandType(cmd);
     final commandId = _v3CommandId(cmd);
@@ -740,12 +741,13 @@ class OtaServer extends GetxService
 
     if (packetType == GaiaCommandBuilder.v3PacketTypeNotification) {
       if (feature == GaiaCommandBuilder.v3FeatureUpgrade &&
-          commandId == GaiaCommandBuilder.v3CmdUpgradeNotification) {
+          commandId == GaiaCommandBuilder.v3NtfUpgradeDataIndication) {
         receiveVMUPacket(payload);
         return;
       }
       // GAIA STOP/START notifications (feature=0x06, type=Notification, id=0x01/0x02).
-      if (feature == GaiaCommandBuilder.v3FeatureUpgrade && commandId == 0x01) {
+      if (feature == GaiaCommandBuilder.v3FeatureUpgrade &&
+          commandId == GaiaCommandBuilder.v3NtfUpgradeStopRequest) {
         final action = payload.isNotEmpty ? payload.first : 0x01;
         _upgradePaused = true;
         if (action == 0x00) {
@@ -759,7 +761,8 @@ class OtaServer extends GetxService
         }
         return;
       }
-      if (feature == GaiaCommandBuilder.v3FeatureUpgrade && commandId == 0x02) {
+      if (feature == GaiaCommandBuilder.v3FeatureUpgrade &&
+          commandId == GaiaCommandBuilder.v3NtfUpgradeStartRequest) {
         final action = payload.isNotEmpty ? payload.first : 0x01;
         if (action == 0x00) {
           _upgradePaused = false;
@@ -1272,7 +1275,8 @@ class OtaServer extends GetxService
           "设备请求offset越界，已修正: cursor=$mStartOffset moveBy=$moveBy req=$desiredOffset use=$clampedOffset");
       mStartOffset = clampedOffset;
     }
-    addLog("本次发包: moveBy=$moveBy offset=$mStartOffset bytesToSend=$mBytesToSend");
+    addLog(
+        "本次发包: moveBy=$moveBy offset=$mStartOffset bytesToSend=$mBytesToSend");
 
     mBytesToSend = (mBytesToSend > 0) ? mBytesToSend : 0;
     final remainingLength = fileLength - mStartOffset;
@@ -1662,8 +1666,8 @@ class OtaServer extends GetxService
       addLog("TX[$channel] RAW ${StringUtils.byteToHexString(bytes)}");
       return;
     }
-    final cmd = gaia.getCommand();
-    final cmdText = _cmdBuilder.gaiaCommandText(cmd);
+    final cmd = gaia.getCommandId();
+    final cmdText = _cmdBuilder.gaiaCommandText(cmd, vendorId: gaia.mVendorId);
     final payload = gaia.mPayload ?? [];
     final base =
         "TX[$channel] $cmdText(0x${cmd.toRadixString(16).padLeft(4, '0').toUpperCase()})";
@@ -1710,8 +1714,8 @@ class OtaServer extends GetxService
           "TX[RWCP] op=$opText seq=$seq bytes=${StringUtils.byteToHexString(bytes)}");
       return;
     }
-    final cmd = gaia.getCommand();
-    final gaiaName = _cmdBuilder.gaiaCommandText(cmd);
+    final cmd = gaia.getCommandId();
+    final gaiaName = _cmdBuilder.gaiaCommandText(cmd, vendorId: gaia.mVendorId);
     final gaiaPayload = gaia.mPayload ?? [];
     if (cmd == _upgradeControlCommand()) {
       final vmu = VMUPacket.getPackageFromByte(gaiaPayload);

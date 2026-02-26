@@ -69,6 +69,65 @@ void main() {
       expect(builder.gaiaCommandText(GAIA.commandDfuWrite), 'DFU_WRITE');
     });
 
+    test('gaiaCommandText maps V3 upgrade notifications for readability', () {
+      final upgradeData = builder.buildV3Command(
+        GaiaCommandBuilder.v3FeatureUpgrade,
+        GaiaCommandBuilder.v3PacketTypeNotification,
+        GaiaCommandBuilder.v3NtfUpgradeDataIndication,
+      );
+      expect(
+        builder.gaiaCommandText(upgradeData,
+            vendorId: GaiaCommandBuilder.vendorIdV3),
+        'UPGRADE_DATA_INDICATION_NTF',
+      );
+
+      final stopReq = builder.buildV3Command(
+        GaiaCommandBuilder.v3FeatureUpgrade,
+        GaiaCommandBuilder.v3PacketTypeNotification,
+        GaiaCommandBuilder.v3NtfUpgradeStopRequest,
+      );
+      expect(
+        builder.gaiaCommandText(stopReq,
+            vendorId: GaiaCommandBuilder.vendorIdV3),
+        'UPGRADE_STOP_REQUEST_NTF',
+      );
+
+      final startReq = builder.buildV3Command(
+        GaiaCommandBuilder.v3FeatureUpgrade,
+        GaiaCommandBuilder.v3PacketTypeNotification,
+        GaiaCommandBuilder.v3NtfUpgradeStartRequest,
+      );
+      expect(
+        builder.gaiaCommandText(startReq,
+            vendorId: GaiaCommandBuilder.vendorIdV3),
+        'UPGRADE_START_REQUEST_NTF',
+      );
+    });
+
+    test('gaiaCommandText decorates V3 upgrade responses and errors', () {
+      final connectRsp = builder.buildV3Command(
+        GaiaCommandBuilder.v3FeatureUpgrade,
+        GaiaCommandBuilder.v3PacketTypeResponse,
+        GaiaCommandBuilder.v3CmdUpgradeConnect,
+      );
+      expect(
+        builder.gaiaCommandText(connectRsp,
+            vendorId: GaiaCommandBuilder.vendorIdV3),
+        'VM_UPGRADE_CONNECT_RSP',
+      );
+
+      final controlErr = builder.buildV3Command(
+        GaiaCommandBuilder.v3FeatureUpgrade,
+        GaiaCommandBuilder.v3PacketTypeError,
+        GaiaCommandBuilder.v3CmdUpgradeControl,
+      );
+      expect(
+        builder.gaiaCommandText(controlErr,
+            vendorId: GaiaCommandBuilder.vendorIdV3),
+        'VM_UPGRADE_CONTROL_ERR',
+      );
+    });
+
     test('dfuResultText returns correct text', () {
       expect(builder.dfuResultText(0x00), 'success');
       expect(builder.dfuResultText(0x01), 'FAIL');
