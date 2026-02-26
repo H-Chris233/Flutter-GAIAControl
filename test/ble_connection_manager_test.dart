@@ -161,7 +161,6 @@ class _NoopLogger implements reactive_ble.Logger {
 class _FakeService implements Service {
   _FakeService({
     required this.id,
-    this.deviceId = 'device-1',
   });
 
   @override

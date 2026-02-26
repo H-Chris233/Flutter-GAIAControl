@@ -241,8 +241,7 @@ class _ThrowingUpgradeStateMachine extends UpgradeStateMachine {
 }
 
 class _ControlledRWCPClient extends RWCPClient {
-  _ControlledRWCPClient(super.mListener,
-      {this.sendReturns = true, this.throwOnSend = false});
+  _ControlledRWCPClient(super.mListener, {this.sendReturns = true});
 
   bool sendReturns;
   bool throwOnSend;
