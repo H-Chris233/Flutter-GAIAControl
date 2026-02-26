@@ -214,6 +214,7 @@ class OtaServer extends GetxService
   String _abortReason = "";
   bool _waitingAbortConfirm = false;
   Worker? _deviceListWorker;
+  DateTime? _expectedRebootDisconnectUntil;
 
   OtaServer({
     BleConnectionManager? bleManagerOverride,
@@ -487,6 +488,7 @@ class OtaServer extends GetxService
           }
         },
         onDisconnected: () {
+          final wasUpgrading = isUpgrading.value;
           isConnecting.value = false;
           connectingDeviceId.value = "";
           isDeviceConnected.value = false;
@@ -494,7 +496,14 @@ class OtaServer extends GetxService
           _notifyUser("设备已断开连接");
           deviceListUiState.value = DeviceListUiState.error;
           deviceListHint.value = "连接断开，请重试";
-          if (isUpgrading.value) {
+          if (wasUpgrading && _shouldTreatDisconnectAsReboot()) {
+            _clearUpgradeWatchdog();
+            rwcpStatusText.value = "重启中";
+            recoveryStatusText.value = "等待重连";
+            addLog("升级末期设备可能重启导致断开，等待自动重连");
+            return;
+          }
+          if (wasUpgrading) {
             _enterFatalUpgradeState("升级过程中蓝牙断链");
           }
         },
@@ -519,6 +528,23 @@ class OtaServer extends GetxService
       deviceListHint.value = "连接失败，请重试";
       _notifyUser('开始连接失败: $e');
     }
+  }
+
+  bool _shouldTreatDisconnectAsReboot() {
+    final until = _expectedRebootDisconnectUntil;
+    if (until != null && _nowProvider().isBefore(until)) {
+      return true;
+    }
+    // 末期阶段（TransferComplete/校验/提交/完成）出现断开，通常是设备重启或切换升级态导致。
+    return _upgradeStateMachine.transferComplete ||
+        _upgradeStateMachine.state == UpgradeState.validating ||
+        _upgradeStateMachine.state == UpgradeState.committing ||
+        _upgradeStateMachine.state == UpgradeState.complete;
+  }
+
+  void _markExpectedRebootDisconnect({int seconds = 20}) {
+    _expectedRebootDisconnectUntil =
+        _nowProvider().add(Duration(seconds: seconds));
   }
 
   void writeMsg(List<int> data) {
@@ -1293,17 +1319,10 @@ class OtaServer extends GetxService
       return;
     }
 
-    // 对齐文档：RWCP 就绪后，所有 Upgrade Control 的 GAIA PDU 都走 RWCP(Data Char)。
-    if (_shouldSendUpgradeControlOverRwcp()) {
-      // validation 轮询期间设备会返回较短的等待时间（例如 100ms），若每次都自动 close 会话，
-      // 会导致 RST/SYN 高频抖动，设备更容易断链。这里保持会话常驻直到升级结束/手动停止。
-      if (packet.mOpCode == OpCodes.upgradeIsValidationDoneReq) {
-        mRWCPClient.setCloseSessionWhenIdle(false);
-      }
-      if (!isTransferringData) {
-        // 控制包也会占用一个 RWCP DATA segment 的 ACK，放一个占位进度避免队列错位。
-        mProgressQueue.add(updatePer.value);
-      }
+    // 对齐手册(80-CH482-1 Rev.AH, 3.6.5)：Data Endpoint Mode 用于“发送升级数据”。
+    // 因此仅将固件数据包（upgradeData）走 RWCP；其余控制/确认类消息仍走常规写通道，
+    // 以降低 RWCP 抖动与末期阶段误断链风险。
+    if (isTransferringData && _shouldSendUpgradeControlOverRwcp()) {
       if (mTransferStartTime <= 0) {
         mTransferStartTime = DateTime.now().millisecondsSinceEpoch;
       }
@@ -1608,6 +1627,7 @@ class OtaServer extends GetxService
       case ConfirmationType.transferComplete:
         {
           code = OpCodes.upgradeTransferCompleteRes;
+          _markExpectedRebootDisconnect();
         }
         break;
       case ConfirmationType.batteryLowOnDevice:

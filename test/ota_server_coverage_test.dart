@@ -962,7 +962,7 @@ void main() {
 
       expect(server.mTransferStartTime, greaterThan(0));
       expect(bleManager.writeWithoutResponsePayloads, isNotEmpty);
-      expect(bleManager.writeWithResponsePayloads, isEmpty);
+      expect(bleManager.writeWithResponsePayloads, isNotEmpty);
     });
 
     test('receiveVMUPacket handles parse fail and non-upgrading packet',
