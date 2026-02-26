@@ -550,6 +550,9 @@ class OtaServer extends GetxService
       addLog("正在升级中，忽略重复开始请求");
       return;
     }
+    // 每次开始升级都把 RWCP client 重置到 listen，保证会话从 RST->SYN 重新建链。
+    mRWCPClient.reset(true);
+    mRWCPClient.setCloseSessionWhenIdle(true);
     logText.value = "";
     writeBytes.clear();
     writeRTCPCount = 0;
@@ -867,6 +870,9 @@ class OtaServer extends GetxService
     if (sendAbort) {
       abortUpgrade();
     }
+    // 停止升级时也重置 RWCP，避免后台残留会话继续触发回调。
+    mRWCPClient.reset(true);
+    mRWCPClient.setCloseSessionWhenIdle(true);
     resetUpload();
     writeRTCPCount = 0;
     updatePer.value = 0;
@@ -1187,6 +1193,11 @@ class OtaServer extends GetxService
 
     // 对齐文档：RWCP 就绪后，所有 Upgrade Control 的 GAIA PDU 都走 RWCP(Data Char)。
     if (_shouldSendUpgradeControlOverRwcp()) {
+      // validation 轮询期间设备会返回较短的等待时间（例如 100ms），若每次都自动 close 会话，
+      // 会导致 RST/SYN 高频抖动，设备更容易断链。这里保持会话常驻直到升级结束/手动停止。
+      if (packet.mOpCode == OpCodes.upgradeIsValidationDoneReq) {
+        mRWCPClient.setCloseSessionWhenIdle(false);
+      }
       if (!isTransferringData) {
         // 控制包也会占用一个 RWCP DATA segment 的 ACK，放一个占位进度避免队列错位。
         mProgressQueue.add(updatePer.value);
@@ -1504,16 +1515,25 @@ class OtaServer extends GetxService
 
   @override
   void onTransferProgress(int acknowledged) {
-    if (acknowledged > 0) {
-      double percentage = 0;
-      while (acknowledged > 0 && mProgressQueue.isNotEmpty) {
-        percentage = mProgressQueue.removeFirst();
-        acknowledged--;
-      }
-      if (mIsRWCPEnabled.value) {
-        updatePer.value = percentage;
-      }
-      // addLog("$mIsRWCPEnabled 升级进度$percentage");
+    if (acknowledged <= 0 || !mIsRWCPEnabled.value) {
+      return;
+    }
+
+    // RWCP 的 ACK 可能在窗口/重传/会话切换时出现“没有对应进度占位”的情况。
+    // 若此时把默认值 0 写回 UI，会造成进度条从 100% 回跳到 0% 的假象。
+    if (mProgressQueue.isEmpty) {
+      return;
+    }
+
+    var percentage = updatePer.value;
+    var consumed = false;
+    while (acknowledged > 0 && mProgressQueue.isNotEmpty) {
+      percentage = mProgressQueue.removeFirst();
+      acknowledged--;
+      consumed = true;
+    }
+    if (consumed) {
+      updatePer.value = percentage;
     }
   }
 
@@ -1533,6 +1553,9 @@ class OtaServer extends GetxService
     isUpgrading.value = false;
     _timer?.cancel();
     addLog("receiveCompleteIND 升级完成");
+    // 升级结束后清空 RWCP 会话状态，避免后续流程复用旧 session。
+    mRWCPClient.reset(true);
+    mRWCPClient.setCloseSessionWhenIdle(true);
     _schedulePostUpgradeVersionQuery();
     disconnectUpgrade();
   }

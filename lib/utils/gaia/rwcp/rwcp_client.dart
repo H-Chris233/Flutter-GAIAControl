@@ -56,6 +56,13 @@ class RWCPClient {
   /// <p>To show the debug logs indicating when a method had been reached.</p>
   bool mShowDebugLogs = true;
 
+  /// Whether to automatically close the RWCP session (send RST) when all pending/unacked data are drained.
+  ///
+  /// 工程实践：
+  /// - 数据传输阶段：保持默认 true（最后一轮 ACK 后自动收尾）
+  /// - validation 轮询阶段：建议设为 false，避免频繁 RST/SYN 抖动导致设备断链
+  bool mCloseSessionWhenIdle = true;
+
   /// To know the number of segments which had been acknowledged in a row with dataAck.
   int mAcknowledgedSegments = 0;
   int mSuccessfulAckStreak = 0;
@@ -71,6 +78,10 @@ class RWCPClient {
   void showDebugLogs(bool show) {
     mShowDebugLogs = show;
     Log.i(tag, "Debug logs are now ${show ? "activated" : "deactivated"}.");
+  }
+
+  void setCloseSessionWhenIdle(bool close) {
+    mCloseSessionWhenIdle = close;
   }
 
   bool sendData(List<int> bytes) {
@@ -664,8 +675,10 @@ class RWCPClient {
           if (mCredits > 0 && !mPendingData.isEmpty) {
             sendDataSegment();
           } else if (mPendingData.isEmpty && mUnacknowledgedSegments.isEmpty) {
-            // no more data to send: close session
-            sendRSTSegment();
+            // no more data to send: optionally close session
+            if (mCloseSessionWhenIdle) {
+              sendRSTSegment();
+            }
           } else if (mPendingData
                   .isEmpty /*&& !mUnacknowledgedSegments.isEmpty()*/
               ||
