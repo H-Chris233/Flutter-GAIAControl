@@ -991,7 +991,9 @@ void main() {
       expect(server.mBytesToSend, 0);
 
       server.onRequestNextDataPacket(3, 99);
-      expect(server.mStartOffset, 6);
+      // 对齐 gaia-client-src DataReader: moveBy 仅在 move>0 且 move+offset < len 时前移，
+      // 不做 clamp 到文件末尾的行为。
+      expect(server.mStartOffset, 5);
     });
 
     test('sendNextDataPacket while idle stops upgrade flow', () async {

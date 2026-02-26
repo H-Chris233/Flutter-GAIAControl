@@ -716,20 +716,16 @@ class RWCPClient {
     switch (mState) {
       case RWCPState.established:
         final gapSequence = segment.getSequenceNumber();
-        // Sequence numbers are 6-bit and wrap (0..63). Avoid raw integer comparisons here.
-        if (!_isSequenceWithinAckWindow(gapSequence)) {
+        if (_isGapDiscarded(gapSequence, mLastAckSequence, mWindow)) {
           Log.i(tag,
-              "Ignoring gap ($gapSequence) as it is out of ACK window: last=$mLastAckSequence next=$mNextSequence.");
+              "Ignoring gap ($gapSequence) as last ack sequence is $mLastAckSequence.");
           return true;
         }
 
-        // GAP 通常表示对端检测到缺口/乱序，希望从 gapSequence 回退重传。
-        // 实务上把 GAP 视为 “下一期待序号=gapSequence”，因此累计确认到 gapSequence-1 最稳，
-        // 可避免误删 gapSequence 对应 segment 导致无法重传。
+        // 对齐 gaia-client-src: GAP 表示对端发现乱序/缺口，建议缩窗并触发重传。
+        // 参考实现会用 GAP 的 seq 直接做 validateAckSequence(data, seq)，随后重传未确认段。
         decreaseWindow();
-        final ackUpTo = decreaseSequenceNumber(gapSequence, 1);
-        validateAckSequence(RWCPOpCodeClient.data, ackUpTo);
-
+        validateAckSequence(RWCPOpCodeClient.data, gapSequence);
         cancelTimeOut();
         resendDataSegment();
         return true;
@@ -749,6 +745,15 @@ class RWCPClient {
             "Received unexpected gap segment with header ${segment.getHeader()} while in state ${RWCP.getStateLabel(mState)}");
         return false;
     }
+  }
+
+  bool _isGapDiscarded(int sequence, int last, int window) {
+    if (last < 0) {
+      return false;
+    }
+    final diff =
+        ((last > sequence) ? RWCP.sequenceNumberMax : 0) + sequence - last;
+    return diff >= 1 && diff <= window;
   }
 
   void decreaseWindow() {

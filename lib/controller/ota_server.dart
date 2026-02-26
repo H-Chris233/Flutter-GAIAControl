@@ -215,6 +215,8 @@ class OtaServer extends GetxService
   bool _waitingAbortConfirm = false;
   Worker? _deviceListWorker;
   DateTime? _expectedRebootDisconnectUntil;
+  bool _upgradeModeEnabled = false;
+  bool _isClosed = false;
 
   OtaServer({
     BleConnectionManager? bleManagerOverride,
@@ -492,12 +494,16 @@ class OtaServer extends GetxService
           isConnecting.value = false;
           connectingDeviceId.value = "";
           isDeviceConnected.value = false;
+          _upgradeModeEnabled = false;
           rwcpStatusText.value = "连接断开";
           _notifyUser("设备已断开连接");
           deviceListUiState.value = DeviceListUiState.error;
           deviceListHint.value = "连接断开，请重试";
           if (wasUpgrading && _shouldTreatDisconnectAsReboot()) {
             _clearUpgradeWatchdog();
+            // 末期断开通常是设备重启/切换状态；清理 RWCP 会话避免超时重传在断链期继续写导致异常。
+            mRWCPClient.reset(true);
+            mProgressQueue.clear();
             rwcpStatusText.value = "重启中";
             recoveryStatusText.value = "等待重连";
             addLog("升级末期设备可能重启导致断开，等待自动重连");
@@ -549,6 +555,9 @@ class OtaServer extends GetxService
 
   void writeMsg(List<int> data) {
     scheduleMicrotask(() async {
+      if (_isClosed) {
+        return;
+      }
       _touchUpgradeWatchdog();
       await writeData(data);
     });
@@ -604,7 +613,7 @@ class OtaServer extends GetxService
     if (isUpgrading.value) {
       rwcpStatusText.value = "已启用";
       _rwcpSetupInProgress = false;
-      if (!transFerComplete) {
+      if (!_upgradeModeEnabled) {
         sendUpgradeConnect();
       }
     } else {
@@ -816,6 +825,7 @@ class OtaServer extends GetxService
       if (feature == GaiaCommandBuilder.v3FeatureUpgrade &&
           commandId == GaiaCommandBuilder.v3CmdUpgradeConnect) {
         if (isUpgrading.value) {
+          _upgradeModeEnabled = true;
           resetUpload();
           sendSyncReq();
         }
@@ -828,6 +838,7 @@ class OtaServer extends GetxService
       }
       if (feature == GaiaCommandBuilder.v3FeatureUpgrade &&
           commandId == GaiaCommandBuilder.v3CmdUpgradeDisconnect) {
+        _upgradeModeEnabled = false;
         stopUpgrade(sendAbort: false, sendDisconnect: false);
         return;
       }
@@ -1383,15 +1394,11 @@ class OtaServer extends GetxService
     mBytesToSend = bytesToSend;
     final fileLength = mBytesFile?.length ?? 0;
 
-    // 文档对齐：DATA_BYTES_REQ 的第二个 u32 为 move_by（相对偏移），mStartOffset 维护当前游标。
-    final desiredOffset = mStartOffset + moveBy;
-    if (desiredOffset >= 0 && desiredOffset <= fileLength) {
-      mStartOffset = desiredOffset;
-    } else {
-      final clampedOffset = desiredOffset < 0 ? 0 : fileLength;
-      addLog(
-          "设备请求offset越界，已修正: cursor=$mStartOffset moveBy=$moveBy req=$desiredOffset use=$clampedOffset");
-      mStartOffset = clampedOffset;
+    // 对齐 gaia-client-src/lib-upgrade DataReader#set(move, requested):
+    // - moveBy 为有符号 int32（Java int 会溢出为负数），且仅在 move>0 时前移 offset。
+    // - requested bytes 若越界则截断为 remaining length。
+    if (moveBy > 0 && (mStartOffset + moveBy) < fileLength) {
+      mStartOffset += moveBy;
     }
     addLog(
         "本次发包: moveBy=$moveBy offset=$mStartOffset bytesToSend=$mBytesToSend");
@@ -2115,6 +2122,9 @@ class OtaServer extends GetxService
 
   @override
   void onClose() {
+    _isClosed = true;
+    // 避免 onClose 后仍有异步写入触发看门狗/升级状态变更（单测与真实场景均可能出现）。
+    isUpgrading.value = false;
     _deviceListWorker?.dispose();
     _logBuffer.dispose();
     _bleManager.dispose();

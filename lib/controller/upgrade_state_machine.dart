@@ -272,7 +272,7 @@ class UpgradeStateMachine {
     // 解析请求的字节数和偏移量
     // 约定：多字节整数为 Big-Endian。
     final bytesToSend = _extractIntFromByteArray(data, 0, 4);
-    final moveBy = _extractIntFromByteArray(data, 4, 4);
+    final moveBy = _extractInt32SignedFromByteArray(data, 4);
 
     delegate.onLog("DATA_BYTES_REQ: moveBy=$moveBy bytesToSend=$bytesToSend");
     delegate.onRequestNextDataPacket(bytesToSend, moveBy);
@@ -417,5 +417,13 @@ class UpgradeStateMachine {
       result = (result << 8) | (source[offset + i] & 0xFF);
     }
     return result;
+  }
+
+  int _extractInt32SignedFromByteArray(List<int> source, int offset) {
+    final raw = _extractIntFromByteArray(source, offset, 4) & 0xFFFFFFFF;
+    if ((raw & 0x80000000) != 0) {
+      return raw - 0x100000000;
+    }
+    return raw;
   }
 }

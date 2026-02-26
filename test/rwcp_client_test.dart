@@ -216,7 +216,9 @@ void main() {
               .add(Segment.get(RWCPOpCodeClient.data, i));
         }
 
-        final gapSegment = Segment.get(RWCPOpCodeServer.gap, 3);
+        // 对齐 gaia-client-src: diff in 1..window 的 GAP 会被丢弃。
+        // 为了覆盖“会触发缩窗+重传”的分支，使用 diff=0（seq==lastAck）。
+        final gapSegment = Segment.get(RWCPOpCodeServer.gap, 2);
         final handled = client.receiveGAP(gapSegment);
 
         expect(handled, isTrue);
@@ -226,7 +228,8 @@ void main() {
 
       test('receiveGAP keeps gap sequence segment for retransmission', () {
         client.mState = RWCPState.established;
-        client.mWindow = 8;
+        // 通过收缩窗口避免 GAP 被 isGAPDiscarded 丢弃，覆盖 validateAckSequence 分支。
+        client.mWindow = 1;
         client.mMaximumWindow = 32;
         client.mCredits = 0;
         client.mLastAckSequence = 10;
@@ -243,12 +246,13 @@ void main() {
             client.receiveGAP(Segment.get(RWCPOpCodeServer.gap, 12));
 
         expect(handled, isTrue);
-        // GAP 视为 nextExpected=12，因此累计确认到 11。
-        expect(client.mLastAckSequence, 11);
+        // 对齐 gaia-client-src: GAP 的 seq 直接用于 validateAckSequence(DATA, seq)。
+        // 因此 11/12 会被确认移出队列，lastAckSequence 推进到 12。
+        expect(client.mLastAckSequence, 12);
         expect(
             client.mUnacknowledgedSegments
                 .any((s) => s.getSequenceNumber() == 12),
-            isTrue);
+            isFalse);
         // 触发重传
         expect(listener.sentSegments, isNotEmpty);
       });
@@ -257,13 +261,13 @@ void main() {
         client.mState = RWCPState.established;
         client.mWindow = 16;
         client.mLastAckSequence = 10;
-        final originalWindow = client.mWindow;
 
         final gapSegment = Segment.get(RWCPOpCodeServer.gap, 5);
         final handled = client.receiveGAP(gapSegment);
 
         expect(handled, isTrue);
-        expect(client.mWindow, originalWindow);
+        // 对齐 gaia-client-src: 这类 GAP 不会被丢弃，会触发缩窗并重传。
+        expect(client.mWindow, 8);
       });
 
       test('receiveGAP returns false in listen state', () {
