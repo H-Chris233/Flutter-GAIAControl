@@ -281,7 +281,7 @@ packages:
     source: hosted
     version: "2.2.1"
   path_provider_platform_interface:
-    dependency: transitive
+    dependency: "direct dev"
     description:
       name: path_provider_platform_interface
       sha256: "94b1e0dd80970c1ce43d5d4e050a9918fce4f4a775e6142424c30a29a363265c"
@@ -361,7 +361,7 @@ packages:
     source: hosted
     version: "3.1.0"
   plugin_platform_interface:
-    dependency: transitive
+    dependency: "direct dev"
     description:
       name: plugin_platform_interface
       sha256: "4820fbfdb9478b1ebae27888254d445073732dae3d6ea81f0b7e06d5dedc3f02"
@@ -393,7 +393,7 @@ packages:
     source: hosted
     version: "5.4.0"
   reactive_ble_platform_interface:
-    dependency: transitive
+    dependency: "direct dev"
     description:
       name: reactive_ble_platform_interface
       sha256: d0e6f86c7ee3865b74d8a7b6deb1fb8320b24176dfd9a3e475f84b7117eb42c7

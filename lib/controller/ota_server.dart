@@ -27,6 +27,7 @@ import 'package:gaia/controller/gaia_command_builder.dart';
 import 'package:gaia/controller/ble_connection_manager.dart';
 import 'package:gaia/controller/upgrade_state_machine.dart';
 import 'package:gaia/utils/crash_reporter.dart';
+import 'package:gaia/utils/app_settings.dart';
 
 typedef DefaultFirmwarePathResolver = Future<String> Function();
 
@@ -273,7 +274,7 @@ class OtaServer extends GetxService
     _upgradeStateMachine =
         _upgradeStateMachineOverride ?? UpgradeStateMachine(delegate: this);
     mRWCPClient = RWCPClient(this);
-    _initDefaultFirmwarePath();
+    _initFirmwarePathOnStartup();
     _bleManager.startBleStatusMonitor();
     _deviceListWorker = ever<List<DiscoveredDevice>>(devices, (current) {
       if (current.isNotEmpty) {
@@ -300,6 +301,37 @@ class OtaServer extends GetxService
     }
   }
 
+  void _initFirmwarePathOnStartup() {
+    unawaited(() async {
+      if (Get.testMode) {
+        await _initDefaultFirmwarePath();
+        return;
+      }
+
+      if (firmwarePath.value.trim().isNotEmpty) {
+        return;
+      }
+      final lastPath = await AppSettings.readLastFirmwarePath();
+
+      if (firmwarePath.value.trim().isNotEmpty) {
+        return;
+      }
+
+      final trimmedLastPath = lastPath?.trim() ?? '';
+      if (trimmedLastPath.isNotEmpty) {
+        firmwarePath.value = trimmedLastPath;
+        lastFirmwareDirectory.value = _extractDirectoryPath(trimmedLastPath);
+        addLog("已恢复上次固件路径$trimmedLastPath");
+        return;
+      }
+
+      if (firmwarePath.value.trim().isNotEmpty) {
+        return;
+      }
+      await _initDefaultFirmwarePath();
+    }());
+  }
+
   void setFirmwarePath(String path) {
     final trimPath = path.trim();
     if (trimPath.isEmpty) {
@@ -308,6 +340,9 @@ class OtaServer extends GetxService
     }
     firmwarePath.value = trimPath;
     lastFirmwareDirectory.value = _extractDirectoryPath(trimPath);
+    if (!Get.testMode) {
+      unawaited(AppSettings.writeLastFirmwarePath(trimPath));
+    }
     addLog("已设置固件路径$trimPath");
   }
 

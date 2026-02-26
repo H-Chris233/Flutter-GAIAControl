@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter/services.dart';
@@ -159,16 +158,13 @@ class _NoopLogger implements reactive_ble.Logger {
 }
 
 class _FakeService implements Service {
-  _FakeService({
-    required this.id,
-    this.deviceId = '',
-  });
+  _FakeService({required this.id});
 
   @override
   final Uuid id;
 
   @override
-  final String deviceId;
+  final String deviceId = '';
 
   @override
   List<Characteristic> get characteristics => const <Characteristic>[];
