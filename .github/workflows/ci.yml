@@ -70,13 +70,32 @@ jobs:
       - name: Build APK
         run: flutter build apk --release
 
+      - name: Collect APK
+        run: |
+          set -euo pipefail
+
+          mkdir -p dist
+
+          apk_path="$(find build/app/outputs -type f -name "app-release.apk" -print -quit || true)"
+          if [[ -z "${apk_path}" ]]; then
+            apk_path="$(find build/app/outputs -type f -name "*.apk" -print -quit || true)"
+          fi
+
+          if [[ -z "${apk_path}" ]]; then
+            echo "未找到任何 APK 输出文件 (build/app/outputs/**/*.apk)" >&2
+            find build/app/outputs -type f || true
+            exit 1
+          fi
+
+          cp "${apk_path}" dist/app-release.apk
+          ls -la dist
+
       # 每次 push/PR 都会运行到这里并生成 APK 产物
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-apk
-          # 使用通配符兼容不同 Flutter 版本可能导致的输出路径差异
-          path: build/app/outputs/**/*.apk 
+          path: dist/app-release.apk
 
   release:
     name: Auto Release
@@ -109,5 +128,5 @@ jobs:
         with:
           tag_name: ${{ env.TAG_NAME }}
           name: Release ${{ env.TAG_NAME }}
-          files: ./apk-output/**/*.apk
+          files: ./apk-output/dist/app-release.apk
           generate_release_notes: true # 自动生成变更日志（非常推荐）
