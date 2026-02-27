@@ -246,13 +246,14 @@ void main() {
             client.receiveGAP(Segment.get(RWCPOpCodeServer.gap, 12));
 
         expect(handled, isTrue);
-        // 对齐 gaia-client-src: GAP 的 seq 直接用于 validateAckSequence(DATA, seq)。
-        // 因此 11/12 会被确认移出队列，lastAckSequence 推进到 12。
-        expect(client.mLastAckSequence, 12);
+        // 部分设备的 GAP.seq 表示“缺口起点/下一期待序列号”。
+        // 为避免把缺口段误判为已确认导致永远不重传，这里将 ACK 对齐到 seq-1，
+        // 使 gapSequence 对应段仍保留在未确认队列中用于重传。
+        expect(client.mLastAckSequence, 11);
         expect(
             client.mUnacknowledgedSegments
                 .any((s) => s.getSequenceNumber() == 12),
-            isFalse);
+            isTrue);
         // 触发重传
         expect(listener.sentSegments, isNotEmpty);
       });
