@@ -583,18 +583,12 @@ void main() {
       expect(server.logText.value, contains('Abort确认超时'));
     });
 
-    test('system connected matcher supports id and name fallback', () {
+    test('system connected matcher uses device id only', () {
       server.systemConnectedDeviceIds.assignAll(<String>['AABBCCDDEEFF']);
-      server.systemConnectedDeviceNames
-          .assignAll(<String>['earfun air pro 4+']);
 
       final matchedById = discoveredDevice(
         'AA:BB:CC:DD:EE:FF',
         name: 'Random Device',
-      );
-      final matchedByName = discoveredDevice(
-        '11:22:33:44:55:66',
-        name: 'EarFun Air Pro 4+',
       );
       final notMatched = discoveredDevice(
         '00:11:22:33:44:55',
@@ -602,7 +596,6 @@ void main() {
       );
 
       expect(server.isSystemConnectedScanDevice(matchedById), isTrue);
-      expect(server.isSystemConnectedScanDevice(matchedByName), isTrue);
       expect(server.isSystemConnectedScanDevice(notMatched), isFalse);
     });
 

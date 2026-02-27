@@ -113,7 +113,6 @@ class OtaServer extends GetxService
   RxBool isScanning = false.obs;
   RxBool isConnecting = false.obs;
   RxList<String> systemConnectedDeviceIds = <String>[].obs;
-  RxList<String> systemConnectedDeviceNames = <String>[].obs;
   RxString connectingDeviceId = "".obs;
   Rx<DeviceListUiState> deviceListUiState = DeviceListUiState.idle.obs;
   RxString deviceListHint = "点击“扫描蓝牙”开始搜索设备".obs;
@@ -384,48 +383,30 @@ class OtaServer extends GetxService
     return upper;
   }
 
-  String _normalizeDeviceName(String name) {
-    return name.trim().toLowerCase();
-  }
-
   bool isSystemConnectedScanDevice(DiscoveredDevice device) {
     final normalizedId = normalizeBluetoothId(device.id);
-    if (normalizedId.isNotEmpty &&
-        systemConnectedDeviceIds.contains(normalizedId)) {
-      return true;
-    }
-    final normalizedName = _normalizeDeviceName(device.name);
-    if (normalizedName.isEmpty) {
+    if (normalizedId.isEmpty) {
       return false;
     }
-    return systemConnectedDeviceNames.contains(normalizedName);
+    return systemConnectedDeviceIds.contains(normalizedId);
   }
 
   Future<void> refreshSystemConnectedDevices() async {
     if (!Platform.isAndroid) {
       systemConnectedDeviceIds.clear();
-      systemConnectedDeviceNames.clear();
       return;
     }
     try {
       final rawDevices = await _systemBluetoothChannel
           .invokeMethod<List<dynamic>>('getConnectedDevices');
       final ids = <String>{};
-      final names = <String>{};
       for (final item in rawDevices ?? const <dynamic>[]) {
         if (item is Map) {
           final rawId = item['id'];
-          final rawName = item['name'];
           if (rawId is String) {
             final normalizedId = normalizeBluetoothId(rawId);
             if (normalizedId.isNotEmpty) {
               ids.add(normalizedId);
-            }
-          }
-          if (rawName is String) {
-            final normalizedName = _normalizeDeviceName(rawName);
-            if (normalizedName.isNotEmpty) {
-              names.add(normalizedName);
             }
           }
           continue;
@@ -440,12 +421,8 @@ class OtaServer extends GetxService
       systemConnectedDeviceIds
         ..clear()
         ..addAll(ids);
-      systemConnectedDeviceNames
-        ..clear()
-        ..addAll(names);
     } catch (e) {
       systemConnectedDeviceIds.clear();
-      systemConnectedDeviceNames.clear();
       addLog("读取系统已连接设备失败: $e");
     }
   }
