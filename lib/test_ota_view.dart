@@ -31,9 +31,11 @@ class _TestOtaState extends State<TestOtaView> {
           builder: (ctx) {
             return AlertDialog(
               title: const Text('升级成功'),
-              content: Text(
-                '固件升级已完成。\n升级后版本：${OtaServer.to.versionAfterUpgrade.value}',
-              ),
+              content: Obx(() {
+                final after = OtaServer.to.versionAfterUpgrade.value;
+                final display = (after == "UNKNOWN") ? "查询中..." : after;
+                return Text('固件升级已完成。\n升级后版本：$display');
+              }),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(ctx).pop(),
