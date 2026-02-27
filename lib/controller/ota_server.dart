@@ -155,6 +155,7 @@ class OtaServer extends GetxService
   RxDouble updatePer = RxDouble(0);
   var versionBeforeUpgrade = "UNKNOWN".obs;
   var versionAfterUpgrade = "UNKNOWN".obs;
+  var currentVersion = "UNKNOWN".obs;
 
   /// To know if we have to disconnect after any event which occurs as a fatal error from the board.
 
@@ -205,6 +206,8 @@ class OtaServer extends GetxService
   Timer? _versionQueryTimer;
   void Function(String version)? _onVersionQuerySuccess;
   VoidCallback? _onVersionQueryFailed;
+  bool _suppressVersionQueryLog = false;
+  Timer? _currentVersionPollTimer;
   bool _pendingStartAfterVersionQuery = false;
   Timer? _postUpgradeVersionRetryTimer;
   int _postUpgradeVersionRetryCount = 0;
@@ -846,6 +849,13 @@ class OtaServer extends GetxService
           addLog("UpgradeDisconnect响应：设备请求断开升级通道，保持升级状态等待恢复");
           return;
         }
+        // 升级完成后我们也会主动发 UpgradeDisconnect 以关闭升级通道：
+        // 此时 isUpgrading 已为 false，但仍需要继续执行“升级后版本查询”定时器，
+        // 因此不要在这里调用 stopUpgrade（其会取消 _postUpgradeVersionRetryTimer）。
+        if (!isUpgrading.value) {
+          addLog("UpgradeDisconnect响应：已退出升级模式");
+          return;
+        }
         stopUpgrade(sendAbort: false, sendDisconnect: false);
         return;
       }
@@ -1210,13 +1220,18 @@ class OtaServer extends GetxService
     required String tag,
     required void Function(String version) onSuccess,
     required VoidCallback onFailed,
+    bool suppressLog = false,
   }) {
     if (_isVersionQueryInFlight) {
-      addLog("版本查询进行中，忽略重复请求");
+      if (!suppressLog) {
+        addLog("版本查询进行中，忽略重复请求");
+      }
       return;
     }
     if (!isDeviceConnected.value) {
-      addLog("$tag版本查询失败：设备未连接");
+      if (!suppressLog) {
+        addLog("$tag版本查询失败：设备未连接");
+      }
       onFailed();
       return;
     }
@@ -1224,8 +1239,11 @@ class OtaServer extends GetxService
     _onVersionQuerySuccess = onSuccess;
     _onVersionQueryFailed = onFailed;
     _isVersionQueryInFlight = true;
+    _suppressVersionQueryLog = suppressLog;
     _versionQueryTimer?.cancel();
-    addLog("发送GET_APPLICATION_VERSION($tag)");
+    if (!suppressLog) {
+      addLog("发送GET_APPLICATION_VERSION($tag)");
+    }
     final packet = _buildGaiaPacket(_getApplicationVersionCommand());
     writeMsg(packet.getBytes());
     _versionQueryTimer =
@@ -1244,9 +1262,13 @@ class OtaServer extends GetxService
     _versionQueryTimer?.cancel();
     final version = _parseApplicationVersionV3(payload);
     final tag = _currentVersionQueryTag;
+    final suppressLog = _suppressVersionQueryLog;
     _isVersionQueryInFlight = false;
     _currentVersionQueryTag = "";
-    addLog("$tag版本号: $version");
+    _suppressVersionQueryLog = false;
+    if (!suppressLog) {
+      addLog("$tag版本号: $version");
+    }
     final successCallback = _onVersionQuerySuccess;
     _onVersionQuerySuccess = null;
     _onVersionQueryFailed = null;
@@ -1256,11 +1278,15 @@ class OtaServer extends GetxService
   void _finishVersionQueryFailed(String reason) {
     _versionQueryTimer?.cancel();
     final failedCallback = _onVersionQueryFailed;
+    final suppressLog = _suppressVersionQueryLog;
     _isVersionQueryInFlight = false;
     _currentVersionQueryTag = "";
     _onVersionQuerySuccess = null;
     _onVersionQueryFailed = null;
-    addLog(reason);
+    _suppressVersionQueryLog = false;
+    if (!suppressLog) {
+      addLog(reason);
+    }
     failedCallback?.call();
   }
 
@@ -1328,6 +1354,49 @@ class OtaServer extends GetxService
       return;
     }
     addLog("版本对比结果：已变化（升级生效）");
+  }
+
+  void startCurrentVersionPolling(
+      {Duration interval = const Duration(seconds: 1)}) {
+    if (Get.testMode) {
+      return;
+    }
+    _currentVersionPollTimer?.cancel();
+    _pollCurrentVersionOnce();
+    _currentVersionPollTimer = Timer.periodic(interval, (_) {
+      _pollCurrentVersionOnce();
+    });
+  }
+
+  void stopCurrentVersionPolling() {
+    _currentVersionPollTimer?.cancel();
+    _currentVersionPollTimer = null;
+  }
+
+  void _pollCurrentVersionOnce() {
+    if (_isClosed) {
+      stopCurrentVersionPolling();
+      return;
+    }
+    if (!isDeviceConnected.value) {
+      if (currentVersion.value != "UNKNOWN") {
+        currentVersion.value = "UNKNOWN";
+      }
+      return;
+    }
+    if (isUpgrading.value || _isVersionQueryInFlight) {
+      return;
+    }
+    queryApplicationVersion(
+      tag: "当前",
+      suppressLog: true,
+      onSuccess: (version) {
+        if (currentVersion.value != version) {
+          currentVersion.value = version;
+        }
+      },
+      onFailed: () {},
+    );
   }
 
   /// <p>To send a VMUPacket over the defined protocol communication.</p>
@@ -1807,6 +1876,15 @@ class OtaServer extends GetxService
     _scanWatchdogTimer?.cancel();
     _cancelRecoveryRetryTimer();
     _clearAbortConfirmWatch();
+    stopCurrentVersionPolling();
+    _versionQueryTimer?.cancel();
+    _postUpgradeVersionRetryTimer?.cancel();
+    _isVersionQueryInFlight = false;
+    _currentVersionQueryTag = "";
+    _onVersionQuerySuccess = null;
+    _onVersionQueryFailed = null;
+    _suppressVersionQueryLog = false;
+    _pendingStartAfterVersionQuery = false;
     _bleManager.disconnect();
     isDeviceConnected.value = false;
     isConnecting.value = false;
@@ -2164,6 +2242,7 @@ class OtaServer extends GetxService
     _upgradeWatchdogTimer?.cancel();
     _versionQueryTimer?.cancel();
     _postUpgradeVersionRetryTimer?.cancel();
+    _currentVersionPollTimer?.cancel();
     _reconnectTimer?.cancel();
     _scanWatchdogTimer?.cancel();
     _clearAbortConfirmWatch();

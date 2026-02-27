@@ -226,6 +226,7 @@ void main() {
     server.mIsRWCPEnabled.value = true;
     server.vendorMode.value = 'v3';
     server.errorCount.value = 2;
+    server.currentVersion.value = '0.9.0';
     server.updatePer.value = 12.34;
     server.timeCount.value = 9;
     server.versionBeforeUpgrade.value = '1.0.0';
@@ -239,6 +240,7 @@ void main() {
     expect(find.textContaining('连接状态: 已连接'), findsOneWidget);
     expect(find.textContaining('RWCP模式: 已启用'), findsOneWidget);
     expect(find.textContaining('Vendor模式: V3'), findsOneWidget);
+    expect(find.textContaining('当前版本: 0.9.0'), findsOneWidget);
     expect(find.textContaining('错误计数: 2'), findsOneWidget);
     expect(find.text('12.34%'), findsOneWidget);
     expect(find.textContaining('升级前版本: 1.0.0'), findsOneWidget);

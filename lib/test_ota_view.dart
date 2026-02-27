@@ -19,6 +19,9 @@ class _TestOtaState extends State<TestOtaView> {
   @override
   void initState() {
     super.initState();
+    if (Get.isRegistered<OtaServer>()) {
+      OtaServer.to.startCurrentVersionPolling();
+    }
     _upgradeSuccessWorker = ever<int>(
       OtaServer.to.upgradeSuccessCounter,
       (_) async {
@@ -57,6 +60,7 @@ class _TestOtaState extends State<TestOtaView> {
             final rwcpEnabled = OtaServer.to.mIsRWCPEnabled.value;
             final mode = OtaServer.to.vendorMode.value.toUpperCase();
             final errors = OtaServer.to.errorCount.value;
+            final currentVersion = OtaServer.to.currentVersion.value;
             return Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -68,6 +72,8 @@ class _TestOtaState extends State<TestOtaView> {
                   Text("连接状态: ${connected ? "已连接" : "未连接"}"),
                   Text("RWCP模式: ${rwcpEnabled ? "已启用" : "未启用"}"),
                   Text("Vendor模式: $mode"),
+                  Text("当前版本: $currentVersion",
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
                   Text("错误计数: $errors"),
                 ],
               ),
@@ -203,6 +209,7 @@ class _TestOtaState extends State<TestOtaView> {
   void dispose() {
     _upgradeSuccessWorker?.dispose();
     if (Get.isRegistered<OtaServer>()) {
+      OtaServer.to.stopCurrentVersionPolling();
       OtaServer.to.disconnect();
     }
     super.dispose();
