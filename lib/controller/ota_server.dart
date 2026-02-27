@@ -1951,6 +1951,18 @@ class OtaServer extends GetxService
         return "upgradeIsValidationDoneReq";
       case OpCodes.upgradeErrorWarnRes:
         return "upgradeErrorWarnRes";
+      case OpCodes.upgradeSilentCommitSupportedReq:
+        return "upgradeSilentCommitSupportedReq";
+      case OpCodes.upgradeSilentCommitSupportedCfm:
+        return "upgradeSilentCommitSupportedCfm";
+      case OpCodes.upgradeSilentCommitCfm:
+        return "upgradeSilentCommitCfm";
+      case OpCodes.upgradePutEarbudsInCaseReq:
+        return "upgradePutEarbudsInCaseReq";
+      case OpCodes.upgradeEarbudsInCaseCfm:
+        return "upgradeEarbudsInCaseCfm";
+      case OpCodes.upgradeCompleteIndWithStatus:
+        return "upgradeCompleteIndWithStatus";
       default:
         return "unknownVMU";
     }

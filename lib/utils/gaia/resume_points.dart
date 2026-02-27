@@ -15,4 +15,7 @@ class ResumePoints {
 
   /// This is the 4th resume point, that means the upgrade should resume from the upgradeCommitCfm confirmation request.
   static const int commit = 0x04;
+
+  /// This resume point means the new image has been committed but the device is yet to send the upgradeCompleteInd.
+  static const int postCommit = 0x05;
 }

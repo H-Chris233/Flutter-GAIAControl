@@ -231,6 +231,40 @@ void main() {
             delegate.lastConfirmationType, ConfirmationType.transferComplete);
       });
 
+      test(
+          'TRANSFER_COMPLETE_IND with protocol v4 requests silent commit support first',
+          () {
+        machine.state = UpgradeState.transferring;
+        machine.protocolVersion = 0x04;
+
+        final completeIndPacket =
+            VMUPacket.get(OpCodes.upgradeTransferCompleteInd);
+        completeIndPacket.mOpCode = OpCodes.upgradeTransferCompleteInd;
+
+        machine.handleVmuPacket(completeIndPacket);
+
+        expect(machine.transferComplete, isTrue);
+        expect(machine.resumePoint, ResumePoints.transferComplete);
+        expect(delegate.lastConfirmationType, isNull);
+        expect(delegate.sentPackets.single.mOpCode,
+            OpCodes.upgradeSilentCommitSupportedReq);
+
+        delegate.reset();
+        final supportedCfm = VMUPacket.get(
+          OpCodes.upgradeSilentCommitSupportedCfm,
+          data: <int>[0x01],
+        );
+        supportedCfm.mOpCode = OpCodes.upgradeSilentCommitSupportedCfm;
+        supportedCfm.mData = <int>[0x01];
+
+        machine.handleVmuPacket(supportedCfm);
+
+        expect(machine.isSilentCommitSupportKnown, isTrue);
+        expect(machine.silentCommitSupported, isTrue);
+        expect(
+            delegate.lastConfirmationType, ConfirmationType.transferComplete);
+      });
+
       test('handles COMMIT_REQ', () {
         machine.state = UpgradeState.validating;
 
@@ -251,6 +285,62 @@ void main() {
         completePacket.mOpCode = OpCodes.upgradeCompleteInd;
 
         machine.handleVmuPacket(completePacket);
+
+        expect(machine.state, UpgradeState.complete);
+        expect(delegate.upgradeCompleted, isTrue);
+      });
+
+      test(
+          'START_CFM success with transferComplete resume point and protocol v4 sends supported req',
+          () {
+        machine.state = UpgradeState.starting;
+        machine.resumePoint = ResumePoints.transferComplete;
+        machine.protocolVersion = 0x04;
+
+        final startCfmPacket = VMUPacket.get(
+          OpCodes.upgradeStartCfm,
+          data: <int>[UpgradeStartCFMStatus.success],
+        );
+        startCfmPacket.mOpCode = OpCodes.upgradeStartCfm;
+        startCfmPacket.mData = <int>[UpgradeStartCFMStatus.success];
+
+        machine.handleVmuPacket(startCfmPacket);
+
+        expect(delegate.lastConfirmationType, isNull);
+        expect(delegate.sentPackets.single.mOpCode,
+            OpCodes.upgradeSilentCommitSupportedReq);
+      });
+
+      test('START_CFM success with postCommit resume point does nothing', () {
+        machine.state = UpgradeState.starting;
+        machine.resumePoint = ResumePoints.postCommit;
+        machine.protocolVersion = 0x06;
+
+        final startCfmPacket = VMUPacket.get(
+          OpCodes.upgradeStartCfm,
+          data: <int>[UpgradeStartCFMStatus.success],
+        );
+        startCfmPacket.mOpCode = OpCodes.upgradeStartCfm;
+        startCfmPacket.mData = <int>[UpgradeStartCFMStatus.success];
+
+        machine.handleVmuPacket(startCfmPacket);
+
+        expect(machine.state, UpgradeState.committing);
+        expect(delegate.sentPackets, isEmpty);
+        expect(delegate.lastConfirmationType, isNull);
+      });
+
+      test('handles COMPLETE_IND_WITH_STATUS', () {
+        machine.state = UpgradeState.committing;
+
+        final packet = VMUPacket.get(
+          OpCodes.upgradeCompleteIndWithStatus,
+          data: <int>[0x00, 0x01],
+        );
+        packet.mOpCode = OpCodes.upgradeCompleteIndWithStatus;
+        packet.mData = <int>[0x00, 0x01];
+
+        machine.handleVmuPacket(packet);
 
         expect(machine.state, UpgradeState.complete);
         expect(delegate.upgradeCompleted, isTrue);
@@ -331,7 +421,10 @@ void main() {
         machine.handleVmuPacket(packet);
         expect(delegate.sentPackets, isEmpty);
 
-        async.elapse(const Duration(milliseconds: 500));
+        async.elapse(const Duration(milliseconds: 1999));
+        expect(delegate.sentPackets, isEmpty);
+
+        async.elapse(const Duration(milliseconds: 1));
         expect(delegate.sentPackets.length, 1);
         expect(delegate.sentPackets.first.mOpCode, OpCodes.upgradeStartReq);
       });
@@ -347,7 +440,7 @@ void main() {
 
         machine.handleVmuPacket(packet);
         machine.state = UpgradeState.error;
-        async.elapse(const Duration(milliseconds: 500));
+        async.elapse(const Duration(seconds: 2));
 
         expect(delegate.sentPackets, isEmpty);
       });

@@ -88,6 +88,23 @@ class UpgradeStateMachine {
   /// 当前状态
   UpgradeState state = UpgradeState.idle;
 
+  /// 升级协议版本（来自 SYNC_CFM 的 PROTOCOL_VERSION 字段）。
+  ///
+  /// 参考 gaia-client-src/lib-upgrade：当前常见版本为 4/5/6。
+  int protocolVersion = 0;
+
+  /// 设备是否支持 Silent Commit（由 upgradeSilentCommitSupportedCfm 返回）。
+  bool silentCommitSupported = false;
+
+  /// 是否已收到 Silent Commit 支持性确认。
+  bool isSilentCommitSupportKnown = false;
+
+  /// 协议版本上限（与官方 lib-upgrade 对齐：V6）。
+  static const int maxSupportedProtocolVersion = 0x06;
+
+  /// Silent Commit 能力探测从协议版本 V4 开始支持。
+  static const int _kProtocolVersionSilentCommit = 0x04;
+
   /// 委托对象
   final UpgradeStateMachineDelegate delegate;
 
@@ -98,7 +115,11 @@ class UpgradeStateMachine {
   int startAttempts = 0;
 
   /// 最大启动重试次数
-  static const int maxStartNotReadyRetries = 3;
+  static const int maxStartNotReadyRetries = 5;
+
+  static const Duration _kStartNotReadyRetryDelay = Duration(seconds: 2);
+
+  bool _waitingSilentCommitSupportedCfm = false;
 
   /// 传输是否完成
   bool transferComplete = false;
@@ -121,6 +142,10 @@ class UpgradeStateMachine {
     _validationPollTimer?.cancel();
     _validationPollTimer = null;
     state = UpgradeState.idle;
+    protocolVersion = 0;
+    silentCommitSupported = false;
+    isSilentCommitSupportKnown = false;
+    _waitingSilentCommitSupportedCfm = false;
     resumePoint = -1;
     startAttempts = 0;
     transferComplete = false;
@@ -171,6 +196,21 @@ class UpgradeStateMachine {
       case OpCodes.upgradeCompleteInd:
         _handleCompleteInd();
         break;
+      case OpCodes.upgradeSilentCommitSupportedCfm:
+        _handleSilentCommitSupportedCfm(packet);
+        break;
+      case OpCodes.upgradeSilentCommitCfm:
+        _handleSilentCommitCfm();
+        break;
+      case OpCodes.upgradePutEarbudsInCaseReq:
+        _handlePutEarbudsInCaseReq();
+        break;
+      case OpCodes.upgradeEarbudsInCaseCfm:
+        _handleEarbudsInCaseCfm();
+        break;
+      case OpCodes.upgradeCompleteIndWithStatus:
+        _handleCompleteIndWithStatus(packet);
+        break;
     }
   }
 
@@ -178,9 +218,17 @@ class UpgradeStateMachine {
   void _handleSyncCfm(VMUPacket packet) {
     final data = packet.mData ?? [];
     if (data.length >= 6) {
-      int step = data[0];
-      delegate.onLog("上次传输步骤 step $step");
+      final step = data[0];
       resumePoint = step;
+      protocolVersion = data[5] & 0xFF;
+      delegate.onLog(
+          "SYNC_CFM: resumePoint=$step protocolVersion=$protocolVersion");
+      if (protocolVersion > maxSupportedProtocolVersion) {
+        state = UpgradeState.error;
+        delegate.onUpgradeError(
+            "不支持的升级协议版本: v$protocolVersion(最大支持v$maxSupportedProtocolVersion)");
+        return;
+      }
     } else {
       if (resumePoint < 0) {
         resumePoint = ResumePoints.dataTransfer;
@@ -210,11 +258,13 @@ class UpgradeStateMachine {
     }
 
     if (status == UpgradeStartCFMStatus.errorAppNotReady) {
-      startAttempts += 1;
-      delegate.onLog("设备应用未就绪(0x09)，第$startAttempts次重试");
-      if (startAttempts <= maxStartNotReadyRetries) {
+      delegate.onLog("设备应用未就绪(0x09)，准备重试");
+      if (startAttempts < maxStartNotReadyRetries) {
+        startAttempts += 1;
+        delegate.onLog(
+            "START_CFM未就绪：第$startAttempts/$maxStartNotReadyRetries次重试，延迟${_kStartNotReadyRetryDelay.inMilliseconds}ms");
         // 延迟后重新发送 START_REQ
-        Future<void>.delayed(const Duration(milliseconds: 500), () {
+        Future<void>.delayed(_kStartNotReadyRetryDelay, () {
           if (state == UpgradeState.starting) {
             final startReqPacket = VMUPacket.get(OpCodes.upgradeStartReq);
             delegate.sendVmuPacket(startReqPacket, false);
@@ -222,7 +272,8 @@ class UpgradeStateMachine {
         });
       } else {
         state = UpgradeState.error;
-        delegate.onUpgradeError("设备持续未就绪(0x09)，超过重试上限");
+        delegate
+            .onUpgradeError("设备持续未就绪(0x09)，超过重试上限($maxStartNotReadyRetries)");
       }
       return;
     }
@@ -239,7 +290,11 @@ class UpgradeStateMachine {
         delegate.onRequestConfirmation(ConfirmationType.commit);
         break;
       case ResumePoints.transferComplete:
-        delegate.onRequestConfirmation(ConfirmationType.transferComplete);
+        if (protocolVersion >= _kProtocolVersionSilentCommit) {
+          _sendSilentCommitSupportedReq();
+        } else {
+          delegate.onRequestConfirmation(ConfirmationType.transferComplete);
+        }
         break;
       case ResumePoints.inProgress:
         delegate.onRequestConfirmation(ConfirmationType.inProgress);
@@ -249,6 +304,12 @@ class UpgradeStateMachine {
         final validationPacket =
             VMUPacket.get(OpCodes.upgradeIsValidationDoneReq);
         delegate.sendVmuPacket(validationPacket, false);
+        break;
+      case ResumePoints.postCommit:
+        // 对齐 gaia-client-src/lib-upgrade：POST_COMMIT 阶段无需主动发送任何 Upgrade 消息，
+        // 等待设备下发 COMPLETE_IND/COMPLETE_IND_WITH_STATUS。
+        state = UpgradeState.committing;
+        delegate.onLog("ResumePoint=POST_COMMIT，等待设备发送完成指示");
         break;
       case ResumePoints.dataTransfer:
       default:
@@ -364,7 +425,11 @@ class UpgradeStateMachine {
     delegate.onLog("receiveTransferCompleteIND");
     transferComplete = true;
     resumePoint = ResumePoints.transferComplete;
-    delegate.onRequestConfirmation(ConfirmationType.transferComplete);
+    if (protocolVersion >= _kProtocolVersionSilentCommit) {
+      _sendSilentCommitSupportedReq();
+    } else {
+      delegate.onRequestConfirmation(ConfirmationType.transferComplete);
+    }
   }
 
   /// 处理 COMMIT_REQ
@@ -380,6 +445,57 @@ class UpgradeStateMachine {
     state = UpgradeState.complete;
     delegate.onLog("receiveCompleteIND 升级完成");
     delegate.onUpgradeComplete();
+  }
+
+  void _handleCompleteIndWithStatus(VMUPacket packet) {
+    final data = packet.mData ?? [];
+    int? status;
+    if (data.length >= 2) {
+      status = _extractIntFromByteArray(data, 0, 2);
+    }
+    state = UpgradeState.complete;
+    delegate.onLog(
+        "receiveCompleteINDWithStatus 升级完成${status == null ? '' : ' status=0x${status.toRadixString(16)}'}");
+    delegate.onUpgradeComplete();
+  }
+
+  void _sendSilentCommitSupportedReq() {
+    if (_waitingSilentCommitSupportedCfm) {
+      return;
+    }
+    _waitingSilentCommitSupportedCfm = true;
+    isSilentCommitSupportKnown = false;
+    silentCommitSupported = false;
+    delegate.onLog("请求设备返回SilentCommit支持性(协议v$protocolVersion)");
+    final req = VMUPacket.get(OpCodes.upgradeSilentCommitSupportedReq);
+    delegate.sendVmuPacket(req, false);
+  }
+
+  void _handleSilentCommitSupportedCfm(VMUPacket packet) {
+    final data = packet.mData ?? [];
+    final support = data.isNotEmpty ? (data[0] & 0xFF) : 0x00;
+    silentCommitSupported = support == 0x01;
+    isSilentCommitSupportKnown = true;
+    _waitingSilentCommitSupportedCfm = false;
+    delegate.onLog(
+        "SilentCommit支持性确认: ${silentCommitSupported ? 'SUPPORTED' : 'NOT_SUPPORTED'}");
+    // 对齐官方：获取支持性结果后，再发起 TRANSFER_COMPLETE 的确认流程。
+    delegate.onRequestConfirmation(ConfirmationType.transferComplete);
+  }
+
+  void _handleSilentCommitCfm() {
+    // 对齐官方：Silent Commit 完成后不一定再收到 COMPLETE_IND，因此将其视为一次正常结束。
+    state = UpgradeState.complete;
+    delegate.onLog("receiveSilentCommitCFM 升级完成(Silent Commit)");
+    delegate.onUpgradeComplete();
+  }
+
+  void _handlePutEarbudsInCaseReq() {
+    delegate.onLog("收到PUT_EARBUDS_IN_CASE_REQ：请提示用户将耳机放回充电盒并合盖以继续升级");
+  }
+
+  void _handleEarbudsInCaseCfm() {
+    delegate.onLog("收到EARBUDS_IN_CASE_CFM：设备确认动作完成，升级可继续");
   }
 
   /// 发送中止请求

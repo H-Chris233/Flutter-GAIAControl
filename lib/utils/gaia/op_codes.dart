@@ -178,6 +178,24 @@ class OpCodes {
   /// <dt><b>Next message</b></dt><dd>Depends on the received `ReturnCodes ReturnCodes` value.</dd> </dl>
   static const upgradeErrorWarnRes = 0x1F;
 
+  /// <p>Used by the Host to request whether the device supports silent commit.</p>
+  static const upgradeSilentCommitSupportedReq = 0x20;
+
+  /// <p>Used by the Device to respond to `upgradeSilentCommitSupportedReq`.</p>
+  static const upgradeSilentCommitSupportedCfm = 0x21;
+
+  /// <p>Used by the Device to indicate that a silent commit has completed.</p>
+  static const upgradeSilentCommitCfm = 0x22;
+
+  /// <p>Used by the Device to request the user to put earbuds in the case (protocol v5+).</p>
+  static const upgradePutEarbudsInCaseReq = 0x23;
+
+  /// <p>Used by the Device to confirm earbuds-in-case action (protocol v5+).</p>
+  static const upgradeEarbudsInCaseCfm = 0x24;
+
+  /// <p>Used by the Device to indicate upgrade complete with an additional status.</p>
+  static const upgradeCompleteIndWithStatus = 0x25;
+
   /// <p>The number of bytes which contains the number of bytes of the uploading file to send.</p>
   static const nbBytesLength = 4;
 
