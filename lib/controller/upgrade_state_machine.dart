@@ -130,8 +130,6 @@ class UpgradeStateMachine {
   /// 是否需要中止
   bool hasToAbort = false;
 
-  static const int _kValidationPollMinDelayMs = 80;
-  static const int _kValidationPollMaxDelayMs = 5000;
   Timer? _validationPollTimer;
 
   /// 构造函数
@@ -384,33 +382,19 @@ class UpgradeStateMachine {
   void _handleValidationDoneCfm(VMUPacket packet) {
     delegate.onLog("receiveValidationDoneCFM");
     final data = packet.mData ?? [];
+    // 对齐 gaia-client-src/lib-upgrade:
+    // - payload >= 2 时，按 WAITING_TIME(2 bytes, Big-Endian) 延迟再发送下一次轮询请求。
+    // - payload 不足时，立即发送下一次轮询请求。
     if (data.length < 2) {
-      // 兼容旧行为：当 payload 不包含延迟信息时，立即发起下一次轮询。
-      // 同时用最小间隔做节流，避免异常重复通知导致瞬时刷屏。
-      if (_validationPollTimer != null) {
-        return;
-      }
       final validationPacket =
           VMUPacket.get(OpCodes.upgradeIsValidationDoneReq);
       delegate.sendVmuPacket(validationPacket, false);
-      _validationPollTimer =
-          Timer(const Duration(milliseconds: _kValidationPollMinDelayMs), () {
-        _validationPollTimer = null;
-      });
       return;
     }
 
     _validationPollTimer?.cancel();
-    _validationPollTimer = null;
-    var delayMs = _kValidationPollMinDelayMs;
-    delayMs = _extractIntFromByteArray(data, 0, 2);
-    if (delayMs < _kValidationPollMinDelayMs) {
-      delayMs = _kValidationPollMinDelayMs;
-    } else if (delayMs > _kValidationPollMaxDelayMs) {
-      delayMs = _kValidationPollMaxDelayMs;
-    }
+    final delayMs = _extractIntFromByteArray(data, 0, 2);
     _validationPollTimer = Timer(Duration(milliseconds: delayMs), () {
-      _validationPollTimer = null;
       if (state != UpgradeState.validating) {
         return;
       }

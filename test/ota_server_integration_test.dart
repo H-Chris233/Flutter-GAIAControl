@@ -205,7 +205,8 @@ void main() {
       expect(fakeBleManager.autoReconnectEnabledHistory, contains(false));
     });
 
-    test('disconnect when not upgrading keeps auto reconnect enabled', () async {
+    test('disconnect when not upgrading keeps auto reconnect enabled',
+        () async {
       server.autoRecoveryEnabled.value = false;
       await server.connectDevice('device-1');
 
@@ -213,7 +214,8 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       expect(server.rwcpStatusText.value, '连接断开');
-      expect(fakeBleManager.autoReconnectEnabledHistory, isNot(contains(false)));
+      expect(
+          fakeBleManager.autoReconnectEnabledHistory, isNot(contains(false)));
     });
 
     test('receiveVMUPacket handles transfer complete and sends confirmation',
@@ -340,6 +342,15 @@ void main() {
       expect(fakeBleManager.writeWithResponsePayloads, isNotEmpty);
       expect(fakeBleManager.writeWithResponsePayloads.last,
           <int>[0x00, 0x1D, 0x0C, 0x01]);
+
+      // upgradeDisconnect response should not stop an upgrade when requested by device
+      final disconnectRspCmd =
+          ((0x06 & 0x7F) << 9) | ((0x02 & 0x03) << 7) | 0x01;
+      final disconnectRspPacket =
+          GaiaPacketBLE(disconnectRspCmd, mPayload: <int>[], mVendorId: 0x001D);
+      server.handleRecMsg(disconnectRspPacket.getBytes());
+      await Future<void>.delayed(Duration.zero);
+      expect(server.isUpgrading.value, isTrue);
 
       // START action=0x00 => reconnect upgrade
       final startCmd = ((0x06 & 0x7F) << 9) | ((0x01 & 0x03) << 7) | 0x02;

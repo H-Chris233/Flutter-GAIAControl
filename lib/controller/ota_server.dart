@@ -186,6 +186,7 @@ class OtaServer extends GetxService
   Timer? _dfuResultTimer;
   bool _rwcpSetupInProgress = false;
   bool _upgradePaused = false;
+  bool _deviceRequestedUpgradeDisconnect = false;
   Timer? _upgradeWatchdogTimer;
   Timer? _reconnectTimer;
   String _fatalUpgradeReason = "";
@@ -839,6 +840,12 @@ class OtaServer extends GetxService
       if (feature == GaiaCommandBuilder.v3FeatureUpgrade &&
           commandId == GaiaCommandBuilder.v3CmdUpgradeDisconnect) {
         _upgradeModeEnabled = false;
+        // 对齐 gaia-client-src: 设备通过 STOP_REQUEST(action=DISCONNECT_UPGRADE) 要求断开升级通道时，
+        // Host 仅需断开 GAIA transport 与 upgrade library 的绑定，不应结束升级进程。
+        if (isUpgrading.value && _deviceRequestedUpgradeDisconnect) {
+          addLog("UpgradeDisconnect响应：设备请求断开升级通道，保持升级状态等待恢复");
+          return;
+        }
         stopUpgrade(sendAbort: false, sendDisconnect: false);
         return;
       }
@@ -856,12 +863,16 @@ class OtaServer extends GetxService
           commandId == GaiaCommandBuilder.v3NtfUpgradeStopRequest) {
         final action = payload.isNotEmpty ? payload.first : 0x01;
         _upgradePaused = true;
+        _clearUpgradeWatchdog();
         if (action == 0x00) {
+          _deviceRequestedUpgradeDisconnect = true;
           addLog("收到GAIA STOP通知(action=0x00)，断开升级通道");
           disconnectUpgrade();
         } else if (action == 0x01) {
+          _deviceRequestedUpgradeDisconnect = false;
           addLog("收到GAIA STOP通知(action=0x01)，暂停发送升级数据");
         } else {
+          _deviceRequestedUpgradeDisconnect = false;
           addLog(
               "收到GAIA STOP通知(action=0x${action.toRadixString(16).padLeft(2, '0')})，按暂停处理");
         }
@@ -872,17 +883,23 @@ class OtaServer extends GetxService
         final action = payload.isNotEmpty ? payload.first : 0x01;
         if (action == 0x00) {
           _upgradePaused = false;
+          _deviceRequestedUpgradeDisconnect = false;
+          _armUpgradeWatchdog();
           addLog("收到GAIA START通知(action=0x00)，重新连接升级通道");
           sendUpgradeConnect();
           return;
         }
         if (action == 0x01) {
           _upgradePaused = false;
+          _deviceRequestedUpgradeDisconnect = false;
+          _armUpgradeWatchdog();
           addLog("收到GAIA START通知(action=0x01)，恢复发送升级数据");
           _resumeUpgradeDataIfPossible();
           return;
         }
         _upgradePaused = false;
+        _deviceRequestedUpgradeDisconnect = false;
+        _armUpgradeWatchdog();
         addLog(
             "收到GAIA START通知(action=0x${action.toRadixString(16).padLeft(2, '0')})，按恢复处理");
         _resumeUpgradeDataIfPossible();
@@ -963,6 +980,7 @@ class OtaServer extends GetxService
     mBytesToSend = 0;
     mStartOffset = 0;
     _upgradePaused = false;
+    _deviceRequestedUpgradeDisconnect = false;
   }
 
   Future<void> stopUpgrade(
@@ -1980,7 +1998,7 @@ class OtaServer extends GetxService
 
   void _armUpgradeWatchdog() {
     _clearUpgradeWatchdog();
-    if (!isUpgrading.value) {
+    if (!isUpgrading.value || _upgradePaused) {
       return;
     }
     _upgradeWatchdogTimer =
