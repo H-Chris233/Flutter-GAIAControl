@@ -211,6 +211,7 @@ class OtaServer extends GetxService
   bool _pendingStartAfterVersionQuery = false;
   Timer? _postUpgradeVersionRetryTimer;
   int _postUpgradeVersionRetryCount = 0;
+  bool _suppressCurrentVersionPolling = false;
   Timer? _scanWatchdogTimer;
   Timer? _recoveryRetryTimer;
   Timer? _abortConfirmTimer;
@@ -1001,6 +1002,7 @@ class OtaServer extends GetxService
     _versionQueryTimer?.cancel();
     _postUpgradeVersionRetryTimer?.cancel();
     _pendingStartAfterVersionQuery = false;
+    _suppressCurrentVersionPolling = false;
     _rwcpSetupInProgress = false;
     rwcpStatusText.value = "待启用";
     timeCount.value = 0;
@@ -1309,10 +1311,13 @@ class OtaServer extends GetxService
   void _schedulePostUpgradeVersionQuery() {
     _postUpgradeVersionRetryTimer?.cancel();
     _postUpgradeVersionRetryCount = 0;
+    _suppressCurrentVersionPolling = true;
     _postUpgradeVersionRetryTimer = Timer.periodic(
         Duration(seconds: kPostUpgradeVersionRetryIntervalSeconds), (timer) {
       if (_postUpgradeVersionRetryCount >= kPostUpgradeVersionMaxRetries) {
         timer.cancel();
+        _postUpgradeVersionRetryTimer = null;
+        _suppressCurrentVersionPolling = false;
         addLog("升级后版本查询超时，无法自动对比");
         return;
       }
@@ -1329,12 +1334,19 @@ class OtaServer extends GetxService
         tag: "升级后",
         onSuccess: (version) {
           versionAfterUpgrade.value = version;
+          if (currentVersion.value != version) {
+            currentVersion.value = version;
+          }
           timer.cancel();
+          _postUpgradeVersionRetryTimer = null;
+          _suppressCurrentVersionPolling = false;
           _logVersionCompare();
         },
         onFailed: () {
           if (_postUpgradeVersionRetryCount >= kPostUpgradeVersionMaxRetries) {
             timer.cancel();
+            _postUpgradeVersionRetryTimer = null;
+            _suppressCurrentVersionPolling = false;
             addLog("升级后版本查询失败，无法自动对比");
           }
         },
@@ -1382,6 +1394,9 @@ class OtaServer extends GetxService
       if (currentVersion.value != "UNKNOWN") {
         currentVersion.value = "UNKNOWN";
       }
+      return;
+    }
+    if (_suppressCurrentVersionPolling) {
       return;
     }
     if (isUpgrading.value || _isVersionQueryInFlight) {
@@ -1885,6 +1900,7 @@ class OtaServer extends GetxService
     _onVersionQueryFailed = null;
     _suppressVersionQueryLog = false;
     _pendingStartAfterVersionQuery = false;
+    _suppressCurrentVersionPolling = false;
     _bleManager.disconnect();
     isDeviceConnected.value = false;
     isConnecting.value = false;
