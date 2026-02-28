@@ -26,6 +26,9 @@ class CrashReporter {
   bool _isRecording = false;
   RawReceivePort? _isolateErrorPort;
 
+  @visibleForTesting
+  SendPort? get isolateErrorSendPortForTesting => _isolateErrorPort?.sendPort;
+
   static Future<void> init() async {
     final docs = await getApplicationDocumentsDirectory();
     var baseDir = docs;
@@ -107,9 +110,6 @@ class CrashReporter {
     StackTrace stack, {
     required String context,
   }) {
-    if (_instance == null) {
-      return;
-    }
     if (_isRecording) {
       return;
     }
