@@ -1,0 +1,9 @@
+{
+  "session_id": "omx-1772282002922-lvfqtx",
+  "started_at": "2026-02-28T12:33:23.824Z",
+  "cwd": "/data/data/com.termux/files/home/Flutter-GAIAControl",
+  "pid": 16619,
+  "platform": "linux",
+  "pid_start_ticks": 9415736,
+  "pid_cmdline": "node /data/data/com.termux/files/home/.local/share/pnpm/global/5/.pnpm/oh-my-codex@0.7.5_hono@4.11.4_zod@3.25.76/node_modules/oh-my-codex/bin/omx.js --madmax"
+}

@@ -15,7 +15,8 @@ Required schema sections and this template's mapping:
 - **Recovery & Lifecycle Overlays**: runtime/team overlays are appended by marker-bounded runtime hooks.
 
 Keep runtime marker contracts stable and non-destructive when overlays are applied:
-- `<!-- OMX:RUNTIME:START --> ... <!-- OMX:RUNTIME:END -->`
+- `
+`
 - `<!-- OMX:TEAM:WORKER:START --> ... <!-- OMX:TEAM:WORKER:END -->`
 </guidance_schema_contract>
 
@@ -357,3 +358,15 @@ Recommended mode fields:
 ## Setup
 
 Run `omx setup` to install all components. Run `omx doctor` to verify installation.
+
+<!-- OMX:RUNTIME:START -->
+<session_context>
+**Session:** omx-1772282002922-lvfqtx | 2026-02-28T12:33:23.128Z
+
+**Compaction Protocol:**
+Before context compaction, preserve critical state:
+1. Write progress checkpoint via state_write MCP tool
+2. Save key decisions to notepad via notepad_write_working
+3. If context is >80% full, proactively checkpoint state
+</session_context>
+<!-- OMX:RUNTIME:END -->
