@@ -41,7 +41,7 @@ Future<void> _drainMicrotasks([int times = 3]) async {
 
 Future<String?> _consumePendingWithRetry(
   CrashReporter reporter, {
-  int retries = 40,
+  int retries = 200,
 }) async {
   // recordError 现在是异步落盘；全局 handler / isolate handler 使用 unawaited，
   // 测试里需要适当等待文件 IO 完成，避免偶发性失败。
