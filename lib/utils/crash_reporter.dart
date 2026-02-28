@@ -32,12 +32,16 @@ class CrashReporter {
   static Future<void> init() async {
     final docs = await getApplicationDocumentsDirectory();
     var baseDir = docs;
-    try {
-      final external = await getExternalStorageDirectory();
-      if (external != null) {
-        baseDir = external;
-      }
-    } catch (_) {}
+    // release 模式下默认落盘到应用私有目录，避免敏感崩溃信息写入 external。
+    // debug/profile 下若 external 可用，则优先使用（便于用户/开发者导出日志）。
+    if (!kReleaseMode) {
+      try {
+        final external = await getExternalStorageDirectory();
+        if (external != null) {
+          baseDir = external;
+        }
+      } catch (_) {}
+    }
 
     final reportsDir = Directory("${baseDir.path}/crash_reports");
     if (!await reportsDir.exists()) {
@@ -58,25 +62,30 @@ class CrashReporter {
   void installGlobalHandlers() {
     FlutterError.onError = (details) {
       FlutterError.dumpErrorToConsole(details);
-      recordError(
+      unawaited(recordError(
         details.exception,
         details.stack ?? StackTrace.current,
         context: "FlutterError",
-      );
+      ));
     };
 
     WidgetsBinding.instance.platformDispatcher.onError = (error, stack) {
-      recordError(error, stack, context: "PlatformDispatcher");
+      unawaited(recordError(error, stack, context: "PlatformDispatcher"));
       return false;
     };
 
+    try {
+      if (_isolateErrorPort != null) {
+        Isolate.current.removeErrorListener(_isolateErrorPort!.sendPort);
+      }
+    } catch (_) {}
     _isolateErrorPort?.close();
     _isolateErrorPort = RawReceivePort((dynamic message) {
       try {
         if (message is List && message.length >= 2) {
           final error = message[0];
           final stack = StackTrace.fromString("${message[1]}");
-          recordError(error, stack, context: "Isolate");
+          unawaited(recordError(error, stack, context: "Isolate"));
         }
       } catch (_) {}
     });
@@ -105,11 +114,11 @@ class CrashReporter {
     }
   }
 
-  void recordError(
+  Future<void> recordError(
     Object error,
     StackTrace stack, {
     required String context,
-  }) {
+  }) async {
     if (_isRecording) {
       return;
     }
@@ -162,11 +171,11 @@ class CrashReporter {
         ..writeln(logs);
 
       try {
-        file.writeAsStringSync(content.toString(), flush: true);
+        await file.writeAsString(content.toString(), flush: true);
       } catch (_) {}
 
       try {
-        _pendingFile.writeAsStringSync(
+        await _pendingFile.writeAsString(
           jsonEncode({"path": file.path, "ts": ts}),
           flush: true,
         );

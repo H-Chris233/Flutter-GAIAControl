@@ -39,6 +39,22 @@ Future<void> _drainMicrotasks([int times = 3]) async {
   }
 }
 
+Future<String?> _consumePendingWithRetry(
+  CrashReporter reporter, {
+  int retries = 40,
+}) async {
+  // recordError 现在是异步落盘；全局 handler / isolate handler 使用 unawaited，
+  // 测试里需要适当等待文件 IO 完成，避免偶发性失败。
+  for (var i = 0; i < retries; i += 1) {
+    final value = await reporter.consumePendingReportPath();
+    if (value != null) {
+      return value;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+  return null;
+}
+
 void main() {
   group('CrashReporter', () {
     late Directory docsDir;
@@ -96,7 +112,7 @@ void main() {
 
       reporter.setContextProvider(() => <String, Object?>{'k': 1});
       reporter.setLogSnapshotProvider(() => 'LOG_SNAPSHOT');
-      reporter.recordError(
+      await reporter.recordError(
         StateError('boom'),
         StackTrace.current,
         context: 'UnitTest',
@@ -131,7 +147,7 @@ void main() {
         throw StateError('log fail');
       });
 
-      reporter.recordError(
+      await reporter.recordError(
         'outer',
         StackTrace.current,
         context: 'Outer',
@@ -161,7 +177,7 @@ void main() {
       sendPort.send(<Object>[StateError('iso'), StackTrace.current.toString()]);
       await _drainMicrotasks();
 
-      final path = await reporter.consumePendingReportPath();
+      final path = await _consumePendingWithRetry(reporter);
       expect(path, isNotNull);
       final content = await File(path!).readAsString();
       expect(content, contains('context: Isolate'));
@@ -181,7 +197,8 @@ void main() {
         exception: StateError('flutter'),
         stack: StackTrace.current,
       ));
-      final flutterPath = await reporter.consumePendingReportPath();
+      await _drainMicrotasks();
+      final flutterPath = await _consumePendingWithRetry(reporter);
       expect(flutterPath, isNotNull);
       final flutterContent = await File(flutterPath!).readAsString();
       expect(flutterContent, contains('context: FlutterError'));
@@ -190,7 +207,8 @@ void main() {
       final platformResult = WidgetsBinding.instance.platformDispatcher.onError
           ?.call(StateError('dispatcher'), StackTrace.current);
       expect(platformResult, isFalse);
-      final dispatcherPath = await reporter.consumePendingReportPath();
+      await _drainMicrotasks();
+      final dispatcherPath = await _consumePendingWithRetry(reporter);
       expect(dispatcherPath, isNotNull);
       final dispatcherContent = await File(dispatcherPath!).readAsString();
       expect(dispatcherContent, contains('context: PlatformDispatcher'));
@@ -267,7 +285,7 @@ void main() {
       await CrashReporter.init();
       final reporter = CrashReporter.instance;
 
-      reporter.recordError(
+      await reporter.recordError(
         'mode',
         StackTrace.current,
         context: 'Mode',

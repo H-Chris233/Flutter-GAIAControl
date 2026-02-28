@@ -181,6 +181,12 @@ class BleConnectionManager {
   /// BLE 状态订阅
   StreamSubscription<BleStatus>? _bleStatusSubscription;
 
+  /// GATT 操作串行化链（主要用于写入/MTU 等需要严格串行的操作）。
+  ///
+  /// 背景：并发 GATT write 在部分机型/系统版本上容易触发 “GATT busy”、
+  /// 丢包或连接不稳定，尤其在 OTA/RWCP 高频发送场景下。
+  Future<void> _gattOpChain = Future<void>.value();
+
   /// 连接代数（用于取消过期的连接操作）
   int _connectionGeneration = 0;
 
@@ -515,25 +521,31 @@ class BleConnectionManager {
 
   /// 写入数据（带响应）
   Future<void> writeWithResponse(List<int> data) async {
-    final characteristic = QualifiedCharacteristic(
-        serviceId: otaServiceUuid,
-        characteristicId: writeCharacteristicUuid,
-        deviceId: connectedDeviceId);
-    await ble.writeCharacteristicWithResponse(characteristic, value: data);
+    await _enqueueGattOp(() async {
+      final characteristic = QualifiedCharacteristic(
+          serviceId: otaServiceUuid,
+          characteristicId: writeCharacteristicUuid,
+          deviceId: connectedDeviceId);
+      await ble.writeCharacteristicWithResponse(characteristic, value: data);
+    });
   }
 
   /// 写入数据（无响应）
   Future<void> writeWithoutResponse(List<int> data) async {
-    final characteristic = QualifiedCharacteristic(
-        serviceId: otaServiceUuid,
-        characteristicId: writeNoResponseCharacteristicUuid,
-        deviceId: connectedDeviceId);
-    await ble.writeCharacteristicWithoutResponse(characteristic, value: data);
+    await _enqueueGattOp(() async {
+      final characteristic = QualifiedCharacteristic(
+          serviceId: otaServiceUuid,
+          characteristicId: writeNoResponseCharacteristicUuid,
+          deviceId: connectedDeviceId);
+      await ble.writeCharacteristicWithoutResponse(characteristic, value: data);
+    });
   }
 
   /// 请求 MTU
   Future<int> requestMtu(int mtu) async {
-    return await ble.requestMtu(deviceId: connectedDeviceId, mtu: mtu);
+    return await _enqueueGattOp(() async {
+      return await ble.requestMtu(deviceId: connectedDeviceId, mtu: mtu);
+    });
   }
 
   /// 断开连接
@@ -546,6 +558,20 @@ class BleConnectionManager {
     _notifySubscription = null;
     _rwcpSubscription = null;
     isDeviceConnected = false;
+  }
+
+  /// 串行执行 GATT 操作（确保链在异常后可继续）。
+  Future<T> _enqueueGattOp<T>(Future<T> Function() op) {
+    final completer = Completer<T>();
+    _gattOpChain = _gattOpChain.then((_) async {
+      try {
+        final value = await op();
+        completer.complete(value);
+      } catch (e, st) {
+        completer.completeError(e, st);
+      }
+    });
+    return completer.future;
   }
 
   /// 释放资源

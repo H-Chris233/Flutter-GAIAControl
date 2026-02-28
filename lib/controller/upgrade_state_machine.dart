@@ -151,6 +151,15 @@ class UpgradeStateMachine {
     hasToAbort = false;
   }
 
+  /// 释放资源（用于外部生命周期管理）。
+  ///
+  /// 说明：状态机内部会创建轮询 Timer（如 validation 阶段），若外部断开连接或销毁服务，
+  /// 需要确保 Timer 被取消，避免在无连接状态下继续触发发包。
+  void dispose() {
+    _validationPollTimer?.cancel();
+    _validationPollTimer = null;
+  }
+
   /// 开始升级流程
   void startUpgrade() {
     state = UpgradeState.syncing;

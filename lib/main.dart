@@ -19,8 +19,10 @@ Future<void> main() async {
       runApp(const MyApp());
     },
     (error, stack) {
-      CrashReporter.maybeInstance
-          ?.recordError(error, stack, context: "runZonedGuarded");
+      final reporter = CrashReporter.maybeInstance;
+      if (reporter != null) {
+        unawaited(reporter.recordError(error, stack, context: "runZonedGuarded"));
+      }
     },
   );
 }

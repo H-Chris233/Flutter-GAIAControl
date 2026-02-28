@@ -536,13 +536,13 @@ class OtaServer extends GetxService
   }
 
   void writeMsg(List<int> data) {
-    scheduleMicrotask(() async {
-      if (_isClosed) {
-        return;
-      }
-      _touchUpgradeWatchdog();
-      await writeData(data);
-    });
+    if (_isClosed) {
+      return;
+    }
+    // 仅做“触发写入”而不在这里 await，避免多次调用时形成隐式并发写入。
+    // 实际写入会在 BleConnectionManager 内部做串行化。
+    _touchUpgradeWatchdog();
+    unawaited(writeData(data));
   }
 
   GaiaPacketBLE _buildGaiaPacket(int command,
@@ -1864,6 +1864,8 @@ class OtaServer extends GetxService
   }
 
   void disconnect() {
+    // 避免断开后 UpgradeStateMachine 的轮询 Timer 继续触发发包。
+    _upgradeStateMachine.dispose();
     _reconnectTimer?.cancel();
     _scanWatchdogTimer?.cancel();
     _cancelRecoveryRetryTimer();
@@ -2226,6 +2228,7 @@ class OtaServer extends GetxService
     _isClosed = true;
     // 避免 onClose 后仍有异步写入触发看门狗/升级状态变更（单测与真实场景均可能出现）。
     isUpgrading.value = false;
+    _upgradeStateMachine.dispose();
     _deviceListWorker?.dispose();
     _logBuffer.dispose();
     _bleManager.dispose();
