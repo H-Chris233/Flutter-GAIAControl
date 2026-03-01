@@ -1,9 +1,0 @@
-{
-  "pid": 16650,
-  "started_at": "2026-02-28T12:33:24.269Z",
-  "cwd": "/data/data/com.termux/files/home/Flutter-GAIAControl",
-  "notify_script": "/data/data/com.termux/files/home/.local/share/pnpm/global/5/.pnpm/oh-my-codex@0.7.5_hono@4.11.4_zod@3.25.76/node_modules/oh-my-codex/scripts/notify-hook.js",
-  "poll_ms": 700,
-  "tracked_files": 3,
-  "seen_turns": 0
-}
