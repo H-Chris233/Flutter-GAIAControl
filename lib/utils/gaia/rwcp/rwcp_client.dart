@@ -765,9 +765,6 @@ class RWCPClient {
     // ACK 的有效区间应当是：[lastAck, lastSent]（包含重复 ACK）。
     // lastSent = mNextSequence - 1。若允许 ACK == mNextSequence，会把“尚未发送”的序号
     // 当作可确认范围，导致队列与窗口状态出现异常日志/误判。
-    if (mUnacknowledgedSegments.isEmpty) {
-      return false;
-    }
     final mod = RWCP.sequenceNumberMax + 1;
     final lastSent = decreaseSequenceNumber(mNextSequence, 1);
 
