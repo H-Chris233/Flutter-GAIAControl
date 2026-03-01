@@ -113,6 +113,20 @@ jobs:
           name: app-apk
           path: ./apk-output
 
+      - name: Locate APK
+        run: |
+          set -euo pipefail
+
+          apk_path="$(find ./apk-output -type f -name "app-release.apk" -print -quit || true)"
+          if [[ -z "${apk_path}" ]]; then
+            echo "未找到 app-release.apk，下载目录如下：" >&2
+            find ./apk-output -type f -maxdepth 5 || true
+            exit 1
+          fi
+
+          echo "APK_PATH=${apk_path}" >> "$GITHUB_ENV"
+          echo "Found APK at: ${apk_path}"
+
       - name: Determine Tag Name
         id: determine_tag
         run: |
@@ -131,5 +145,6 @@ jobs:
         with:
           tag_name: ${{ env.TAG_NAME }}
           name: Release ${{ env.TAG_NAME }}
-          files: ./apk-output/dist/app-release.apk
+          files: ${{ env.APK_PATH }}
+          fail_on_unmatched_files: true
           generate_release_notes: true # 自动生成变更日志（非常推荐）
