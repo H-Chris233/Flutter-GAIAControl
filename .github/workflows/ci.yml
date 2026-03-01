@@ -44,6 +44,11 @@ jobs:
     name: Build APK
     needs: test
     runs-on: ubuntu-latest
+    env:
+      # 解决 release 构建阶段 JetifyTransform 触发的 Java heap space（Gradle JVM 堆不足）问题。
+      # 说明：必须以 system property 的形式传给 Gradle，单纯设置 -Xmx4g 对 action env 不一定生效。
+      GRADLE_OPTS: >-
+        -Dorg.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8
     steps:
       # 升级到 v4 避免 Node.js 兼容性警告
       - name: Checkout
@@ -65,7 +70,6 @@ jobs:
         env:
           FILE_NAME: lib/common/config/ignoreConfig.dart
           FILE_DATA: class NetConfig { static const CLIENT_ID = "${{ secrets.CLIENT_ID }}"; static const CLIENT_SECRET = "${{ secrets.CLIENT_SECRET }}";}
-          GRADLE_OPTS: -Xmx4g
 
       - name: Flutter Pub Get
         run: flutter pub get
