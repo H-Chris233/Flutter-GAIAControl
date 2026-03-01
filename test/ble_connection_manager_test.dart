@@ -704,7 +704,8 @@ void main() {
     test('connect schedules reconnect after disconnected', () {
       fakeAsync((async) {
         final manager = BleConnectionManager(ble: fakeBle);
-        unawaited(manager.connect('device-1'));
+        // 需要先等待 connect 完成订阅建立，否则 broadcast stream 的事件会在无监听时被丢弃。
+        async.run((_) => manager.connect('device-1'));
         async.flushMicrotasks();
         async.elapse(Duration.zero);
         async.flushMicrotasks();
@@ -715,6 +716,8 @@ void main() {
           failure: null,
         ));
         async.flushMicrotasks();
+        async.elapse(Duration.zero);
+        async.flushMicrotasks();
 
         fakeBle.connectionController.add(const ConnectionStateUpdate(
           deviceId: 'device-1',
@@ -722,11 +725,15 @@ void main() {
           failure: null,
         ));
         async.flushMicrotasks();
+        async.elapse(Duration.zero);
+        async.flushMicrotasks();
         async.elapse(const Duration(milliseconds: 50));
         async.flushMicrotasks();
 
         expect(fakeBle.connectInvocationCount, 1);
         async.elapse(const Duration(seconds: 6));
+        async.flushMicrotasks();
+        async.elapse(Duration.zero);
         async.flushMicrotasks();
         expect(fakeBle.connectInvocationCount, greaterThanOrEqualTo(2));
 

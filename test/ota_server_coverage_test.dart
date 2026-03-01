@@ -809,11 +809,17 @@ void main() {
       expect(controlled.receivedSegments.last, equals(<int>[0x01]));
     });
 
-    test('startUpdate duplicate request is ignored', () async {
-      server.isUpgrading.value = true;
-      await server.startUpdate();
+    test('startUpdate duplicate request is ignored', () {
+      fakeAsync((async) {
+        server.isUpgrading.value = true;
+        async.run((_) => server.startUpdate());
 
-      expect(server.logText.value, contains('正在升级中'));
+        // 日志写入由 LogBuffer 防抖 120ms 刷新到 logText，这里用虚拟时间推进。
+        async.elapse(const Duration(milliseconds: 150));
+        async.flushMicrotasks();
+
+        expect(server.logText.value, contains('正在升级中'));
+      });
     });
 
     test('startUpdate timer increments time count', () {
