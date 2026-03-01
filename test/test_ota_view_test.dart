@@ -179,6 +179,20 @@ Future<void> _pumpOtaView(WidgetTester tester, _SpyOtaServer server) async {
   await tester.pump();
 }
 
+Future<void> _invokePossiblyAsyncCallback(
+  WidgetTester tester,
+  VoidCallback? callback,
+) async {
+  await tester.runAsync(() async {
+    // MaterialButton.onPressed 的静态类型是 VoidCallback，但实际实现里可能是 async 闭包，
+    // 在运行时会返回一个 Future。这里通过 dynamic call 捕获该返回值并等待完成。
+    final result = (callback as dynamic)?.call();
+    if (result is Future) {
+      await result;
+    }
+  });
+}
+
 Finder _materialButtonWithTextPrefix(String prefix) {
   return find.byWidgetPredicate((widget) {
     if (widget is! MaterialButton) {
@@ -287,10 +301,7 @@ void main() {
     );
     expect(startButton.onPressed, isNotNull);
 
-    await tester.runAsync(() async {
-      startButton.onPressed?.call();
-      await Future<void>.delayed(const Duration(milliseconds: 120));
-    });
+    await _invokePossiblyAsyncCallback(tester, startButton.onPressed);
     await tester.pump();
 
     expect(server.startUpdateWithVersionCheckCallCount, 0);
@@ -314,13 +325,7 @@ void main() {
       _materialButtonWithTextPrefix('开始升级'),
     );
     expect(startButton.onPressed, isNotNull);
-    await tester.runAsync(() async {
-      startButton.onPressed?.call();
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    });
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 500)),
-    );
+    await _invokePossiblyAsyncCallback(tester, startButton.onPressed);
     await tester.pump();
 
     expect(server.startUpdateWithVersionCheckCallCount, 1);
@@ -403,12 +408,8 @@ void main() {
     final chooseButton = tester.widget<MaterialButton>(
       find.widgetWithText(MaterialButton, '选择本地固件(.bin)'),
     );
-    await tester.runAsync(() async {
-      chooseButton.onPressed?.call();
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    });
+    await _invokePossiblyAsyncCallback(tester, chooseButton.onPressed);
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 200));
 
     expect(server.appliedFirmwarePaths, isEmpty);
   });
@@ -422,12 +423,8 @@ void main() {
     final chooseButton = tester.widget<MaterialButton>(
       find.widgetWithText(MaterialButton, '选择本地固件(.bin)'),
     );
-    await tester.runAsync(() async {
-      chooseButton.onPressed?.call();
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    });
+    await _invokePossiblyAsyncCallback(tester, chooseButton.onPressed);
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 200));
 
     expect(find.text('未获取到文件路径，请重试'), findsOneWidget);
     expect(server.appliedFirmwarePaths, isEmpty);
@@ -447,12 +444,8 @@ void main() {
     final chooseButton = tester.widget<MaterialButton>(
       find.widgetWithText(MaterialButton, '选择本地固件(.bin)'),
     );
-    await tester.runAsync(() async {
-      chooseButton.onPressed?.call();
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    });
+    await _invokePossiblyAsyncCallback(tester, chooseButton.onPressed);
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 200));
 
     expect(server.loggedMessages, contains('仅支持 .bin 固件文件'));
     expect(find.text('仅支持 .bin 固件文件'), findsOneWidget);
@@ -473,12 +466,8 @@ void main() {
     final chooseButton = tester.widget<MaterialButton>(
       find.widgetWithText(MaterialButton, '选择本地固件(.bin)'),
     );
-    await tester.runAsync(() async {
-      chooseButton.onPressed?.call();
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    });
+    await _invokePossiblyAsyncCallback(tester, chooseButton.onPressed);
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 200));
 
     expect(server.loggedMessages.last, contains('固件文件不存在'));
     expect(find.textContaining('固件文件不存在'), findsWidgets);
@@ -500,12 +489,8 @@ void main() {
     final chooseButton = tester.widget<MaterialButton>(
       find.widgetWithText(MaterialButton, '选择本地固件(.bin)'),
     );
-    await tester.runAsync(() async {
-      chooseButton.onPressed?.call();
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    });
+    await _invokePossiblyAsyncCallback(tester, chooseButton.onPressed);
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 200));
 
     expect(server.loggedMessages.last, contains('固件文件为空'));
     expect(find.textContaining('固件文件为空'), findsWidgets);
@@ -527,12 +512,8 @@ void main() {
     final chooseButton = tester.widget<MaterialButton>(
       find.widgetWithText(MaterialButton, '选择本地固件(.bin)'),
     );
-    await tester.runAsync(() async {
-      chooseButton.onPressed?.call();
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    });
+    await _invokePossiblyAsyncCallback(tester, chooseButton.onPressed);
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 200));
 
     expect(server.appliedFirmwarePaths, contains(goodBin.path));
     expect(server.firmwarePath.value, goodBin.path);
@@ -550,10 +531,7 @@ void main() {
     final chooseButton = tester.widget<MaterialButton>(
       find.widgetWithText(MaterialButton, '选择本地固件(.bin)'),
     );
-    await tester.runAsync(() async {
-      chooseButton.onPressed?.call();
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    });
+    await _invokePossiblyAsyncCallback(tester, chooseButton.onPressed);
     await tester.pump();
 
     expect(fakeFilePicker.lastInitialDirectory, '/tmp/fw/last_dir');
@@ -585,7 +563,7 @@ void main() {
     await _pumpOtaView(tester, server);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump();
 
     expect(server.disconnectCallCount, 1);
     expect(manager.disconnectCallCount, 1);

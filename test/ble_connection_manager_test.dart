@@ -701,28 +701,37 @@ void main() {
       manager.dispose();
     });
 
-    test('connect schedules reconnect after disconnected', () async {
-      final manager = BleConnectionManager(ble: fakeBle);
-      await manager.connect('device-1');
-      fakeBle.connectionController.add(const ConnectionStateUpdate(
-        deviceId: 'device-1',
-        connectionState: DeviceConnectionState.connected,
-        failure: null,
-      ));
-      await Future<void>.delayed(Duration.zero);
+    test('connect schedules reconnect after disconnected', () {
+      fakeAsync((async) {
+        final manager = BleConnectionManager(ble: fakeBle);
+        unawaited(manager.connect('device-1'));
+        async.flushMicrotasks();
+        async.elapse(Duration.zero);
+        async.flushMicrotasks();
 
-      fakeBle.connectionController.add(const ConnectionStateUpdate(
-        deviceId: 'device-1',
-        connectionState: DeviceConnectionState.disconnected,
-        failure: null,
-      ));
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+        fakeBle.connectionController.add(const ConnectionStateUpdate(
+          deviceId: 'device-1',
+          connectionState: DeviceConnectionState.connected,
+          failure: null,
+        ));
+        async.flushMicrotasks();
 
-      expect(fakeBle.connectInvocationCount, 1);
-      await Future<void>.delayed(const Duration(seconds: 6));
-      expect(fakeBle.connectInvocationCount, greaterThanOrEqualTo(2));
+        fakeBle.connectionController.add(const ConnectionStateUpdate(
+          deviceId: 'device-1',
+          connectionState: DeviceConnectionState.disconnected,
+          failure: null,
+        ));
+        async.flushMicrotasks();
+        async.elapse(const Duration(milliseconds: 50));
+        async.flushMicrotasks();
 
-      manager.dispose();
+        expect(fakeBle.connectInvocationCount, 1);
+        async.elapse(const Duration(seconds: 6));
+        async.flushMicrotasks();
+        expect(fakeBle.connectInvocationCount, greaterThanOrEqualTo(2));
+
+        manager.dispose();
+      });
     });
 
     test('connect logs intermediate connection state changes', () async {

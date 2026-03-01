@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gaia/controller/ble_connection_manager.dart';
@@ -112,22 +113,28 @@ void main() {
     expect(server.userMessage.value, contains('蓝牙连接权限'));
   });
 
-  test('startScan 启动后超时无设备进入空状态', () async {
-    final fakeManager =
-        _FakeBleConnectionManager(scanResult: BleScanStartResult.started);
-    final server = OtaServer(
-      bleManagerOverride: fakeManager,
-      defaultFirmwarePathResolver: () async => '/tmp/test.bin',
-    );
-    Get.put<OtaServer>(server);
+  test('startScan 启动后超时无设备进入空状态', () {
+    fakeAsync((async) {
+      final fakeManager =
+          _FakeBleConnectionManager(scanResult: BleScanStartResult.started);
+      final server = OtaServer(
+        bleManagerOverride: fakeManager,
+        defaultFirmwarePathResolver: () async => '/tmp/test.bin',
+      );
+      Get.put<OtaServer>(server);
 
-    await server.startScan();
-    expect(server.deviceListUiState.value, DeviceListUiState.scanning);
+      unawaited(server.startScan());
+      async.flushMicrotasks();
+      async.elapse(Duration.zero);
+      async.flushMicrotasks();
+      expect(server.deviceListUiState.value, DeviceListUiState.scanning);
 
-    await Future<void>.delayed(const Duration(seconds: 9));
+      async.elapse(const Duration(seconds: 9));
+      async.flushMicrotasks();
 
-    expect(server.deviceListUiState.value, DeviceListUiState.empty);
-    expect(server.isScanning.value, isFalse);
+      expect(server.deviceListUiState.value, DeviceListUiState.empty);
+      expect(server.isScanning.value, isFalse);
+    });
   });
 
   test('stopScan 在无设备时保持空状态提示', () async {

@@ -659,11 +659,15 @@ void main() {
         expect(client.startSession(), isFalse);
       });
 
-      test('startTimeOut timer invokes timeout callback', () async {
-        client.mState = RWCPState.listen;
-        client.startTimeOut(1);
-        await Future<void>.delayed(const Duration(milliseconds: 10));
-        expect(client.isTimeOutRunning, isFalse);
+      test('startTimeOut timer invokes timeout callback', () {
+        fakeAsync((async) {
+          client.mState = RWCPState.listen;
+          client.startTimeOut(1);
+          // startTimeOut 的参数单位为毫秒：这里推进足够宽松的窗口，避免边界抖动。
+          async.elapse(const Duration(milliseconds: 10));
+          async.flushMicrotasks();
+          expect(client.isTimeOutRunning, isFalse);
+        });
       });
 
       test('resendSegment returns early in established state', () {
