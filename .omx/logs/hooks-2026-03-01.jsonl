@@ -1,6 +1,0 @@
-{"timestamp":"2026-03-01T00:00:54.525Z","type":"hook_dispatch","event":"turn-complete","source":"native","enabled":false,"reason":"plugins_disabled"}
-{"timestamp":"2026-03-01T00:00:54.690Z","type":"hook_dispatch","event":"session-idle","source":"native","enabled":false,"reason":"plugins_disabled"}
-{"timestamp":"2026-03-01T00:16:04.883Z","type":"hook_dispatch","event":"turn-complete","source":"native","enabled":false,"reason":"plugins_disabled"}
-{"timestamp":"2026-03-01T00:16:05.121Z","type":"hook_dispatch","event":"session-idle","source":"native","enabled":false,"reason":"plugins_disabled"}
-{"timestamp":"2026-03-01T00:26:31.262Z","type":"hook_dispatch","event":"turn-complete","source":"native","enabled":false,"reason":"plugins_disabled"}
-{"timestamp":"2026-03-01T00:26:31.401Z","type":"hook_dispatch","event":"session-idle","source":"native","enabled":false,"reason":"plugins_disabled"}
