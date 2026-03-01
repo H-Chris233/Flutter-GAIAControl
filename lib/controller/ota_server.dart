@@ -168,6 +168,7 @@ class OtaServer extends GetxService
   Timer? _timer;
   static final bool _enableWriteTraceLog = kDebugMode;
   static const int _dataPacketLogSampleInterval = 50;
+  static const int _validationPollLogSampleInterval = 10;
 
   var timeCount = 0.obs;
 
@@ -221,6 +222,9 @@ class OtaServer extends GetxService
   DateTime? _expectedRebootDisconnectUntil;
   bool _upgradeModeEnabled = false;
   bool _isClosed = false;
+  int _validationPollRawNotifyCounter = 0;
+  int _validationPollTxCounter = 0;
+  int _validationPollRxCounter = 0;
 
   OtaServer({
     BleConnectionManager? bleManagerOverride,
@@ -694,8 +698,21 @@ class OtaServer extends GetxService
 
   void handleRecMsg(List<int> data) async {
     _touchUpgradeWatchdog();
-    // 保持历史日志关键字，避免测试/外部解析依赖被破坏。
-    addLog("收到通知>${StringUtils.byteToHexString(data)}");
+    // 高频通知在“校验轮询阶段”会刷屏，且内容与后续结构化日志重复。
+    // 这里保留“收到通知>”关键字，但在 validating 阶段做采样输出，避免影响阅读。
+    if (_shouldSampleValidationPollLog()) {
+      _validationPollRawNotifyCounter += 1;
+      if (_validationPollRawNotifyCounter <= 3 ||
+          _validationPollRawNotifyCounter % _validationPollLogSampleInterval ==
+              0) {
+        addLog("收到通知>${StringUtils.byteToHexString(data)}");
+      }
+    } else {
+      _validationPollRawNotifyCounter = 0;
+      _validationPollTxCounter = 0;
+      _validationPollRxCounter = 0;
+      addLog("收到通知>${StringUtils.byteToHexString(data)}");
+    }
     final packet = GaiaPacketBLE.fromByte(data);
     if (packet == null) {
       // 保持历史日志关键字，避免测试/外部解析依赖被破坏。
@@ -729,6 +746,20 @@ class OtaServer extends GetxService
       final vmu = VMUPacket.getPackageFromByte(payload);
       if (vmu != null) {
         final vmuData = vmu.mData ?? [];
+        if (_shouldSampleValidationPollLog() &&
+            vmu.mOpCode == OpCodes.upgradeIsValidationDoneCfm) {
+          // 校验轮询：只保留关键信息，避免每次都输出完整 hex。
+          _validationPollRxCounter += 1;
+          if (!(_validationPollRxCounter <= 3 ||
+              _validationPollRxCounter % _validationPollLogSampleInterval ==
+                  0)) {
+            return;
+          }
+          addLog(
+              "$base VMU=${_vmuOpText(vmu.mOpCode)}(0x${vmu.mOpCode.toRadixString(16).padLeft(2, '0').toUpperCase()}) "
+              "len=${vmuData.length}");
+          return;
+        }
         addLog(
             "$base VMU=${_vmuOpText(vmu.mOpCode)}(0x${vmu.mOpCode.toRadixString(16).padLeft(2, '0').toUpperCase()}) "
             "len=${vmuData.length} bytes=${StringUtils.byteToHexString(packet.mBytes ?? [])}");
@@ -1972,6 +2003,19 @@ class OtaServer extends GetxService
         final vmuData = vmu.mData ?? [];
         final isUpgradeData = vmu.mOpCode == OpCodes.upgradeData;
         final isLastDataPacket = vmuData.isNotEmpty && vmuData.first == 0x01;
+        if (_shouldSampleValidationPollLog() &&
+            vmu.mOpCode == OpCodes.upgradeIsValidationDoneReq) {
+          // 校验轮询请求：只做采样，且不输出 bytes，避免刷屏。
+          _validationPollTxCounter += 1;
+          if (!(_validationPollTxCounter <= 3 ||
+              _validationPollTxCounter % _validationPollLogSampleInterval ==
+                  0)) {
+            return;
+          }
+          addLog(
+              "$base VMU=${_vmuOpText(vmu.mOpCode)}(0x${vmu.mOpCode.toRadixString(16).padLeft(2, '0').toUpperCase()})");
+          return;
+        }
         final shouldLogUpgradeData = !isUpgradeData ||
             sendPkgCount <= 3 ||
             sendPkgCount % _dataPacketLogSampleInterval == 0 ||
@@ -2018,6 +2062,18 @@ class OtaServer extends GetxService
         final vmuData = vmu.mData ?? [];
         final isUpgradeData = vmu.mOpCode == OpCodes.upgradeData;
         final isLastDataPacket = vmuData.isNotEmpty && vmuData.first == 0x01;
+        if (_shouldSampleValidationPollLog() &&
+            vmu.mOpCode == OpCodes.upgradeIsValidationDoneReq) {
+          _validationPollTxCounter += 1;
+          if (!(_validationPollTxCounter <= 3 ||
+              _validationPollTxCounter % _validationPollLogSampleInterval ==
+                  0)) {
+            return;
+          }
+          addLog("TX[RWCP] op=$opText seq=$seq gaia=$gaiaName "
+              "vmu=${_vmuOpText(vmu.mOpCode)}(0x${vmu.mOpCode.toRadixString(16).padLeft(2, '0').toUpperCase()})");
+          return;
+        }
         final shouldLogUpgradeData = !isUpgradeData ||
             sendPkgCount <= 3 ||
             sendPkgCount % _dataPacketLogSampleInterval == 0 ||
@@ -2049,6 +2105,13 @@ class OtaServer extends GetxService
       default:
         return "UNKNOWN";
     }
+  }
+
+  bool _shouldSampleValidationPollLog() {
+    // 只在“固件数据已传完后的校验轮询阶段”做日志压缩。
+    // 这段期间：设备会以 0x17 / WAITING_TIME 驱动 host 继续轮询，日志极高频且重复度高。
+    return isUpgrading.value &&
+        _upgradeStateMachine.state == UpgradeState.validating;
   }
 
   String _vmuOpText(int opCode) {
