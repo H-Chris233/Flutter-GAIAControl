@@ -1619,8 +1619,26 @@ class OtaServer extends GetxService
       return;
     }
 
+    // RWCP 节流：
+    // - GAP/超时重传时，继续预灌会扩大 pending/unacked 堆积，使“卡在 GAP 重传”的现象更难恢复
+    // - 同时避免 OtaServer 过度前移 offset，减少内存与队列压力
+    if (mRWCPClient.isResendingSegments) {
+      return;
+    }
+
+    final buffered =
+        mRWCPClient.pendingDataLength + mRWCPClient.unacknowledgedLength;
+    // 经验值：最多缓存 2 个窗口的数据（pending+unacked），上限不超过 64（序号空间）。
+    final maxBuffered = ((mRWCPClient.window * 2).clamp(2, 64)).toInt();
+    if (buffered >= maxBuffered) {
+      return;
+    }
+    final budget = maxBuffered - buffered;
+
     var pumped = 0;
-    while (pumped < _kRwcpPumpMaxPacketsPerTick &&
+    final pumpLimit =
+        (budget < _kRwcpPumpMaxPacketsPerTick) ? budget : _kRwcpPumpMaxPacketsPerTick;
+    while (pumped < pumpLimit &&
         mBytesToSend > 0 &&
         !_upgradePaused &&
         isUpgrading.value) {
@@ -1787,7 +1805,16 @@ class OtaServer extends GetxService
 
   @override
   bool sendRWCPSegment(List<int> bytes) {
-    writeMsgRWCP(bytes);
+    if (_isClosed ||
+        _upgradePaused ||
+        !isUpgrading.value ||
+        !isDeviceConnected.value ||
+        !mIsRWCPEnabled.value) {
+      return false;
+    }
+    // 这里返回 true 的语义是“已成功提交给 BLE 写入链路”（不是“对端已收到”）。
+    // 底层异常会在 writeMsgRWCP 内部进入 fatal state/断链恢复流程。
+    unawaited(writeMsgRWCP(bytes));
     return true;
   }
 

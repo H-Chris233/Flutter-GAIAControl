@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:gaia/utils/gaia/rwcp/rwcp.dart';
 import 'package:gaia/utils/gaia/rwcp/rwcp_client.dart';
 import 'package:gaia/utils/gaia/rwcp/rwcp_listener.dart';
@@ -445,23 +446,33 @@ void main() {
     });
 
     group('sendDataSegment reliability', () {
-      test('send failure keeps pending data and starts timeout for retry', () {
-        listener.sendSucceeds = false;
-        client.mState = RWCPState.established;
-        client.mWindow = 10;
-        client.mCredits = 1;
-        client.mDataTimeOutMs = 1000;
-        client.mPendingData.add([0x01, 0x02]);
-        client.mNextSequence = 7;
+      test('send failure keeps pending data and schedules retry', () {
+        fakeAsync((async) {
+          listener.sendSucceeds = false;
+          client.mState = RWCPState.established;
+          client.mWindow = 10;
+          client.mCredits = 1;
+          client.mDataTimeOutMs = 1000;
+          client.mPendingData.add([0x01, 0x02]);
+          client.mNextSequence = 7;
 
-        client.sendDataSegment();
+          client.sendDataSegment();
 
-        expect(client.mPendingData.length, 1);
-        expect(client.mUnacknowledgedSegments, isEmpty);
-        expect(client.mNextSequence, 7);
-        expect(client.mCredits, 1);
-        expect(client.isTimeOutRunning, isTrue);
-        client.cancelTimeOut();
+          expect(client.mPendingData.length, 1);
+          expect(client.mUnacknowledgedSegments, isEmpty);
+          expect(client.mNextSequence, 7);
+          expect(client.mCredits, 1);
+          // 发送失败意味着“底层暂不可写”，不应该进入协议 TIMEOUT 重传逻辑。
+          expect(client.isTimeOutRunning, isFalse);
+
+          // 触发一次短延迟重试（仍会失败，但不应破坏队列/序号/credits）。
+          async.elapse(RWCPClient.sendRetryBaseDelay +
+              const Duration(milliseconds: 20));
+          expect(client.mPendingData.length, 1);
+          expect(client.mUnacknowledgedSegments, isEmpty);
+
+          client.dispose();
+        });
       });
     });
 
