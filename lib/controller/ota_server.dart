@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import 'package:flutter/services.dart';
@@ -30,6 +31,31 @@ import 'package:gaia/utils/crash_reporter.dart';
 import 'package:gaia/utils/app_settings.dart';
 
 typedef DefaultFirmwarePathResolver = Future<String> Function();
+
+/// 在后台 isolate 中计算文件 MD5（UpperCase），避免大文件在 UI isolate 上计算导致卡顿。
+///
+/// 说明：使用同步分块读取 + AccumulatorSink，避免整包读入内存。
+String _computeFirmwareMd5Upper(String filePath) {
+  final raf = File(filePath).openSync(mode: FileMode.read);
+  try {
+    final output = AccumulatorSink<Digest>();
+    final input = md5.startChunkedConversion(output);
+    while (true) {
+      final chunk = raf.readSync(64 * 1024);
+      if (chunk.isEmpty) {
+        break;
+      }
+      input.add(chunk);
+    }
+    input.close();
+    final digest = output.events.isEmpty ? md5.convert(const <int>[]) : output.events.single;
+    return digest.toString().toUpperCase();
+  } finally {
+    try {
+      raf.closeSync();
+    } catch (_) {}
+  }
+}
 
 enum DeviceListUiState {
   idle,
@@ -137,6 +163,15 @@ class OtaServer extends GetxService
   /// The file to upload on the device.
   List<int>? mBytesFile;
 
+  /// 固件文件长度（byte）
+  int _firmwareLength = 0;
+
+  /// 固件 RandomAccessFile（用于按需分块读取，避免整包读入内存）
+  RandomAccessFile? _firmwareRaf;
+
+  /// 固件读取串行化链（避免并发 setPosition/read 导致读取错位）
+  Future<void> _firmwareReadChain = Future<void>.value();
+
   List<int> writeBytes = [];
 
   /// The maximum value for the data length of a VM upgrade packet for the data transfer step.
@@ -221,6 +256,7 @@ class OtaServer extends GetxService
   DateTime? _expectedRebootDisconnectUntil;
   bool _upgradeModeEnabled = false;
   bool _isClosed = false;
+  bool _rwcpPumpInProgress = false;
 
   OtaServer({
     BleConnectionManager? bleManagerOverride,
@@ -264,7 +300,7 @@ class OtaServer extends GetxService
         "upgradePaused": _upgradePaused,
         "offset": mStartOffset,
         "bytesToSend": mBytesToSend,
-        "fileLength": mBytesFile?.length ?? 0,
+        "fileLength": _effectiveFirmwareLength,
         "progressQueueSize": mProgressQueue.length,
         "payloadSizeMax": mPayloadSizeMax,
         "maxLengthForDataTransfer": mMaxLengthForDataTransfer,
@@ -995,12 +1031,35 @@ class OtaServer extends GetxService
     isUpgrading.value = false;
     _dfuWriteInFlight = false;
     _dfuPendingChunkSize = 0;
+    await _closeFirmwareFile();
     if (sendDisconnect &&
         isDeviceConnected.value &&
         connectDeviceId.isNotEmpty) {
       await Future.delayed(const Duration(milliseconds: 500));
       sendUpgradeDisconnect();
     }
+  }
+
+  Future<void> _closeFirmwareFile() async {
+    mBytesFile = null;
+    _firmwareLength = 0;
+    fileMd5 = "";
+    file = null;
+    final raf = _firmwareRaf;
+    _firmwareRaf = null;
+    _firmwareReadChain = Future<void>.value();
+    if (raf != null) {
+      try {
+        await raf.close();
+      } catch (_) {}
+    }
+  }
+
+  int get _effectiveFirmwareLength {
+    if (_firmwareLength > 0) {
+      return _firmwareLength;
+    }
+    return mBytesFile?.length ?? 0;
   }
 
   Future<bool> loadFirmwareFile() async {
@@ -1016,21 +1075,65 @@ class OtaServer extends GetxService
         addLog("升级文件不存在：$usePath");
         return false;
       }
-      mBytesFile = await selectedFile.readAsBytes();
-      if ((mBytesFile ?? []).isEmpty) {
+      await _closeFirmwareFile();
+      file = selectedFile;
+      _firmwareLength = await selectedFile.length();
+      if (_firmwareLength <= 0) {
         addLog("升级文件为空：$usePath");
         return false;
       }
-      fileMd5 = StringUtils.file2md5(mBytesFile ?? []).toUpperCase();
+      _firmwareRaf = await selectedFile.open(mode: FileMode.read);
+      fileMd5 = await compute(_computeFirmwareMd5Upper, usePath);
       addLog("读取到文件:$usePath");
       addLog("读取到文件MD5$fileMd5");
       return true;
     } catch (e) {
       addLog("读取升级文件失败: error=$e");
-      mBytesFile = null;
-      fileMd5 = "";
+      await _closeFirmwareFile();
       return false;
     }
+  }
+
+  Future<List<int>?> _readFirmwareSlice(int offset, int length) async {
+    // 单测/部分场景下允许直接注入内存固件数据（避免引入真实文件 IO 依赖）。
+    final memoryBytes = mBytesFile;
+    if (_firmwareRaf == null && memoryBytes != null && memoryBytes.isNotEmpty) {
+      if (offset < 0 || offset >= memoryBytes.length) {
+        return null;
+      }
+      if (length <= 0) {
+        return <int>[];
+      }
+      final safeLen = (offset + length <= memoryBytes.length)
+          ? length
+          : (memoryBytes.length - offset);
+      return memoryBytes.sublist(offset, offset + safeLen);
+    }
+
+    final raf = _firmwareRaf;
+    final total = _effectiveFirmwareLength;
+    if (raf == null || total <= 0) {
+      return null;
+    }
+    if (offset < 0 || offset >= total) {
+      return null;
+    }
+    if (length <= 0) {
+      return <int>[];
+    }
+    final safeLen = (offset + length <= total) ? length : (total - offset);
+    final completer = Completer<List<int>>();
+    _firmwareReadChain = _firmwareReadChain.then((_) async {
+      try {
+        await raf.setPosition(offset);
+        final data = await raf.read(safeLen);
+        completer.complete(data);
+      } catch (_) {
+        // 读取失败时返回空数组，由上层统一判定为“读取固件失败”进入错误流程。
+        completer.complete(<int>[]);
+      }
+    });
+    return completer.future;
   }
 
   List<int>? _getMd5TailBytes() {
@@ -1049,7 +1152,9 @@ class OtaServer extends GetxService
   Future<void> sendSyncReq() async {
     //A2305C3A9059C15171BD33F3BB08ADE4 MD5
     //000A0642130004BB08ADE4
-    final loaded = await loadFirmwareFile();
+    final injectedReady =
+        _effectiveFirmwareLength > 0 && fileMd5.trim().isNotEmpty;
+    final loaded = injectedReady ? true : await loadFirmwareFile();
     if (!loaded) {
       await stopUpgrade();
       return;
@@ -1070,18 +1175,18 @@ class OtaServer extends GetxService
     _dfuWriteInFlight = false;
     _dfuPendingChunkSize = 0;
     mStartOffset = 0;
-    mBytesToSend = mBytesFile?.length ?? 0;
+    mBytesToSend = _effectiveFirmwareLength;
     final packet = _buildGaiaPacket(GAIA.commandDfuRequest);
     writeMsg(packet.getBytes());
   }
 
   void sendDfuBegin() {
-    if ((mBytesFile ?? []).isEmpty) {
+    if (_effectiveFirmwareLength <= 0) {
       addLog("DFU_BEGIN失败：固件数据为空");
       stopUpgrade(sendAbort: false);
       return;
     }
-    final fileLength = mBytesFile?.length ?? 0;
+    final fileLength = _effectiveFirmwareLength;
     final fileLengthBytes = [
       (fileLength >> 24) & 0xFF,
       (fileLength >> 16) & 0xFF,
@@ -1101,19 +1206,44 @@ class OtaServer extends GetxService
     writeMsg(packet.getBytes());
   }
 
-  void sendNextDfuPacket() {
+  Future<void> sendNextDfuPacket() async {
     if (!isUpgrading.value || _dfuWriteInFlight) {
       return;
     }
-    final bytes = mBytesFile ?? [];
-    if (mStartOffset >= bytes.length) {
+    final memoryBytes = mBytesFile;
+    if (_firmwareRaf == null && memoryBytes != null && memoryBytes.isNotEmpty) {
+      if (mStartOffset >= memoryBytes.length) {
+        sendDfuCommit();
+        return;
+      }
+      final chunkSize = (memoryBytes.length - mStartOffset) < mPayloadSizeMax
+          ? (memoryBytes.length - mStartOffset)
+          : mPayloadSizeMax;
+      final payload = memoryBytes.sublist(mStartOffset, mStartOffset + chunkSize);
+      _dfuPendingChunkSize = chunkSize;
+      _dfuWriteInFlight = true;
+      final packet = _buildGaiaPacket(GAIA.commandDfuWrite, payload: payload);
+      writeMsg(packet.getBytes());
+      return;
+    }
+
+    final total = _effectiveFirmwareLength;
+    if (total <= 0) {
+      _enterFatalUpgradeState("固件数据为空，无法继续DFU发包");
+      return;
+    }
+    if (mStartOffset >= total) {
       sendDfuCommit();
       return;
     }
-    final chunkSize = (bytes.length - mStartOffset) < mPayloadSizeMax
-        ? (bytes.length - mStartOffset)
+    final chunkSize = (total - mStartOffset) < mPayloadSizeMax
+        ? (total - mStartOffset)
         : mPayloadSizeMax;
-    final payload = bytes.sublist(mStartOffset, mStartOffset + chunkSize);
+    final payload = await _readFirmwareSlice(mStartOffset, chunkSize);
+    if (payload == null || payload.isEmpty) {
+      _enterFatalUpgradeState("读取固件失败，无法继续DFU发包");
+      return;
+    }
     _dfuPendingChunkSize = chunkSize;
     _dfuWriteInFlight = true;
     final packet = _buildGaiaPacket(GAIA.commandDfuWrite, payload: payload);
@@ -1127,11 +1257,11 @@ class OtaServer extends GetxService
     _dfuWriteInFlight = false;
     mStartOffset += _dfuPendingChunkSize;
     _dfuPendingChunkSize = 0;
-    final total = (mBytesFile ?? []).length;
+    final total = _effectiveFirmwareLength;
     if (total > 0) {
       updatePer.value = mStartOffset * 100.0 / total;
     }
-    sendNextDfuPacket();
+    unawaited(sendNextDfuPacket());
   }
 
   void sendDfuCommit() {
@@ -1471,7 +1601,7 @@ class OtaServer extends GetxService
 
   void _handleDataBytesRequest(int bytesToSend, int moveBy) {
     mBytesToSend = bytesToSend;
-    final fileLength = mBytesFile?.length ?? 0;
+    final fileLength = _effectiveFirmwareLength;
 
     // 对齐 gaia-client-src/lib-upgrade DataReader#set(move, requested):
     // - moveBy 为有符号 int32（Java int 会溢出为负数），且仅在 move>0 时前移 offset。
@@ -1491,7 +1621,7 @@ class OtaServer extends GetxService
       return;
     }
     if (!_upgradePaused) {
-      sendNextDataPacket();
+      unawaited(sendNextDataPacket());
     }
   }
 
@@ -1554,21 +1684,53 @@ class OtaServer extends GetxService
   }
 
   //主要发包逻辑
-  void sendNextDataPacket() {
+  Future<void> sendNextDataPacket() async {
     if (!isUpgrading.value) {
-      stopUpgrade();
+      unawaited(stopUpgrade());
       return;
     }
     if (_upgradePaused) {
       return;
     }
-    final bytes = mBytesFile;
-    if (bytes == null || bytes.isEmpty) {
+    final memoryBytes = mBytesFile;
+    if (_firmwareRaf == null && memoryBytes != null && memoryBytes.isNotEmpty) {
+      if (mStartOffset < 0 || mStartOffset > memoryBytes.length) {
+        _enterFatalUpgradeState("发包offset异常: $mStartOffset/${memoryBytes.length}");
+        return;
+      }
+      onFileUploadProgress();
+      var bytesToSend = mBytesToSend < mMaxLengthForDataTransfer - 1
+          ? mBytesToSend
+          : mMaxLengthForDataTransfer - 1;
+      final available = memoryBytes.length - mStartOffset;
+      if (bytesToSend > available) {
+        bytesToSend = available;
+      }
+      if (bytesToSend <= 0) {
+        return;
+      }
+      final lastPacket = available <= bytesToSend;
+      final end = mStartOffset + bytesToSend;
+      final dataToSend = memoryBytes.sublist(mStartOffset, end);
+      if (lastPacket) {
+        _upgradeStateMachine.setWasLastPacket(true);
+        mBytesToSend = 0;
+      } else {
+        _upgradeStateMachine.setWasLastPacket(false);
+        mStartOffset = end;
+        mBytesToSend = mBytesToSend - bytesToSend;
+      }
+      sendData(lastPacket, dataToSend);
+      return;
+    }
+
+    final total = _effectiveFirmwareLength;
+    if (total <= 0) {
       _enterFatalUpgradeState("固件数据为空，无法继续发包");
       return;
     }
-    if (mStartOffset < 0 || mStartOffset > bytes.length) {
-      _enterFatalUpgradeState("发包offset异常: $mStartOffset/${bytes.length}");
+    if (mStartOffset < 0 || mStartOffset > total) {
+      _enterFatalUpgradeState("发包offset异常: $mStartOffset/$total");
       return;
     }
     // inform listeners about evolution
@@ -1577,7 +1739,7 @@ class OtaServer extends GetxService
         ? mBytesToSend
         : mMaxLengthForDataTransfer - 1;
     // to know if we are sending the last data packet.
-    final available = bytes.length - mStartOffset;
+    final available = total - mStartOffset;
     if (bytesToSend > available) {
       bytesToSend = available;
     }
@@ -1590,7 +1752,11 @@ class OtaServer extends GetxService
           "mMaxLengthForDataTransfer$mMaxLengthForDataTransfer bytesToSend$bytesToSend lastPacket$lastPacket");
     }
     final end = mStartOffset + bytesToSend;
-    final dataToSend = bytes.sublist(mStartOffset, end);
+    final dataToSend = await _readFirmwareSlice(mStartOffset, bytesToSend);
+    if (dataToSend == null || dataToSend.length != bytesToSend) {
+      _enterFatalUpgradeState("读取固件失败，无法继续发包");
+      return;
+    }
 
     if (lastPacket) {
       _upgradeStateMachine.setWasLastPacket(true);
@@ -1605,28 +1771,38 @@ class OtaServer extends GetxService
   }
 
   void _pumpRwcpData({bool force = false}) {
-    if (!mIsRWCPEnabled.value || _upgradePaused) {
+    if (_rwcpPumpInProgress) {
       return;
     }
-    if (!isUpgrading.value) {
-      return;
-    }
-    if (!force &&
-        _upgradeStateMachine.resumePoint != ResumePoints.dataTransfer) {
-      return;
-    }
-    if (mBytesToSend <= 0) {
-      return;
-    }
+    _rwcpPumpInProgress = true;
+    unawaited(() async {
+      try {
+        if (!mIsRWCPEnabled.value || _upgradePaused) {
+          return;
+        }
+        if (!isUpgrading.value) {
+          return;
+        }
+        if (!force &&
+            _upgradeStateMachine.resumePoint != ResumePoints.dataTransfer) {
+          return;
+        }
+        if (mBytesToSend <= 0) {
+          return;
+        }
 
-    var pumped = 0;
-    while (pumped < _kRwcpPumpMaxPacketsPerTick &&
-        mBytesToSend > 0 &&
-        !_upgradePaused &&
-        isUpgrading.value) {
-      sendNextDataPacket();
-      pumped += 1;
-    }
+        var pumped = 0;
+        while (pumped < _kRwcpPumpMaxPacketsPerTick &&
+            mBytesToSend > 0 &&
+            !_upgradePaused &&
+            isUpgrading.value) {
+          await sendNextDataPacket();
+          pumped += 1;
+        }
+      } finally {
+        _rwcpPumpInProgress = false;
+      }
+    }());
   }
 
   void _resumeUpgradeDataIfPossible() {
@@ -1644,7 +1820,7 @@ class OtaServer extends GetxService
       _pumpRwcpData();
       return;
     }
-    sendNextDataPacket();
+    unawaited(sendNextDataPacket());
   }
 
   bool _shouldSendUpgradeControlOverRwcp() {
@@ -1655,7 +1831,7 @@ class OtaServer extends GetxService
 
   //计算进度
   void onFileUploadProgress() {
-    final fileLength = (mBytesFile ?? []).length;
+    final fileLength = _effectiveFirmwareLength;
     if (fileLength <= 0) return;
     double percentage = (mStartOffset * 100.0 / fileLength);
     percentage = (percentage < 0)
@@ -1684,7 +1860,7 @@ class OtaServer extends GetxService
     if (mBytesToSend > 0 &&
         _upgradeStateMachine.resumePoint == ResumePoints.dataTransfer &&
         !mIsRWCPEnabled.value) {
-      sendNextDataPacket();
+      unawaited(sendNextDataPacket());
     }
     if (mIsRWCPEnabled.value) {
       _pumpRwcpData();
@@ -1866,6 +2042,8 @@ class OtaServer extends GetxService
   void disconnect() {
     // 避免断开后 UpgradeStateMachine 的轮询 Timer 继续触发发包。
     _upgradeStateMachine.dispose();
+    // 断开连接时释放固件文件句柄，避免句柄泄露与后台读写。
+    unawaited(_closeFirmwareFile());
     _reconnectTimer?.cancel();
     _scanWatchdogTimer?.cancel();
     _cancelRecoveryRetryTimer();
@@ -2229,6 +2407,8 @@ class OtaServer extends GetxService
     // 避免 onClose 后仍有异步写入触发看门狗/升级状态变更（单测与真实场景均可能出现）。
     isUpgrading.value = false;
     _upgradeStateMachine.dispose();
+    // 关闭 Service 时释放固件文件句柄。
+    unawaited(_closeFirmwareFile());
     _deviceListWorker?.dispose();
     _logBuffer.dispose();
     _bleManager.dispose();
