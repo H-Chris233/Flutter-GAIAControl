@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 
+import 'log.dart';
+
 class AppSettings {
   static const String _fileName = "gaia_settings.json";
   static const String _keyLastFirmwarePath = "lastFirmwarePath";
@@ -13,7 +15,9 @@ class AppSettings {
       if (external != null) {
         return external;
       }
-    } catch (_) {}
+    } catch (e, s) {
+      Log.w("AppSettings", "getExternalStorageDirectory failed: $e\n$s");
+    }
     return getApplicationDocumentsDirectory();
   }
 
@@ -38,7 +42,8 @@ class AppSettings {
         return value.trim();
       }
       return null;
-    } catch (_) {
+    } catch (e, s) {
+      Log.w("AppSettings", "readLastFirmwarePath failed: $e\n$s");
       return null;
     }
   }
@@ -55,6 +60,8 @@ class AppSettings {
         "updatedAt": DateTime.now().toIso8601String(),
       };
       await file.writeAsString(jsonEncode(payload), flush: true);
-    } catch (_) {}
+    } catch (e, s) {
+      Log.w("AppSettings", "writeLastFirmwarePath failed: $e\n$s");
+    }
   }
 }

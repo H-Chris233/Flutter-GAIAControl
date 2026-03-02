@@ -218,6 +218,11 @@ class UpgradeStateMachine {
       case OpCodes.upgradeCompleteIndWithStatus:
         _handleCompleteIndWithStatus(packet);
         break;
+      default:
+        // 兜底：协议演进或链路异常时，未知 opcode 不能静默忽略，否则表现为“卡住但无日志”。
+        delegate.onLog(
+            "未知VMU包 opcode=0x${packet.mOpCode.toRadixString(16).padLeft(2, '0')} len=${(packet.mData ?? const <int>[]).length}");
+        break;
     }
   }
 

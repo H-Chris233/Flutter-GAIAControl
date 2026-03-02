@@ -864,6 +864,15 @@ class OtaServer extends GetxService
         stopUpgrade(sendAbort: false, sendDisconnect: false);
         return;
       }
+      // 兜底：未知/未处理的 V3 Response 不能静默忽略，否则升级现场容易“卡住但无日志”。
+      addLog(
+          "未处理V3响应 feature=$feature cmdId=$commandId payloadLen=${payload.length}");
+      if (isUpgrading.value) {
+        _reportDeviceError(
+          "未处理V3响应 feature=$feature cmdId=$commandId",
+          triggerRecovery: false,
+        );
+      }
       return;
     }
 

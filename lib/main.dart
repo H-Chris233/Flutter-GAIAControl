@@ -8,13 +8,17 @@ import 'package:permission_handler/permission_handler.dart';
 import 'controller/ota_server.dart';
 import 'test_ota_view.dart';
 import 'utils/crash_reporter.dart';
+import 'utils/log.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await CrashReporter.init();
     CrashReporter.maybeInstance?.installGlobalHandlers();
-  } catch (_) {}
+  } catch (e, s) {
+    // 关键初始化失败不能静默吞掉：至少在 debug 下输出，便于排障。
+    Log.e("main", "CrashReporter init/install failed: $e\n$s");
+  }
   runZonedGuarded(
     () {
       runApp(const MyApp());

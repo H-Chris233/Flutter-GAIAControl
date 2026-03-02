@@ -8,6 +8,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'log.dart';
+
 typedef CrashContextProvider = Map<String, Object?> Function();
 typedef CrashLogSnapshotProvider = String Function();
 
@@ -41,7 +43,9 @@ class CrashReporter {
         if (external != null) {
           baseDir = external;
         }
-      } catch (_) {}
+      } catch (e, s) {
+        Log.w("CrashReporter", "getExternalStorageDirectory failed: $e\n$s");
+      }
     }
 
     final reportsDir = Directory("${baseDir.path}/crash_reports");
@@ -80,13 +84,17 @@ class CrashReporter {
     // 防御性同步：部分测试/嵌入环境可能通过 WidgetsBinding 读取该回调。
     try {
       WidgetsBinding.instance.platformDispatcher.onError = handler;
-    } catch (_) {}
+    } catch (e, s) {
+      Log.w("CrashReporter", "bind WidgetsBinding platformDispatcher failed: $e\n$s");
+    }
 
     try {
       if (_isolateErrorPort != null) {
         Isolate.current.removeErrorListener(_isolateErrorPort!.sendPort);
       }
-    } catch (_) {}
+    } catch (e, s) {
+      Log.w("CrashReporter", "removeErrorListener failed: $e\n$s");
+    }
     _isolateErrorPort?.close();
     _isolateErrorPort = RawReceivePort((dynamic message) {
       try {
@@ -95,7 +103,9 @@ class CrashReporter {
           final stack = StackTrace.fromString("${message[1]}");
           unawaited(recordError(error, stack, context: "Isolate"));
         }
-      } catch (_) {}
+      } catch (e, s) {
+        Log.w("CrashReporter", "isolate error handler failed: $e\n$s");
+      }
     });
     Isolate.current.addErrorListener(_isolateErrorPort!.sendPort);
   }
@@ -117,7 +127,8 @@ class CrashReporter {
         return path;
       }
       return null;
-    } catch (_) {
+    } catch (e, s) {
+      Log.w("CrashReporter", "consumePendingReportPath failed: $e\n$s");
       return null;
     }
   }
@@ -140,14 +151,16 @@ class CrashReporter {
       Map<String, Object?> extra = {};
       try {
         extra = _contextProvider?.call() ?? {};
-      } catch (_) {
+      } catch (e, s) {
+        Log.w("CrashReporter", "contextProvider failed: $e\n$s");
         extra = {};
       }
 
       String logs = "";
       try {
         logs = _logSnapshotProvider?.call() ?? "";
-      } catch (_) {
+      } catch (e, s) {
+        Log.w("CrashReporter", "logSnapshotProvider failed: $e\n$s");
         logs = "";
       }
 
@@ -180,14 +193,18 @@ class CrashReporter {
 
       try {
         await file.writeAsString(content.toString(), flush: true);
-      } catch (_) {}
+      } catch (e, s) {
+        Log.w("CrashReporter", "write crash report failed: $e\n$s");
+      }
 
       try {
         await _pendingFile.writeAsString(
           jsonEncode({"path": file.path, "ts": ts}),
           flush: true,
         );
-      } catch (_) {}
+      } catch (e, s) {
+        Log.w("CrashReporter", "write pending file failed: $e\n$s");
+      }
     } finally {
       _isRecording = false;
     }
@@ -198,7 +215,9 @@ class CrashReporter {
       if (_isolateErrorPort != null) {
         Isolate.current.removeErrorListener(_isolateErrorPort!.sendPort);
       }
-    } catch (_) {}
+    } catch (e, s) {
+      Log.w("CrashReporter", "dispose removeErrorListener failed: $e\n$s");
+    }
     _isolateErrorPort?.close();
     _isolateErrorPort = null;
   }
