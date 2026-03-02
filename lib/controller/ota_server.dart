@@ -585,7 +585,8 @@ class OtaServer extends GetxService
       _logRwcpRxPacket(data);
       mRWCPClient.onReceiveRWCPSegment(data);
     });
-    if (!channelReady || !_bleManager.isDeviceConnected) {
+    // 连接状态以 OtaServer 的 isDeviceConnected 为单一真相，避免多处来源导致竞态/不一致。
+    if (!channelReady || !isDeviceConnected.value) {
       rwcpStatusText.value = "服务未就绪";
       _rwcpSetupInProgress = false;
       return;

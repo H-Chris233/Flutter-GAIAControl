@@ -369,7 +369,7 @@ void main() {
 
     test('setDataEndpointMode response triggers registerRWCP when enabled',
         () async {
-      bleManager.isDeviceConnected = true;
+      bleManager.setIsDeviceConnectedForTest(true);
       server.mIsRWCPEnabled.value = true;
       server.enableRwcpForUpgrade();
       await Future<void>.delayed(Duration.zero);
@@ -799,7 +799,7 @@ void main() {
       final controlled = _ControlledRWCPClient(server);
       server.mRWCPClient = controlled;
       server.mIsRWCPEnabled.value = true;
-      bleManager.isDeviceConnected = true;
+      bleManager.setIsDeviceConnectedForTest(true);
       await server.registerRWCP();
       bleManager.latestRwcpListener?.call(<int>[0x01]);
 

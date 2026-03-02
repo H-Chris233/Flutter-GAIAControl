@@ -1000,7 +1000,7 @@ void main() {
         ble: fakeBle,
         discoverResult: true,
       );
-      manager.connectedDeviceId = 'device-1';
+      manager.setConnectedDeviceIdForTest('device-1');
 
       final ready = await manager.registerNotifyChannel((data) {
         received.add(data);
@@ -1025,7 +1025,7 @@ void main() {
         ble: fakeBle,
         discoverResult: false,
       );
-      manager.connectedDeviceId = 'device-1';
+      manager.setConnectedDeviceIdForTest('device-1');
 
       final ready = await manager.registerNotifyChannel((_) {});
 
@@ -1052,7 +1052,7 @@ void main() {
         discoverResult: true,
         onLog: logs.add,
       );
-      manager.connectedDeviceId = 'device-1';
+      manager.setConnectedDeviceIdForTest('device-1');
       fakeBle.subscribeThrowCharacteristicIds
           .add(manager.notifyCharacteristicUuid.toString());
 
@@ -1071,7 +1071,7 @@ void main() {
         discoverResult: true,
         onLog: logs.add,
       );
-      manager.connectedDeviceId = 'device-1';
+      manager.setConnectedDeviceIdForTest('device-1');
 
       final ready = await manager.registerNotifyChannel((_) {});
       expect(ready, isTrue);
@@ -1090,7 +1090,7 @@ void main() {
         ble: fakeBle,
         discoverResult: true,
       );
-      manager.connectedDeviceId = 'device-1';
+      manager.setConnectedDeviceIdForTest('device-1');
 
       final ready = await manager.registerRwcpChannel((data) {
         received.add(data);
@@ -1115,7 +1115,7 @@ void main() {
         ble: fakeBle,
         discoverResult: false,
       );
-      manager.connectedDeviceId = 'device-1';
+      manager.setConnectedDeviceIdForTest('device-1');
 
       final ready = await manager.registerRwcpChannel((_) {});
 
@@ -1142,7 +1142,7 @@ void main() {
         discoverResult: true,
         onLog: logs.add,
       );
-      manager.connectedDeviceId = 'device-1';
+      manager.setConnectedDeviceIdForTest('device-1');
       fakeBle.subscribeThrowCharacteristicIds
           .add(manager.writeNoResponseCharacteristicUuid.toString());
 
@@ -1161,7 +1161,7 @@ void main() {
         discoverResult: true,
         onLog: logs.add,
       );
-      manager.connectedDeviceId = 'device-1';
+      manager.setConnectedDeviceIdForTest('device-1');
 
       final ready = await manager.registerRwcpChannel((_) {});
       expect(ready, isTrue);
@@ -1180,7 +1180,7 @@ void main() {
         ble: fakeBle,
         discoverResult: true,
       );
-      manager.connectedDeviceId = 'device-1';
+      manager.setConnectedDeviceIdForTest('device-1');
 
       final ready = await manager.registerRwcpChannel(received.add);
       expect(ready, isTrue);
@@ -1197,7 +1197,7 @@ void main() {
     test('write and mtu methods call BleClient with expected arguments',
         () async {
       final manager = BleConnectionManager(ble: fakeBle);
-      manager.connectedDeviceId = 'device-1';
+      manager.setConnectedDeviceIdForTest('device-1');
 
       await manager.writeWithResponse(<int>[0x01]);
       await manager.writeWithoutResponse(<int>[0x02]);
@@ -1322,7 +1322,7 @@ void main() {
 
     test('disconnect marks device as disconnected', () {
       final manager = BleConnectionManager(ble: fakeBle);
-      manager.isDeviceConnected = true;
+      manager.setIsDeviceConnectedForTest(true);
 
       manager.disconnect();
 

@@ -148,10 +148,26 @@ class BleConnectionManager {
   final RxList<DiscoveredDevice> devices = <DiscoveredDevice>[].obs;
 
   /// 当前连接的设备 ID
-  String connectedDeviceId = "";
+  String _connectedDeviceId = "";
+
+  /// 当前连接的设备 ID（只读对外暴露，避免多处写入造成“多份真相”）
+  String get connectedDeviceId => _connectedDeviceId;
 
   /// 设备是否已连接
-  bool isDeviceConnected = false;
+  bool _isDeviceConnected = false;
+
+  /// 设备是否已连接（只读对外暴露，避免多处写入造成“多份真相”）
+  bool get isDeviceConnected => _isDeviceConnected;
+
+  @visibleForTesting
+  void setConnectedDeviceIdForTest(String deviceId) {
+    _connectedDeviceId = deviceId;
+  }
+
+  @visibleForTesting
+  void setIsDeviceConnectedForTest(bool connected) {
+    _isDeviceConnected = connected;
+  }
 
   /// OTA 服务 UUID
   final Uuid otaServiceUuid = BleConstants.otaServiceUuid;
@@ -358,13 +374,13 @@ class BleConnectionManager {
       final failure = connectionState.failure;
       if (state == DeviceConnectionState.connected) {
         _reconnectTimer?.cancel();
-        isDeviceConnected = true;
-        connectedDeviceId = deviceId;
-        _log("连接成功$connectedDeviceId");
+        _isDeviceConnected = true;
+        _connectedDeviceId = deviceId;
+        _log("连接成功$_connectedDeviceId");
         onConnectionStateChanged?.call(state, deviceId);
         onConnected?.call();
       } else if (state == DeviceConnectionState.disconnected) {
-        isDeviceConnected = false;
+        _isDeviceConnected = false;
         if (failure != null) {
           _log('断开连接: $failure');
         } else {
@@ -372,13 +388,13 @@ class BleConnectionManager {
         }
         onConnectionStateChanged?.call(state, deviceId);
         onDisconnected?.call();
-        if (_autoReconnectEnabled && connectedDeviceId.isNotEmpty) {
+        if (_autoReconnectEnabled && _connectedDeviceId.isNotEmpty) {
           _scheduleReconnect(generation, onConnected, onDisconnected);
         } else {
           _log("自动重连已关闭，等待手动重连");
         }
       } else {
-        isDeviceConnected = false;
+        _isDeviceConnected = false;
         if (failure != null) {
           _log('连接状态变更: $state failure=$failure');
         } else {
@@ -390,7 +406,7 @@ class BleConnectionManager {
       if (generation != _connectionGeneration) {
         return;
       }
-      isDeviceConnected = false;
+      _isDeviceConnected = false;
       _log("连接异常: $error");
       onError?.call(error);
       onDisconnected?.call();
@@ -409,11 +425,11 @@ class BleConnectionManager {
         return;
       }
       if (!_autoReconnectEnabled ||
-          isDeviceConnected ||
-          connectedDeviceId.isEmpty) {
+          _isDeviceConnected ||
+          _connectedDeviceId.isEmpty) {
         return;
       }
-      connect(connectedDeviceId,
+      connect(_connectedDeviceId,
           onConnected: onConnected, onDisconnected: onDisconnected);
     });
   }
@@ -561,7 +577,7 @@ class BleConnectionManager {
     _connectionSubscription = null;
     _notifySubscription = null;
     _rwcpSubscription = null;
-    isDeviceConnected = false;
+    _isDeviceConnected = false;
   }
 
   /// 串行执行 GATT 操作（确保链在异常后可继续）。
