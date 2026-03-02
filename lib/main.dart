@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'controller/ota_server.dart';
+import 'test_ota_view.dart';
 import 'utils/crash_reporter.dart';
 
 Future<void> main() async {
@@ -53,6 +54,8 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   Worker? _messageWorker;
+  Worker? _connectionWorker;
+  bool _navigatedToOta = false;
 
   @override
   void initState() {
@@ -93,11 +96,26 @@ class _MyHomePageState extends State<MyHomePage> {
       }
       ota.userMessage.value = "检测到上次异常退出，崩溃日志已保存: $last";
     }());
+
+    _connectionWorker = ever<bool>(
+      ota.isDeviceConnected,
+      (connected) {
+        if (!mounted) return;
+        if (!connected) {
+          _navigatedToOta = false;
+          return;
+        }
+        if (_navigatedToOta) return;
+        _navigatedToOta = true;
+        Get.to(() => const TestOtaView());
+      },
+    );
   }
 
   @override
   void dispose() {
     _messageWorker?.dispose();
+    _connectionWorker?.dispose();
     CrashReporter.maybeInstance?.dispose();
     super.dispose();
   }

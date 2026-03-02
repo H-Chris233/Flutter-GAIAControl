@@ -8,7 +8,6 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:path_provider/path_provider.dart';
 
-import 'package:gaia/test_ota_view.dart';
 import 'package:gaia/utils/ble_constants.dart';
 import 'package:gaia/utils/string_utils.dart';
 import 'package:gaia/utils/gaia/confirmation_type.dart';
@@ -471,9 +470,6 @@ class OtaServer extends GetxService
           addLog("Vendor模式固定为V3，使用${_vendorToHex(_activeVendorId)}");
           await registerNotice();
           await restPayloadSize();
-          if (!isUpgrading.value) {
-            Get.to(() => const TestOtaView());
-          }
         },
         onDisconnected: () {
           final wasUpgrading = isUpgrading.value;
