@@ -38,7 +38,7 @@ jobs:
         run: flutter test --coverage
 
       - name: Check Coverage (>=90%)
-        run: python3 tool/check_coverage.py --lcov coverage/lcov.info --exclude lib/main.dart --min-percent 90
+        run: python3 tool/check_coverage.py --lcov coverage/lcov.info --exclude lib/main.dart --min-percent 90 --fail-on-missing
 
   build:
     name: Build APK

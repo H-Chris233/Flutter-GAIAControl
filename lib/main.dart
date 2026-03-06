@@ -207,7 +207,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       isConnecting && connectingId == device.id;
                   final appConnectedThis =
                       OtaServer.to.isDeviceConnected.value &&
-                          OtaServer.to.connectDeviceId == device.id;
+                          OtaServer.to.currentConnectedDeviceId == device.id;
                   final phoneConnectedThis = appConnectedThis ||
                       OtaServer.to.isSystemConnectedScanDevice(device);
                   return InkWell(

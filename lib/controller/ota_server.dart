@@ -103,7 +103,11 @@ class OtaServer extends GetxService
   final String tag = "OtaServer";
   late final RxList<DiscoveredDevice> devices;
 
+  /// 最近一次成功/尝试连接的设备 ID（用于自动恢复时的重连目标）。
   String connectDeviceId = "";
+
+  /// 当前已连接设备 ID 以 BleConnectionManager 为单一真相。
+  String get currentConnectedDeviceId => _bleManager.connectedDeviceId;
   final Uuid otaUUID = BleConstants.otaServiceUuid;
   final Uuid notifyUUID = BleConstants.notifyCharacteristicUuid;
   final Uuid writeUUID = BleConstants.writeCharacteristicUuid;
@@ -279,10 +283,9 @@ class OtaServer extends GetxService
           ble: FlutterReactiveBleClient(FlutterReactiveBle()),
           onLog: addLog,
           onConnectionStateChanged: (state, deviceId) {
-            if (state != DeviceConnectionState.connected) {
-              return;
+            if (state == DeviceConnectionState.connected) {
+              connectDeviceId = deviceId;
             }
-            connectDeviceId = deviceId;
           },
         );
     devices = _bleManager.devices;
@@ -445,6 +448,7 @@ class OtaServer extends GetxService
 
   Future<void> connectDevice(String id) async {
     try {
+      connectDeviceId = id;
       isConnecting.value = true;
       connectingDeviceId.value = id;
       _scanWatchdogTimer?.cancel();
@@ -459,7 +463,6 @@ class OtaServer extends GetxService
           isConnecting.value = false;
           connectingDeviceId.value = "";
           isDeviceConnected.value = true;
-          connectDeviceId = id;
           _cancelRecoveryRetryTimer();
           recoveryStatusText.value = "空闲";
           if (!isUpgrading.value) {
@@ -585,7 +588,8 @@ class OtaServer extends GetxService
       _logRwcpRxPacket(data);
       mRWCPClient.onReceiveRWCPSegment(data);
     });
-    // 连接状态以 OtaServer 的 isDeviceConnected 为单一真相，避免多处来源导致竞态/不一致。
+    // 当前连接设备 ID 与底层连接状态以 BleConnectionManager 为单一真相，
+    // OtaServer 只维护面向 UI 的响应式镜像，避免多处写入造成竞态。
     if (!channelReady || !isDeviceConnected.value) {
       rwcpStatusText.value = "服务未就绪";
       _rwcpSetupInProgress = false;
@@ -1034,7 +1038,7 @@ class OtaServer extends GetxService
     _dfuPendingChunkSize = 0;
     if (sendDisconnect &&
         isDeviceConnected.value &&
-        connectDeviceId.isNotEmpty) {
+        currentConnectedDeviceId.isNotEmpty) {
       await Future.delayed(const Duration(milliseconds: 500));
       sendUpgradeDisconnect();
     }

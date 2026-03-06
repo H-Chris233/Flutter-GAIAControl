@@ -169,6 +169,14 @@ class BleConnectionManager {
     _isDeviceConnected = connected;
   }
 
+  void _setConnectionState({
+    required bool connected,
+    String deviceId = "",
+  }) {
+    _isDeviceConnected = connected;
+    _connectedDeviceId = connected ? deviceId : "";
+  }
+
   /// OTA 服务 UUID
   final Uuid otaServiceUuid = BleConstants.otaServiceUuid;
 
@@ -295,6 +303,13 @@ class BleConnectionManager {
         _log("bluetoothScan deny");
         return BleScanStartResult.bluetoothScanDenied;
       }
+      final bluetoothConnect = statuses[Permission.bluetoothConnect] ??
+          statuses[Permission.bluetooth] ??
+          PermissionStatus.granted;
+      if (!bluetoothConnect.isGranted) {
+        _log("bluetoothConnect deny");
+        return BleScanStartResult.bluetoothConnectDenied;
+      }
     } else {
       var bluetooth = await _bluetoothPermissionStatus();
       if (!bluetooth.isGranted) {
@@ -374,13 +389,12 @@ class BleConnectionManager {
       final failure = connectionState.failure;
       if (state == DeviceConnectionState.connected) {
         _reconnectTimer?.cancel();
-        _isDeviceConnected = true;
-        _connectedDeviceId = deviceId;
+        _setConnectionState(connected: true, deviceId: deviceId);
         _log("连接成功$_connectedDeviceId");
         onConnectionStateChanged?.call(state, deviceId);
         onConnected?.call();
       } else if (state == DeviceConnectionState.disconnected) {
-        _isDeviceConnected = false;
+        _setConnectionState(connected: false);
         if (failure != null) {
           _log('断开连接: $failure');
         } else {
@@ -388,8 +402,8 @@ class BleConnectionManager {
         }
         onConnectionStateChanged?.call(state, deviceId);
         onDisconnected?.call();
-        if (_autoReconnectEnabled && _connectedDeviceId.isNotEmpty) {
-          _scheduleReconnect(generation, onConnected, onDisconnected);
+        if (_autoReconnectEnabled && deviceId.isNotEmpty) {
+          _scheduleReconnect(generation, deviceId, onConnected, onDisconnected);
         } else {
           _log("自动重连已关闭，等待手动重连");
         }
@@ -406,8 +420,9 @@ class BleConnectionManager {
       if (generation != _connectionGeneration) {
         return;
       }
-      _isDeviceConnected = false;
+      _setConnectionState(connected: false);
       _log("连接异常: $error");
+      onConnectionStateChanged?.call(DeviceConnectionState.disconnected, deviceId);
       onError?.call(error);
       onDisconnected?.call();
     });
@@ -416,6 +431,7 @@ class BleConnectionManager {
   /// 调度重连
   void _scheduleReconnect(
     int expectedGeneration,
+    String deviceId,
     VoidCallback? onConnected,
     VoidCallback? onDisconnected,
   ) {
@@ -424,13 +440,10 @@ class BleConnectionManager {
       if (expectedGeneration != _connectionGeneration) {
         return;
       }
-      if (!_autoReconnectEnabled ||
-          _isDeviceConnected ||
-          _connectedDeviceId.isEmpty) {
+      if (!_autoReconnectEnabled || _isDeviceConnected || deviceId.isEmpty) {
         return;
       }
-      connect(_connectedDeviceId,
-          onConnected: onConnected, onDisconnected: onDisconnected);
+      connect(deviceId, onConnected: onConnected, onDisconnected: onDisconnected);
     });
   }
 
@@ -577,7 +590,7 @@ class BleConnectionManager {
     _connectionSubscription = null;
     _notifySubscription = null;
     _rwcpSubscription = null;
-    _isDeviceConnected = false;
+    _setConnectionState(connected: false);
   }
 
   /// 串行执行 GATT 操作（确保链在异常后可继续）。

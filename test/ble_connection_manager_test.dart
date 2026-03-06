@@ -528,9 +528,11 @@ void main() {
       manager.dispose();
     });
 
-    test('startScan ignores bluetoothConnect denial on Android', () async {
+    test('startScan returns bluetoothConnectDenied on Android', () async {
+      final logs = <String>[];
       final manager = BleConnectionManager(
         ble: fakeBle,
+        onLog: logs.add,
         isAndroidPlatform: () => true,
         requestAndroidPermissions: () async => <Permission, PermissionStatus>{
           Permission.location: PermissionStatus.granted,
@@ -541,7 +543,8 @@ void main() {
 
       final result = await manager.startScan();
 
-      expect(result, BleScanStartResult.started);
+      expect(result, BleScanStartResult.bluetoothConnectDenied);
+      expect(logs, contains('bluetoothConnect deny'));
       manager.dispose();
     });
 
@@ -886,6 +889,7 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       expect(manager.isDeviceConnected, isFalse);
+      expect(manager.connectedDeviceId, '');
       expect(disconnectedCalled, isTrue);
       expect(stateEvents, contains(DeviceConnectionState.disconnected));
 
@@ -1320,13 +1324,15 @@ void main() {
       await ble.dispose();
     });
 
-    test('disconnect marks device as disconnected', () {
+    test('disconnect clears connection state snapshot', () {
       final manager = BleConnectionManager(ble: fakeBle);
       manager.setIsDeviceConnectedForTest(true);
+      manager.setConnectedDeviceIdForTest('device-1');
 
       manager.disconnect();
 
       expect(manager.isDeviceConnected, isFalse);
+      expect(manager.connectedDeviceId, '');
       manager.dispose();
     });
   });
