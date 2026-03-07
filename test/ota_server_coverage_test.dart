@@ -245,6 +245,7 @@ class _ControlledRWCPClient extends RWCPClient {
   bool sendReturns;
   bool throwOnSend = false;
   bool cancelCalled = false;
+  final List<List<int>?> receivedSegments = <List<int>?>[];
 
   @override
   bool sendData(List<int> bytes) {
@@ -252,6 +253,14 @@ class _ControlledRWCPClient extends RWCPClient {
       throw StateError('rwcp send throws');
     }
     return sendReturns;
+  }
+
+  @override
+  bool onReceiveRWCPSegment(List<int>? bytes) {
+    receivedSegments.add(bytes == null ? null : List<int>.from(bytes));
+    // 该测试用 fake client 仅用于验证“回调是否把 bytes 交给 RWCPClient”，
+    // 不需要在这里执行真实 RWCP 解析/状态机。
+    return true;
   }
 
   @override
@@ -360,7 +369,7 @@ void main() {
 
     test('setDataEndpointMode response triggers registerRWCP when enabled',
         () async {
-      bleManager.isDeviceConnected = true;
+      bleManager.setIsDeviceConnectedForTest(true);
       server.mIsRWCPEnabled.value = true;
       server.enableRwcpForUpgrade();
       await Future<void>.delayed(Duration.zero);
@@ -787,28 +796,41 @@ void main() {
     });
 
     test('registerRWCP callback forwards bytes to rwcp client', () async {
+      final controlled = _ControlledRWCPClient(server);
+      server.mRWCPClient = controlled;
       server.mIsRWCPEnabled.value = true;
-      bleManager.isDeviceConnected = true;
+      bleManager.setIsDeviceConnectedForTest(true);
       await server.registerRWCP();
       bleManager.latestRwcpListener?.call(<int>[0x01]);
 
       expect(bleManager.registerRwcpCalled, 1);
       expect(bleManager.latestRwcpListener, isNotNull);
+      expect(controlled.receivedSegments, isNotEmpty);
+      expect(controlled.receivedSegments.last, equals(<int>[0x01]));
     });
 
-    test('startUpdate duplicate request is ignored', () async {
-      server.isUpgrading.value = true;
-      server.startUpdate();
-      await Future<void>.delayed(const Duration(milliseconds: 120));
+    test('startUpdate duplicate request is ignored', () {
+      fakeAsync((async) {
+        server.isUpgrading.value = true;
+        async.run((_) => server.startUpdate());
 
-      expect(server.logText.value, contains('正在升级中'));
+        // 日志写入由 LogBuffer 防抖 120ms 刷新到 logText，这里用虚拟时间推进。
+        async.elapse(const Duration(milliseconds: 150));
+        async.flushMicrotasks();
+
+        expect(server.logText.value, contains('正在升级中'));
+      });
     });
 
-    test('startUpdate timer increments time count', () async {
-      server.startUpdate();
-      await Future<void>.delayed(const Duration(milliseconds: 1100));
+    test('startUpdate timer increments time count', () {
+      fakeAsync((async) {
+        unawaited(server.startUpdate());
+        async.flushMicrotasks();
+        async.elapse(const Duration(milliseconds: 1100));
+        async.flushMicrotasks();
 
-      expect(server.timeCount.value, greaterThanOrEqualTo(1));
+        expect(server.timeCount.value, greaterThanOrEqualTo(1));
+      });
     });
 
     test('startUpdateWithVersionCheck success starts upgrade', () async {
@@ -850,23 +872,26 @@ void main() {
       expect(server.logText.value, contains('正在升级中'));
     });
 
-    test('queryApplicationVersion duplicate call and timeout', () async {
-      var failedCount = 0;
-      server.isDeviceConnected.value = true;
-      server.queryApplicationVersion(
-        tag: 'A',
-        onSuccess: (_) {},
-        onFailed: () => failedCount += 1,
-      );
-      server.queryApplicationVersion(
-        tag: 'B',
-        onSuccess: (_) {},
-        onFailed: () => failedCount += 10,
-      );
-      await Future<void>.delayed(
-          Duration(seconds: OtaServer.kVersionQueryTimeoutSeconds + 1));
+    test('queryApplicationVersion duplicate call and timeout', () {
+      fakeAsync((async) {
+        var failedCount = 0;
+        server.isDeviceConnected.value = true;
+        server.queryApplicationVersion(
+          tag: 'A',
+          onSuccess: (_) {},
+          onFailed: () => failedCount += 1,
+        );
+        server.queryApplicationVersion(
+          tag: 'B',
+          onSuccess: (_) {},
+          onFailed: () => failedCount += 10,
+        );
+        async.elapse(
+            Duration(seconds: OtaServer.kVersionQueryTimeoutSeconds + 1));
+        async.flushMicrotasks();
 
-      expect(failedCount, 1);
+        expect(failedCount, 1);
+      });
     });
 
     test('application version parser returns hex for non printable payload',
@@ -924,14 +949,17 @@ void main() {
       expect(server.firmwarePath.value, firmwarePath);
     });
 
-    test('DFU commit ack triggers result timeout fallback', () async {
-      server.isUpgrading.value = true;
-      server.sendDfuCommit();
-      server.onDfuCommitAck();
-      await Future<void>.delayed(
-          Duration(seconds: OtaServer.kDfuResultQueryTimeoutSeconds + 1));
+    test('DFU commit ack triggers result timeout fallback', () {
+      fakeAsync((async) {
+        server.isUpgrading.value = true;
+        server.sendDfuCommit();
+        server.onDfuCommitAck();
+        async.elapse(
+            Duration(seconds: OtaServer.kDfuResultQueryTimeoutSeconds + 1));
+        async.flushMicrotasks();
 
-      expect(server.isUpgrading.value, isFalse);
+        expect(server.isUpgrading.value, isFalse);
+      });
     });
 
     test('DFU result ack with short payload treated as success', () async {
@@ -1087,55 +1115,68 @@ void main() {
           greaterThanOrEqualTo(3));
     });
 
-    test('quick recovery branch handles no device id and attempt limit',
-        () async {
-      server.connectDeviceId = '';
-      for (var i = 0; i < 4; i++) {
-        server.quickRecoverNow();
-        await Future<void>.delayed(const Duration(milliseconds: 120));
-      }
+    test('quick recovery branch handles no device id and attempt limit', () {
+      fakeAsync((async) {
+        server.connectDeviceId = '';
+        for (var i = 0; i < 4; i++) {
+          server.quickRecoverNow();
+          async.elapse(const Duration(milliseconds: 120));
+          async.flushMicrotasks();
+        }
 
-      expect(server.recoveryStatusText.value, '恢复受限');
+        expect(server.recoveryStatusText.value, '恢复受限');
+      });
     });
 
-    test('quick recovery sends abort when connected but idle', () async {
-      server.connectDeviceId = '';
-      server.isDeviceConnected.value = true;
-      server.quickRecoverNow();
-      await Future<void>.delayed(const Duration(milliseconds: 380));
+    test('quick recovery sends abort when connected but idle', () {
+      fakeAsync((async) {
+        server.connectDeviceId = '';
+        server.isDeviceConnected.value = true;
+        server.quickRecoverNow();
+        async.elapse(const Duration(milliseconds: 380));
+        async.flushMicrotasks();
 
-      expect(bleManager.writeWithResponsePayloads, isNotEmpty);
+        expect(bleManager.writeWithResponsePayloads, isNotEmpty);
+      });
     });
 
     test('auto recovery first attempt sends abort when device still connected',
-        () async {
-      server.autoRecoveryEnabled.value = true;
-      server.connectDeviceId = '';
-      server.isDeviceConnected.value = true;
-      server.isUpgrading.value = true;
+        () {
+      fakeAsync((async) {
+        server.autoRecoveryEnabled.value = true;
+        server.connectDeviceId = '';
+        server.isDeviceConnected.value = true;
+        server.isUpgrading.value = true;
 
-      server.onUpgradeError('设备返回升级错误码0x23');
-      await Future<void>.delayed(const Duration(milliseconds: 420));
+        server.onUpgradeError('设备返回升级错误码0x23');
+        async.elapse(const Duration(milliseconds: 420));
+        async.flushMicrotasks();
 
-      expect(bleManager.writeWithResponsePayloads, isNotEmpty);
+        expect(bleManager.writeWithResponsePayloads, isNotEmpty);
+      });
     });
 
-    test('quick recovery catches disconnect exception', () async {
-      server.connectDeviceId = '';
-      bleManager.throwOnDisconnect = true;
-      server.quickRecoverNow();
-      await Future<void>.delayed(const Duration(milliseconds: 120));
+    test('quick recovery catches disconnect exception', () {
+      fakeAsync((async) {
+        server.connectDeviceId = '';
+        bleManager.throwOnDisconnect = true;
+        server.quickRecoverNow();
+        async.elapse(const Duration(milliseconds: 120));
+        async.flushMicrotasks();
 
-      expect(server.recoveryStatusText.value, '恢复失败');
+        expect(server.recoveryStatusText.value, '恢复失败');
+      });
     });
 
-    test('quick recovery reconnect path triggers connect call', () async {
-      server.connectDeviceId = 'device-1';
-      server.quickRecoverNow();
-      await Future<void>.delayed(
-          Duration(seconds: OtaServer.kRecoveryDelaySeconds + 1));
+    test('quick recovery reconnect path triggers connect call', () {
+      fakeAsync((async) {
+        server.connectDeviceId = 'device-1';
+        server.quickRecoverNow();
+        async.elapse(Duration(seconds: OtaServer.kRecoveryDelaySeconds + 1));
+        async.flushMicrotasks();
 
-      expect(bleManager.latestOnConnected, isNotNull);
+        expect(bleManager.latestOnConnected, isNotNull);
+      });
     });
 
     test('quick recovery keeps retrying when reconnect is still unavailable',
@@ -1521,8 +1562,18 @@ void main() {
     });
 
     test('sendRWCPSegment writes bytes and returns true', () {
-      final ok = server.sendRWCPSegment(<int>[0x80, 0x00]);
-      expect(ok, isTrue);
+      fakeAsync((async) {
+        final payload = <int>[0x80, 0x00];
+        final ok = server.sendRWCPSegment(payload);
+        async.flushMicrotasks();
+
+        expect(ok, isTrue);
+        expect(
+          bleManager.writeWithoutResponsePayloads
+              .any((p) => listEquals(p, payload)),
+          isTrue,
+        );
+      });
     });
   });
 }

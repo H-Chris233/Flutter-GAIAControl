@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:gaia/utils/gaia/rwcp/rwcp.dart';
 import 'package:gaia/utils/gaia/rwcp/rwcp_client.dart';
 import 'package:gaia/utils/gaia/rwcp/rwcp_listener.dart';
@@ -246,13 +247,14 @@ void main() {
             client.receiveGAP(Segment.get(RWCPOpCodeServer.gap, 12));
 
         expect(handled, isTrue);
-        // 对齐 gaia-client-src: GAP 的 seq 直接用于 validateAckSequence(DATA, seq)。
-        // 因此 11/12 会被确认移出队列，lastAckSequence 推进到 12。
-        expect(client.mLastAckSequence, 12);
+        // 部分设备的 GAP.seq 表示“缺口起点/下一期待序列号”。
+        // 为避免把缺口段误判为已确认导致永远不重传，这里将 ACK 对齐到 seq-1，
+        // 使 gapSequence 对应段仍保留在未确认队列中用于重传。
+        expect(client.mLastAckSequence, 11);
         expect(
             client.mUnacknowledgedSegments
                 .any((s) => s.getSequenceNumber() == 12),
-            isFalse);
+            isTrue);
         // 触发重传
         expect(listener.sentSegments, isNotEmpty);
       });
@@ -444,23 +446,33 @@ void main() {
     });
 
     group('sendDataSegment reliability', () {
-      test('send failure keeps pending data and starts timeout for retry', () {
-        listener.sendSucceeds = false;
-        client.mState = RWCPState.established;
-        client.mWindow = 10;
-        client.mCredits = 1;
-        client.mDataTimeOutMs = 1000;
-        client.mPendingData.add([0x01, 0x02]);
-        client.mNextSequence = 7;
+      test('send failure keeps pending data and schedules retry', () {
+        fakeAsync((async) {
+          listener.sendSucceeds = false;
+          client.mState = RWCPState.established;
+          client.mWindow = 10;
+          client.mCredits = 1;
+          client.mDataTimeOutMs = 1000;
+          client.mPendingData.add([0x01, 0x02]);
+          client.mNextSequence = 7;
 
-        client.sendDataSegment();
+          client.sendDataSegment();
 
-        expect(client.mPendingData.length, 1);
-        expect(client.mUnacknowledgedSegments, isEmpty);
-        expect(client.mNextSequence, 7);
-        expect(client.mCredits, 1);
-        expect(client.isTimeOutRunning, isTrue);
-        client.cancelTimeOut();
+          expect(client.mPendingData.length, 1);
+          expect(client.mUnacknowledgedSegments, isEmpty);
+          expect(client.mNextSequence, 7);
+          expect(client.mCredits, 1);
+          // 发送失败意味着“底层暂不可写”，不应该进入协议 TIMEOUT 重传逻辑。
+          expect(client.isTimeOutRunning, isFalse);
+
+          // 触发一次短延迟重试（仍会失败，但不应破坏队列/序号/credits）。
+          async.elapse(RWCPClient.sendRetryBaseDelay +
+              const Duration(milliseconds: 20));
+          expect(client.mPendingData.length, 1);
+          expect(client.mUnacknowledgedSegments, isEmpty);
+
+          client.dispose();
+        });
       });
     });
 
@@ -647,11 +659,15 @@ void main() {
         expect(client.startSession(), isFalse);
       });
 
-      test('startTimeOut timer invokes timeout callback', () async {
-        client.mState = RWCPState.listen;
-        client.startTimeOut(1);
-        await Future<void>.delayed(const Duration(milliseconds: 10));
-        expect(client.isTimeOutRunning, isFalse);
+      test('startTimeOut timer invokes timeout callback', () {
+        fakeAsync((async) {
+          client.mState = RWCPState.listen;
+          client.startTimeOut(1);
+          // startTimeOut 的参数单位为毫秒：这里推进足够宽松的窗口，避免边界抖动。
+          async.elapse(const Duration(milliseconds: 10));
+          async.flushMicrotasks();
+          expect(client.isTimeOutRunning, isFalse);
+        });
       });
 
       test('resendSegment returns early in established state', () {

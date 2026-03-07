@@ -8,7 +8,6 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:path_provider/path_provider.dart';
 
-import 'package:gaia/test_ota_view.dart';
 import 'package:gaia/utils/ble_constants.dart';
 import 'package:gaia/utils/string_utils.dart';
 import 'package:gaia/utils/gaia/confirmation_type.dart';
@@ -104,7 +103,11 @@ class OtaServer extends GetxService
   final String tag = "OtaServer";
   late final RxList<DiscoveredDevice> devices;
 
+  /// 最近一次成功/尝试连接的设备 ID（用于自动恢复时的重连目标）。
   String connectDeviceId = "";
+
+  /// 当前已连接设备 ID 以 BleConnectionManager 为单一真相。
+  String get currentConnectedDeviceId => _bleManager.connectedDeviceId;
   final Uuid otaUUID = BleConstants.otaServiceUuid;
   final Uuid notifyUUID = BleConstants.notifyCharacteristicUuid;
   final Uuid writeUUID = BleConstants.writeCharacteristicUuid;
@@ -168,6 +171,7 @@ class OtaServer extends GetxService
   Timer? _timer;
   static final bool _enableWriteTraceLog = kDebugMode;
   static const int _dataPacketLogSampleInterval = 50;
+  static const int _validationPollLogSampleInterval = 10;
 
   var timeCount = 0.obs;
 
@@ -221,6 +225,9 @@ class OtaServer extends GetxService
   DateTime? _expectedRebootDisconnectUntil;
   bool _upgradeModeEnabled = false;
   bool _isClosed = false;
+  int _validationPollRawNotifyCounter = 0;
+  int _validationPollTxCounter = 0;
+  int _validationPollRxCounter = 0;
 
   OtaServer({
     BleConnectionManager? bleManagerOverride,
@@ -276,10 +283,9 @@ class OtaServer extends GetxService
           ble: FlutterReactiveBleClient(FlutterReactiveBle()),
           onLog: addLog,
           onConnectionStateChanged: (state, deviceId) {
-            if (state != DeviceConnectionState.connected) {
-              return;
+            if (state == DeviceConnectionState.connected) {
+              connectDeviceId = deviceId;
             }
-            connectDeviceId = deviceId;
           },
         );
     devices = _bleManager.devices;
@@ -442,6 +448,7 @@ class OtaServer extends GetxService
 
   Future<void> connectDevice(String id) async {
     try {
+      connectDeviceId = id;
       isConnecting.value = true;
       connectingDeviceId.value = id;
       _scanWatchdogTimer?.cancel();
@@ -456,7 +463,6 @@ class OtaServer extends GetxService
           isConnecting.value = false;
           connectingDeviceId.value = "";
           isDeviceConnected.value = true;
-          connectDeviceId = id;
           _cancelRecoveryRetryTimer();
           recoveryStatusText.value = "空闲";
           if (!isUpgrading.value) {
@@ -467,9 +473,6 @@ class OtaServer extends GetxService
           addLog("Vendor模式固定为V3，使用${_vendorToHex(_activeVendorId)}");
           await registerNotice();
           await restPayloadSize();
-          if (!isUpgrading.value) {
-            Get.to(() => const TestOtaView());
-          }
         },
         onDisconnected: () {
           final wasUpgrading = isUpgrading.value;
@@ -536,13 +539,13 @@ class OtaServer extends GetxService
   }
 
   void writeMsg(List<int> data) {
-    scheduleMicrotask(() async {
-      if (_isClosed) {
-        return;
-      }
-      _touchUpgradeWatchdog();
-      await writeData(data);
-    });
+    if (_isClosed) {
+      return;
+    }
+    // 仅做“触发写入”而不在这里 await，避免多次调用时形成隐式并发写入。
+    // 实际写入会在 BleConnectionManager 内部做串行化。
+    _touchUpgradeWatchdog();
+    unawaited(writeData(data));
   }
 
   GaiaPacketBLE _buildGaiaPacket(int command,
@@ -585,7 +588,9 @@ class OtaServer extends GetxService
       _logRwcpRxPacket(data);
       mRWCPClient.onReceiveRWCPSegment(data);
     });
-    if (!channelReady || !_bleManager.isDeviceConnected) {
+    // 当前连接设备 ID 与底层连接状态以 BleConnectionManager 为单一真相，
+    // OtaServer 只维护面向 UI 的响应式镜像，避免多处写入造成竞态。
+    if (!channelReady || !isDeviceConnected.value) {
       rwcpStatusText.value = "服务未就绪";
       _rwcpSetupInProgress = false;
       return;
@@ -694,8 +699,21 @@ class OtaServer extends GetxService
 
   void handleRecMsg(List<int> data) async {
     _touchUpgradeWatchdog();
-    // 保持历史日志关键字，避免测试/外部解析依赖被破坏。
-    addLog("收到通知>${StringUtils.byteToHexString(data)}");
+    // 高频通知在“校验轮询阶段”会刷屏，且内容与后续结构化日志重复。
+    // 这里保留“收到通知>”关键字，但在 validating 阶段做采样输出，避免影响阅读。
+    if (_shouldSampleValidationPollLog()) {
+      _validationPollRawNotifyCounter += 1;
+      if (_validationPollRawNotifyCounter <= 3 ||
+          _validationPollRawNotifyCounter % _validationPollLogSampleInterval ==
+              0) {
+        addLog("收到通知>${StringUtils.byteToHexString(data)}");
+      }
+    } else {
+      _validationPollRawNotifyCounter = 0;
+      _validationPollTxCounter = 0;
+      _validationPollRxCounter = 0;
+      addLog("收到通知>${StringUtils.byteToHexString(data)}");
+    }
     final packet = GaiaPacketBLE.fromByte(data);
     if (packet == null) {
       // 保持历史日志关键字，避免测试/外部解析依赖被破坏。
@@ -729,6 +747,20 @@ class OtaServer extends GetxService
       final vmu = VMUPacket.getPackageFromByte(payload);
       if (vmu != null) {
         final vmuData = vmu.mData ?? [];
+        if (_shouldSampleValidationPollLog() &&
+            vmu.mOpCode == OpCodes.upgradeIsValidationDoneCfm) {
+          // 校验轮询：只保留关键信息，避免每次都输出完整 hex。
+          _validationPollRxCounter += 1;
+          if (!(_validationPollRxCounter <= 3 ||
+              _validationPollRxCounter % _validationPollLogSampleInterval ==
+                  0)) {
+            return;
+          }
+          addLog(
+              "$base VMU=${_vmuOpText(vmu.mOpCode)}(0x${vmu.mOpCode.toRadixString(16).padLeft(2, '0').toUpperCase()}) "
+              "len=${vmuData.length}");
+          return;
+        }
         addLog(
             "$base VMU=${_vmuOpText(vmu.mOpCode)}(0x${vmu.mOpCode.toRadixString(16).padLeft(2, '0').toUpperCase()}) "
             "len=${vmuData.length} bytes=${StringUtils.byteToHexString(packet.mBytes ?? [])}");
@@ -836,6 +868,15 @@ class OtaServer extends GetxService
         }
         stopUpgrade(sendAbort: false, sendDisconnect: false);
         return;
+      }
+      // 兜底：未知/未处理的 V3 Response 不能静默忽略，否则升级现场容易“卡住但无日志”。
+      addLog(
+          "未处理V3响应 feature=$feature cmdId=$commandId payloadLen=${payload.length}");
+      if (isUpgrading.value) {
+        _reportDeviceError(
+          "未处理V3响应 feature=$feature cmdId=$commandId",
+          triggerRecovery: false,
+        );
       }
       return;
     }
@@ -997,7 +1038,7 @@ class OtaServer extends GetxService
     _dfuPendingChunkSize = 0;
     if (sendDisconnect &&
         isDeviceConnected.value &&
-        connectDeviceId.isNotEmpty) {
+        currentConnectedDeviceId.isNotEmpty) {
       await Future.delayed(const Duration(milliseconds: 500));
       sendUpgradeDisconnect();
     }
@@ -1619,8 +1660,26 @@ class OtaServer extends GetxService
       return;
     }
 
+    // RWCP 节流：
+    // - GAP/超时重传时，继续预灌会扩大 pending/unacked 堆积，使“卡在 GAP 重传”的现象更难恢复
+    // - 同时避免 OtaServer 过度前移 offset，减少内存与队列压力
+    if (mRWCPClient.isResendingSegments) {
+      return;
+    }
+
+    final buffered =
+        mRWCPClient.pendingDataLength + mRWCPClient.unacknowledgedLength;
+    // 经验值：最多缓存 2 个窗口的数据（pending+unacked），上限不超过 64（序号空间）。
+    final maxBuffered = ((mRWCPClient.window * 2).clamp(2, 64)).toInt();
+    if (buffered >= maxBuffered) {
+      return;
+    }
+    final budget = maxBuffered - buffered;
+
     var pumped = 0;
-    while (pumped < _kRwcpPumpMaxPacketsPerTick &&
+    final pumpLimit =
+        (budget < _kRwcpPumpMaxPacketsPerTick) ? budget : _kRwcpPumpMaxPacketsPerTick;
+    while (pumped < pumpLimit &&
         mBytesToSend > 0 &&
         !_upgradePaused &&
         isUpgrading.value) {
@@ -1787,7 +1846,22 @@ class OtaServer extends GetxService
 
   @override
   bool sendRWCPSegment(List<int> bytes) {
-    writeMsgRWCP(bytes);
+    if (_isClosed) {
+      return false;
+    }
+
+    // 兼容测试与上层调用语义：
+    // - 测试覆盖会在非升级状态下直接调用 sendRWCPSegment 并期望返回 true。
+    // - 真正升级过程中，若处于暂停/断链/RWCP未启用，则返回 false 以触发 RWCPClient 的退避重试。
+    if (isUpgrading.value) {
+      if (_upgradePaused || !isDeviceConnected.value || !mIsRWCPEnabled.value) {
+        return false;
+      }
+    }
+
+    // 这里返回 true 的语义是“已成功提交给 BLE 写入链路”（不是“对端已收到”）。
+    // 底层异常会在 writeMsgRWCP 内部进入 fatal state/断链恢复流程。
+    unawaited(writeMsgRWCP(bytes));
     return true;
   }
 
@@ -1864,6 +1938,8 @@ class OtaServer extends GetxService
   }
 
   void disconnect() {
+    // 避免断开后 UpgradeStateMachine 的轮询 Timer 继续触发发包。
+    _upgradeStateMachine.dispose();
     _reconnectTimer?.cancel();
     _scanWatchdogTimer?.cancel();
     _cancelRecoveryRetryTimer();
@@ -1937,6 +2013,19 @@ class OtaServer extends GetxService
         final vmuData = vmu.mData ?? [];
         final isUpgradeData = vmu.mOpCode == OpCodes.upgradeData;
         final isLastDataPacket = vmuData.isNotEmpty && vmuData.first == 0x01;
+        if (_shouldSampleValidationPollLog() &&
+            vmu.mOpCode == OpCodes.upgradeIsValidationDoneReq) {
+          // 校验轮询请求：只做采样，且不输出 bytes，避免刷屏。
+          _validationPollTxCounter += 1;
+          if (!(_validationPollTxCounter <= 3 ||
+              _validationPollTxCounter % _validationPollLogSampleInterval ==
+                  0)) {
+            return;
+          }
+          addLog(
+              "$base VMU=${_vmuOpText(vmu.mOpCode)}(0x${vmu.mOpCode.toRadixString(16).padLeft(2, '0').toUpperCase()})");
+          return;
+        }
         final shouldLogUpgradeData = !isUpgradeData ||
             sendPkgCount <= 3 ||
             sendPkgCount % _dataPacketLogSampleInterval == 0 ||
@@ -1983,6 +2072,18 @@ class OtaServer extends GetxService
         final vmuData = vmu.mData ?? [];
         final isUpgradeData = vmu.mOpCode == OpCodes.upgradeData;
         final isLastDataPacket = vmuData.isNotEmpty && vmuData.first == 0x01;
+        if (_shouldSampleValidationPollLog() &&
+            vmu.mOpCode == OpCodes.upgradeIsValidationDoneReq) {
+          _validationPollTxCounter += 1;
+          if (!(_validationPollTxCounter <= 3 ||
+              _validationPollTxCounter % _validationPollLogSampleInterval ==
+                  0)) {
+            return;
+          }
+          addLog("TX[RWCP] op=$opText seq=$seq gaia=$gaiaName "
+              "vmu=${_vmuOpText(vmu.mOpCode)}(0x${vmu.mOpCode.toRadixString(16).padLeft(2, '0').toUpperCase()})");
+          return;
+        }
         final shouldLogUpgradeData = !isUpgradeData ||
             sendPkgCount <= 3 ||
             sendPkgCount % _dataPacketLogSampleInterval == 0 ||
@@ -2014,6 +2115,13 @@ class OtaServer extends GetxService
       default:
         return "UNKNOWN";
     }
+  }
+
+  bool _shouldSampleValidationPollLog() {
+    // 只在“固件数据已传完后的校验轮询阶段”做日志压缩。
+    // 这段期间：设备会以 0x17 / WAITING_TIME 驱动 host 继续轮询，日志极高频且重复度高。
+    return isUpgrading.value &&
+        _upgradeStateMachine.state == UpgradeState.validating;
   }
 
   String _vmuOpText(int opCode) {
@@ -2226,6 +2334,7 @@ class OtaServer extends GetxService
     _isClosed = true;
     // 避免 onClose 后仍有异步写入触发看门狗/升级状态变更（单测与真实场景均可能出现）。
     isUpgrading.value = false;
+    _upgradeStateMachine.dispose();
     _deviceListWorker?.dispose();
     _logBuffer.dispose();
     _bleManager.dispose();

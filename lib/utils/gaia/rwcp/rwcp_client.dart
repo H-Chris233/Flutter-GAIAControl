@@ -11,6 +11,15 @@ class RWCPClient {
   /// <p>The tag to display for logs.</p>
   final String tag = "RWCPClient";
 
+  /// 发送失败后的最小重试间隔。
+  ///
+  /// 说明：这是“底层暂不可写（GATT busy/平台栈忙/瞬时断链）”的恢复手段，
+  /// 不等同于 RWCP 协议 TIMEOUT（TIMEOUT 表示段已发出但未收到 ACK/GAP）。
+  static const Duration sendRetryBaseDelay = Duration(milliseconds: 40);
+
+  /// 发送失败后的最大重试间隔（指数退避上限）。
+  static const Duration sendRetryMaxDelay = Duration(milliseconds: 1000);
+
   /// <p>The listener to communicate with the application and send segments.</p>
   final RWCPListener mListener;
 
@@ -68,8 +77,30 @@ class RWCPClient {
   int mSuccessfulAckStreak = 0;
   static const int _timeoutRecoveryAckThreshold = 8;
   Timer? _timer;
+  Timer? _sendRetryTimer;
+  void Function()? _retryAction;
+  int _sendRetryConsecutiveFailures = 0;
+  Duration _sendRetryDelay = sendRetryBaseDelay;
 
   RWCPClient(this.mListener);
+
+  /// 当前窗口剩余可发送额度（用于上层节流/观测）。
+  int get credits => mCredits;
+
+  /// 当前窗口大小（用于上层节流/观测）。
+  int get window => mWindow;
+
+  /// 待发送数据队列长度（用于上层节流/观测）。
+  int get pendingDataLength => mPendingData.length;
+
+  /// 未确认段队列长度（用于上层节流/观测）。
+  int get unacknowledgedLength => mUnacknowledgedSegments.length;
+
+  /// 是否正在重传（用于上层节流/观测）。
+  bool get isResendingSegments => mIsResendingSegments;
+
+  /// 当前是否有协议级超时计时器在跑（用于上层节流/观测）。
+  bool get isTimeoutRunning => isTimeOutRunning;
 
   bool isRunningASession() {
     return mState != RWCPState.listen;
@@ -330,6 +361,7 @@ class RWCPClient {
   bool sendSegment(Segment segment, int timeout) {
     List<int> bytes = segment.getBytes();
     if (mListener.sendRWCPSegment(bytes)) {
+      _onSendSucceeded();
       startTimeOut(timeout);
       return true;
     }
@@ -346,6 +378,111 @@ class RWCPClient {
     _timer = Timer(Duration(milliseconds: delay), () {
       onTimeOut();
     });
+  }
+
+  int _dataTimeoutForCurrentWindow() {
+    // 关键背景：
+    // - 上层 BLE 写入在部分机型会被串行化/排队（GATT busy）。
+    // - 若 data timeout 过小，会在“实际写入尚未完成”时误触发 TIMEOUT，导致无意义重传，
+    //   进一步放大 GAP/卡顿问题。
+    //
+    // 这里在不改变 RWCP 常量（保持单测/默认配置）的前提下，给出一个“窗口相关的下限”。
+    final w = mWindow;
+    final floor = (w <= 2)
+        ? 120
+        : (w <= 4)
+            ? 160
+            : (w <= 8)
+                ? 220
+                : (w <= 16)
+                    ? 320
+                    : 420;
+    return (mDataTimeOutMs < floor) ? floor : mDataTimeOutMs;
+  }
+
+  void _resetSendRetryBackoff() {
+    _sendRetryConsecutiveFailures = 0;
+    _sendRetryDelay = sendRetryBaseDelay;
+  }
+
+  void _onSendSucceeded() {
+    _sendRetryConsecutiveFailures = 0;
+    // 避免“偶发成功 → 立刻回到 40ms”导致的周期性突发：成功时只逐步回退 backoff。
+    if (_sendRetryDelay > sendRetryBaseDelay) {
+      final baseMs = sendRetryBaseDelay.inMilliseconds;
+      final reducedMs = _sendRetryDelay.inMilliseconds ~/ 2;
+      _sendRetryDelay =
+          Duration(milliseconds: (reducedMs < baseMs) ? baseMs : reducedMs);
+    } else {
+      _sendRetryDelay = sendRetryBaseDelay;
+    }
+    _sendRetryTimer?.cancel();
+    _sendRetryTimer = null;
+    _retryAction = null;
+  }
+
+  Duration _onSendFailedAndGetDelay(String reason) {
+    final delay = _sendRetryDelay;
+    _sendRetryConsecutiveFailures += 1;
+
+    // 指数退避：快速把高频重试压到 <= 1s，避免暂停/断链/不可写阶段持续 25Hz 唤醒。
+    final nextMs = _sendRetryDelay.inMilliseconds * 2;
+    final maxMs = sendRetryMaxDelay.inMilliseconds;
+    _sendRetryDelay = Duration(milliseconds: (nextMs > maxMs) ? maxMs : nextMs);
+
+    if (mShowDebugLogs) {
+      Log.d(
+          tag,
+          "schedule send retry: $reason "
+          "(failures=$_sendRetryConsecutiveFailures "
+          "delay=${delay.inMilliseconds}ms next=${_sendRetryDelay.inMilliseconds}ms)");
+    }
+    return delay;
+  }
+
+  void _scheduleRetry(void Function() action, String reason) {
+    // 发送失败通常意味着“底层暂时不可写”（断链/队列拥堵/平台栈忙）。
+    // 这不是协议层 TIMEOUT（没有真正发出 DATA 段），因此单独做重试，避免：
+    // - 立刻进入 TIMEOUT->重传->更拥堵 的负反馈
+    // - 没有后续 ACK 触发时，发送链路永久停住
+
+    // 会话已结束或没有待处理内容时，不进行重试，避免无意义唤醒。
+    if (mState == RWCPState.listen) {
+      return;
+    }
+    if (mPendingData.isEmpty && mUnacknowledgedSegments.isEmpty) {
+      return;
+    }
+
+    final delay = _onSendFailedAndGetDelay(reason);
+    _retryAction = action;
+
+    // 若已有 retry 在排队，则只更新 action 与 backoff，不重复创建 Timer。
+    _sendRetryTimer ??= Timer(delay, () {
+      _sendRetryTimer = null;
+      final run = _retryAction;
+      _retryAction = null;
+      if (mState == RWCPState.listen) {
+        return;
+      }
+      if (mPendingData.isEmpty && mUnacknowledgedSegments.isEmpty) {
+        return;
+      }
+      try {
+        run?.call();
+      } catch (e, st) {
+        if (mShowDebugLogs) {
+          Log.w(tag, "retry action failed: $e\n$st");
+        }
+      }
+    });
+  }
+
+  void _cancelSendRetry() {
+    _sendRetryTimer?.cancel();
+    _sendRetryTimer = null;
+    _retryAction = null;
+    _resetSendRetryBackoff();
   }
 
   void onTimeOut() {
@@ -366,6 +503,9 @@ class RWCPClient {
           mDataTimeOutMs = RWCP.dataTimeoutMsMax;
         }
 
+        // TIMEOUT 通常意味着链路/对端处理跟不上：收缩窗口降低并发写入压力，
+        // 以减少持续 GAP/重传风暴导致的“卡住”。
+        decreaseWindow();
         resendDataSegment();
       } else {
         // syn or rst segments are timed out
@@ -386,12 +526,19 @@ class RWCPClient {
 
     // resend the unacknowledged segments corresponding to the window
     for (Segment segment in mUnacknowledgedSegments) {
+      if (mCredits <= 0) break;
       int delay = (segment.getOperationCode() == RWCPOpCodeClient.syn)
           ? RWCP.synTimeoutMs
           : (segment.getOperationCode() == RWCPOpCodeClient.rst)
               ? RWCP.rstTimeoutMs
-              : mDataTimeOutMs;
-      sendSegment(segment, delay);
+              : _dataTimeoutForCurrentWindow();
+      final sent = sendSegment(segment, delay);
+      if (!sent) {
+        // 底层不可写：保持重传状态并稍后重试，避免 credits 被错误消耗。
+        _scheduleRetry(resendSegment, "resendSegment");
+        logState("resend segments (send failed)");
+        return;
+      }
       mCredits--;
     }
     logState("resend segments");
@@ -432,7 +579,12 @@ class RWCPClient {
     // resend the unacknowledged segments corresponding to the window
     for (var segment in mUnacknowledgedSegments) {
       if (mCredits <= 0) break;
-      sendSegment(segment, mDataTimeOutMs);
+      final sent = sendSegment(segment, _dataTimeoutForCurrentWindow());
+      if (!sent) {
+        _scheduleRetry(resendDataSegment, "resendDataSegment");
+        logState("Resend data segments (send failed)");
+        return;
+      }
       mCredits--;
     }
 
@@ -453,15 +605,17 @@ class RWCPClient {
       List<int> data = mPendingData.first;
       Segment segment =
           Segment.get(RWCPOpCodeClient.data, mNextSequence, payload: data);
-      final sent = sendSegment(segment, mDataTimeOutMs);
+      final sent = sendSegment(segment, _dataTimeoutForCurrentWindow());
       if (!sent) {
         Log.w(
             tag,
             "Failed to send data segment(sequence=${segment.getSequenceNumber()}), "
             "keeping pending data for retry.");
-        if (!isTimeOutRunning) {
-          startTimeOut(mDataTimeOutMs);
-        }
+        _scheduleRetry(() {
+          if (mState == RWCPState.established && !mIsResendingSegments) {
+            sendDataSegment();
+          }
+        }, "sendDataSegment");
         break;
       }
       mPendingData.removeFirst();
@@ -492,6 +646,7 @@ class RWCPClient {
     mDataTimeOutMs = RWCP.dataTimeoutMsDefault;
     mCredits = mWindow;
     cancelTimeOut();
+    _cancelSendRetry();
     if (complete) {
       mPendingData.clear();
     }
@@ -547,7 +702,8 @@ class RWCPClient {
     }
   }
 
-  int validateAckSequence(final int code, final int sequence) {
+  int validateAckSequence(final int code, final int sequence,
+      {bool adjustWindow = true}) {
     final int notValidated = -1;
 
     if (sequence < 0) {
@@ -597,20 +753,32 @@ class RWCPClient {
     logState("$acknowledged"
         " segment(s) validated with ACK sequence(code=$code seq=$sequence");
 
-    // increase the window size if qualified.
-    increaseWindow(acknowledged);
+    // GAP/重传阶段不应“边确认边增窗”，否则容易出现窗口振荡，诱发持续 GAP。
+    if (adjustWindow) {
+      increaseWindow(acknowledged);
+    }
 
     return acknowledged;
   }
 
   bool _isSequenceWithinAckWindow(int sequence) {
-    if (mLastAckSequence < 0) {
-      return sequence <= mNextSequence;
-    }
+    // ACK 的有效区间应当是：[lastAck, lastSent]（包含重复 ACK）。
+    // lastSent = mNextSequence - 1。若允许 ACK == mNextSequence，会把“尚未发送”的序号
+    // 当作可确认范围，导致队列与窗口状态出现异常日志/误判。
     final mod = RWCP.sequenceNumberMax + 1;
-    final forwardToNext = (mNextSequence - mLastAckSequence + mod) % mod;
-    final forwardToSequence = (sequence - mLastAckSequence + mod) % mod;
-    return forwardToSequence <= forwardToNext;
+    final lastSent = decreaseSequenceNumber(mNextSequence, 1);
+
+    // mLastAckSequence == -1 表示“尚未确认任何段”，此时合法 ACK 仅可能落在 [0..lastSent]。
+    // 不能用 RWCP.sequenceNumberMax 代替 -1，否则会错误接受 sequence=63 等异常 ACK，
+    // 触发 validateAckSequence 的长循环与告警风暴。
+    if (mLastAckSequence < 0) {
+      return sequence <= lastSent;
+    }
+
+    final lastAck = mLastAckSequence;
+    final forwardToLastSent = (lastSent - lastAck + mod) % mod;
+    final forwardToSequence = (sequence - lastAck + mod) % mod;
+    return forwardToSequence <= forwardToLastSent;
   }
 
   void _recoverTimeoutAfterSuccess(int acknowledged) {
@@ -685,7 +853,7 @@ class RWCPClient {
               mCredits == 0 /*&& !mPendingData.isEmpty()*/) {
             // no more data to send but still some waiting to be acknowledged
             // or no credits and still some data to send
-            startTimeOut(mDataTimeOutMs);
+            startTimeOut(_dataTimeoutForCurrentWindow());
           }
           mListener.onTransferProgress(validated);
         }
@@ -716,16 +884,18 @@ class RWCPClient {
     switch (mState) {
       case RWCPState.established:
         final gapSequence = segment.getSequenceNumber();
-        if (_isGapDiscarded(gapSequence, mLastAckSequence, mWindow)) {
-          Log.i(tag,
-              "Ignoring gap ($gapSequence) as last ack sequence is $mLastAckSequence.");
-          return true;
-        }
-
-        // 对齐 gaia-client-src: GAP 表示对端发现乱序/缺口，建议缩窗并触发重传。
-        // 参考实现会用 GAP 的 seq 直接做 validateAckSequence(data, seq)，随后重传未确认段。
+        // GAP 表示对端发现乱序/缺口，建议缩窗并触发重传。
+        //
+        // 兼容性说明：
+        // 部分设备在 GAP 段里携带的是“缺口起点/下一期待序列号”，而不是“最后已确认序列号”。
+        // 若直接 validateAckSequence(..., gapSequence) 会把缺口段误判为已确认，
+        // 进而导致缺口段永远不会被重传，传输会卡死在持续 GAP 的状态中。
+        //
+        // 因此这里将 ACK 对齐到 gapSequence-1，并重传未确认 DATA 段。
+        final ackSequence = decreaseSequenceNumber(gapSequence, 1);
         decreaseWindow();
-        validateAckSequence(RWCPOpCodeClient.data, gapSequence);
+        validateAckSequence(RWCPOpCodeClient.data, ackSequence,
+            adjustWindow: false);
         cancelTimeOut();
         resendDataSegment();
         return true;
@@ -747,15 +917,6 @@ class RWCPClient {
     }
   }
 
-  bool _isGapDiscarded(int sequence, int last, int window) {
-    if (last < 0) {
-      return false;
-    }
-    final diff =
-        ((last > sequence) ? RWCP.sequenceNumberMax : 0) + sequence - last;
-    return diff >= 1 && diff <= window;
-  }
-
   void decreaseWindow() {
     mWindow = ((mWindow - 1) ~/ 2) + 1;
     if (mWindow > mMaximumWindow || mWindow < 1) {
@@ -772,6 +933,7 @@ class RWCPClient {
   /// Should be called when the client is no longer needed.
   void dispose() {
     cancelTimeOut();
+    _cancelSendRetry();
     reset(true);
   }
 }

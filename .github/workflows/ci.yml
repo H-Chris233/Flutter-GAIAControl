@@ -18,9 +18,37 @@ permissions:
   contents: write
 
 jobs:
+  test:
+    name: Flutter Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter Pub Get
+        run: flutter pub get
+
+      - name: Run Tests
+        run: flutter test --coverage
+
+      - name: Check Coverage (>=90%)
+        run: python3 tool/check_coverage.py --lcov coverage/lcov.info --exclude lib/main.dart --min-percent 90 --fail-on-missing
+
   build:
     name: Build APK
+    needs: test
     runs-on: ubuntu-latest
+    env:
+      # 解决 release 构建阶段 JetifyTransform 触发的 Java heap space（Gradle JVM 堆不足）问题。
+      # 说明：必须以 system property 的形式传给 Gradle，单纯设置 -Xmx4g 对 action env 不一定生效。
+      GRADLE_OPTS: >-
+        -Dorg.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8
     steps:
       # 升级到 v4 避免 Node.js 兼容性警告
       - name: Checkout
@@ -42,7 +70,6 @@ jobs:
         env:
           FILE_NAME: lib/common/config/ignoreConfig.dart
           FILE_DATA: class NetConfig { static const CLIENT_ID = "${{ secrets.CLIENT_ID }}"; static const CLIENT_SECRET = "${{ secrets.CLIENT_SECRET }}";}
-          GRADLE_OPTS: -Xmx4g
 
       - name: Flutter Pub Get
         run: flutter pub get
@@ -50,13 +77,32 @@ jobs:
       - name: Build APK
         run: flutter build apk --release
 
+      - name: Collect APK
+        run: |
+          set -euo pipefail
+
+          mkdir -p dist
+
+          apk_path="$(find build/app/outputs -type f -name "app-release.apk" -print -quit || true)"
+          if [[ -z "${apk_path}" ]]; then
+            apk_path="$(find build/app/outputs -type f -name "*.apk" -print -quit || true)"
+          fi
+
+          if [[ -z "${apk_path}" ]]; then
+            echo "未找到任何 APK 输出文件 (build/app/outputs/**/*.apk)" >&2
+            find build/app/outputs -type f || true
+            exit 1
+          fi
+
+          cp "${apk_path}" dist/app-release.apk
+          ls -la dist
+
       # 每次 push/PR 都会运行到这里并生成 APK 产物
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-apk
-          # 使用通配符兼容不同 Flutter 版本可能导致的输出路径差异
-          path: build/app/outputs/**/*.apk 
+          path: dist/app-release.apk
 
   release:
     name: Auto Release
@@ -70,6 +116,20 @@ jobs:
         with:
           name: app-apk
           path: ./apk-output
+
+      - name: Locate APK
+        run: |
+          set -euo pipefail
+
+          apk_path="$(find ./apk-output -type f -name "app-release.apk" -print -quit || true)"
+          if [[ -z "${apk_path}" ]]; then
+            echo "未找到 app-release.apk，下载目录如下：" >&2
+            find ./apk-output -type f -maxdepth 5 || true
+            exit 1
+          fi
+
+          echo "APK_PATH=${apk_path}" >> "$GITHUB_ENV"
+          echo "Found APK at: ${apk_path}"
 
       - name: Determine Tag Name
         id: determine_tag
@@ -89,5 +149,6 @@ jobs:
         with:
           tag_name: ${{ env.TAG_NAME }}
           name: Release ${{ env.TAG_NAME }}
-          files: ./apk-output/**/*.apk
+          files: ${{ env.APK_PATH }}
+          fail_on_unmatched_files: true
           generate_release_notes: true # 自动生成变更日志（非常推荐）

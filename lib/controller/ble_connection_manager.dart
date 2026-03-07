@@ -148,10 +148,34 @@ class BleConnectionManager {
   final RxList<DiscoveredDevice> devices = <DiscoveredDevice>[].obs;
 
   /// 当前连接的设备 ID
-  String connectedDeviceId = "";
+  String _connectedDeviceId = "";
+
+  /// 当前连接的设备 ID（只读对外暴露，避免多处写入造成“多份真相”）
+  String get connectedDeviceId => _connectedDeviceId;
 
   /// 设备是否已连接
-  bool isDeviceConnected = false;
+  bool _isDeviceConnected = false;
+
+  /// 设备是否已连接（只读对外暴露，避免多处写入造成“多份真相”）
+  bool get isDeviceConnected => _isDeviceConnected;
+
+  @visibleForTesting
+  void setConnectedDeviceIdForTest(String deviceId) {
+    _connectedDeviceId = deviceId;
+  }
+
+  @visibleForTesting
+  void setIsDeviceConnectedForTest(bool connected) {
+    _isDeviceConnected = connected;
+  }
+
+  void _setConnectionState({
+    required bool connected,
+    String deviceId = "",
+  }) {
+    _isDeviceConnected = connected;
+    _connectedDeviceId = connected ? deviceId : "";
+  }
 
   /// OTA 服务 UUID
   final Uuid otaServiceUuid = BleConstants.otaServiceUuid;
@@ -180,6 +204,12 @@ class BleConnectionManager {
 
   /// BLE 状态订阅
   StreamSubscription<BleStatus>? _bleStatusSubscription;
+
+  /// GATT 操作串行化链（主要用于写入/MTU 等需要严格串行的操作）。
+  ///
+  /// 背景：并发 GATT write 在部分机型/系统版本上容易触发 “GATT busy”、
+  /// 丢包或连接不稳定，尤其在 OTA/RWCP 高频发送场景下。
+  Future<void> _gattOpChain = Future<void>.value();
 
   /// 连接代数（用于取消过期的连接操作）
   int _connectionGeneration = 0;
@@ -273,6 +303,13 @@ class BleConnectionManager {
         _log("bluetoothScan deny");
         return BleScanStartResult.bluetoothScanDenied;
       }
+      final bluetoothConnect = statuses[Permission.bluetoothConnect] ??
+          statuses[Permission.bluetooth] ??
+          PermissionStatus.granted;
+      if (!bluetoothConnect.isGranted) {
+        _log("bluetoothConnect deny");
+        return BleScanStartResult.bluetoothConnectDenied;
+      }
     } else {
       var bluetooth = await _bluetoothPermissionStatus();
       if (!bluetooth.isGranted) {
@@ -327,11 +364,15 @@ class BleConnectionManager {
     final int generation = ++_connectionGeneration;
     _reconnectTimer?.cancel();
     await _scanSubscription?.cancel();
-    await _connectionSubscription?.cancel();
+    // 连接状态流的 cancel 在部分 BLE 实现/平台上可能不会及时完成（甚至永不完成），
+    // 如果这里阻塞等待，会导致“自动重连”在 Timer 触发后卡死，第二次 connectToDevice 永远不发生。
+    // 因此对 connectionSubscription 采取“尽力取消但不等待”的策略，避免重连被阻塞。
+    final oldConnectionSubscription = _connectionSubscription;
+    _connectionSubscription = null;
+    unawaited(oldConnectionSubscription?.cancel() ?? Future<void>.value());
     await _notifySubscription?.cancel();
     await _rwcpSubscription?.cancel();
     _scanSubscription = null;
-    _connectionSubscription = null;
     _notifySubscription = null;
     _rwcpSubscription = null;
     _autoReconnectEnabled = true;
@@ -348,13 +389,12 @@ class BleConnectionManager {
       final failure = connectionState.failure;
       if (state == DeviceConnectionState.connected) {
         _reconnectTimer?.cancel();
-        isDeviceConnected = true;
-        connectedDeviceId = deviceId;
-        _log("连接成功$connectedDeviceId");
+        _setConnectionState(connected: true, deviceId: deviceId);
+        _log("连接成功$_connectedDeviceId");
         onConnectionStateChanged?.call(state, deviceId);
         onConnected?.call();
       } else if (state == DeviceConnectionState.disconnected) {
-        isDeviceConnected = false;
+        _setConnectionState(connected: false);
         if (failure != null) {
           _log('断开连接: $failure');
         } else {
@@ -362,13 +402,13 @@ class BleConnectionManager {
         }
         onConnectionStateChanged?.call(state, deviceId);
         onDisconnected?.call();
-        if (_autoReconnectEnabled && connectedDeviceId.isNotEmpty) {
-          _scheduleReconnect(generation, onConnected, onDisconnected);
+        if (_autoReconnectEnabled && deviceId.isNotEmpty) {
+          _scheduleReconnect(generation, deviceId, onConnected, onDisconnected);
         } else {
           _log("自动重连已关闭，等待手动重连");
         }
       } else {
-        isDeviceConnected = false;
+        _isDeviceConnected = false;
         if (failure != null) {
           _log('连接状态变更: $state failure=$failure');
         } else {
@@ -380,8 +420,9 @@ class BleConnectionManager {
       if (generation != _connectionGeneration) {
         return;
       }
-      isDeviceConnected = false;
+      _setConnectionState(connected: false);
       _log("连接异常: $error");
+      onConnectionStateChanged?.call(DeviceConnectionState.disconnected, deviceId);
       onError?.call(error);
       onDisconnected?.call();
     });
@@ -390,6 +431,7 @@ class BleConnectionManager {
   /// 调度重连
   void _scheduleReconnect(
     int expectedGeneration,
+    String deviceId,
     VoidCallback? onConnected,
     VoidCallback? onDisconnected,
   ) {
@@ -398,13 +440,10 @@ class BleConnectionManager {
       if (expectedGeneration != _connectionGeneration) {
         return;
       }
-      if (!_autoReconnectEnabled ||
-          isDeviceConnected ||
-          connectedDeviceId.isEmpty) {
+      if (!_autoReconnectEnabled || _isDeviceConnected || deviceId.isEmpty) {
         return;
       }
-      connect(connectedDeviceId,
-          onConnected: onConnected, onDisconnected: onDisconnected);
+      connect(deviceId, onConnected: onConnected, onDisconnected: onDisconnected);
     });
   }
 
@@ -515,25 +554,31 @@ class BleConnectionManager {
 
   /// 写入数据（带响应）
   Future<void> writeWithResponse(List<int> data) async {
-    final characteristic = QualifiedCharacteristic(
-        serviceId: otaServiceUuid,
-        characteristicId: writeCharacteristicUuid,
-        deviceId: connectedDeviceId);
-    await ble.writeCharacteristicWithResponse(characteristic, value: data);
+    await _enqueueGattOp(() async {
+      final characteristic = QualifiedCharacteristic(
+          serviceId: otaServiceUuid,
+          characteristicId: writeCharacteristicUuid,
+          deviceId: connectedDeviceId);
+      await ble.writeCharacteristicWithResponse(characteristic, value: data);
+    });
   }
 
   /// 写入数据（无响应）
   Future<void> writeWithoutResponse(List<int> data) async {
-    final characteristic = QualifiedCharacteristic(
-        serviceId: otaServiceUuid,
-        characteristicId: writeNoResponseCharacteristicUuid,
-        deviceId: connectedDeviceId);
-    await ble.writeCharacteristicWithoutResponse(characteristic, value: data);
+    await _enqueueGattOp(() async {
+      final characteristic = QualifiedCharacteristic(
+          serviceId: otaServiceUuid,
+          characteristicId: writeNoResponseCharacteristicUuid,
+          deviceId: connectedDeviceId);
+      await ble.writeCharacteristicWithoutResponse(characteristic, value: data);
+    });
   }
 
   /// 请求 MTU
   Future<int> requestMtu(int mtu) async {
-    return await ble.requestMtu(deviceId: connectedDeviceId, mtu: mtu);
+    return await _enqueueGattOp(() async {
+      return await ble.requestMtu(deviceId: connectedDeviceId, mtu: mtu);
+    });
   }
 
   /// 断开连接
@@ -545,7 +590,21 @@ class BleConnectionManager {
     _connectionSubscription = null;
     _notifySubscription = null;
     _rwcpSubscription = null;
-    isDeviceConnected = false;
+    _setConnectionState(connected: false);
+  }
+
+  /// 串行执行 GATT 操作（确保链在异常后可继续）。
+  Future<T> _enqueueGattOp<T>(Future<T> Function() op) {
+    final completer = Completer<T>();
+    _gattOpChain = _gattOpChain.then((_) async {
+      try {
+        final value = await op();
+        completer.complete(value);
+      } catch (e, st) {
+        completer.completeError(e, st);
+      }
+    });
+    return completer.future;
   }
 
   /// 释放资源

@@ -528,9 +528,11 @@ void main() {
       manager.dispose();
     });
 
-    test('startScan ignores bluetoothConnect denial on Android', () async {
+    test('startScan returns bluetoothConnectDenied on Android', () async {
+      final logs = <String>[];
       final manager = BleConnectionManager(
         ble: fakeBle,
+        onLog: logs.add,
         isAndroidPlatform: () => true,
         requestAndroidPermissions: () async => <Permission, PermissionStatus>{
           Permission.location: PermissionStatus.granted,
@@ -541,7 +543,8 @@ void main() {
 
       final result = await manager.startScan();
 
-      expect(result, BleScanStartResult.started);
+      expect(result, BleScanStartResult.bluetoothConnectDenied);
+      expect(logs, contains('bluetoothConnect deny'));
       manager.dispose();
     });
 
@@ -701,28 +704,72 @@ void main() {
       manager.dispose();
     });
 
-    test('connect schedules reconnect after disconnected', () async {
-      final manager = BleConnectionManager(ble: fakeBle);
-      await manager.connect('device-1');
-      fakeBle.connectionController.add(const ConnectionStateUpdate(
-        deviceId: 'device-1',
-        connectionState: DeviceConnectionState.connected,
-        failure: null,
-      ));
-      await Future<void>.delayed(Duration.zero);
+    test('connect schedules reconnect after disconnected', () {
+      fakeAsync((async) {
+        final manager = BleConnectionManager(ble: fakeBle);
 
-      fakeBle.connectionController.add(const ConnectionStateUpdate(
-        deviceId: 'device-1',
-        connectionState: DeviceConnectionState.disconnected,
-        failure: null,
-      ));
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+        void pumpUntil(
+          bool Function() condition, {
+          int maxIterations = 80,
+          required String reason,
+        }) {
+          for (var i = 0; i < maxIterations; i++) {
+            if (condition()) {
+              return;
+            }
+            async.flushMicrotasks();
+            // `Stream.fromIterable`/`StreamController` 默认是异步投递事件（event queue / 0-delay timer）。
+            // 在 `fake_async` 下仅 `elapse(Duration.zero)` 可能无法稳定驱动这些事件被派发，
+            // 导致测试在不同调度实现/版本下变得脆弱（偶现超时）。
+            //
+            // 推进一个很小的非零时间片可以稳定触发这些异步事件，同时不会意外触发 5s 的重连定时器。
+            async.elapse(const Duration(milliseconds: 1));
+          }
+          fail(
+              '等待条件超时: $reason, connectInvocationCount=${fakeBle.connectInvocationCount}, '
+              'connectedDeviceId=${manager.connectedDeviceId}, isDeviceConnected=${manager.isDeviceConnected}');
+        }
 
-      expect(fakeBle.connectInvocationCount, 1);
-      await Future<void>.delayed(const Duration(seconds: 6));
-      expect(fakeBle.connectInvocationCount, greaterThanOrEqualTo(2));
+        // 模拟“首次连接的状态流”：connected -> disconnected -> done。
+        //
+        // 真实 BLE SDK 通常会在断开后结束连接状态流；这样可以保证重连时 cancel 旧订阅不会卡住。
+        final firstConnectionStream = Stream<ConnectionStateUpdate>.fromIterable(
+          const <ConnectionStateUpdate>[
+            ConnectionStateUpdate(
+              deviceId: 'device-1',
+              connectionState: DeviceConnectionState.connected,
+              failure: null,
+            ),
+            ConnectionStateUpdate(
+              deviceId: 'device-1',
+              connectionState: DeviceConnectionState.disconnected,
+              failure: null,
+            ),
+          ],
+        );
+        fakeBle.queuedConnectionStreams.add(firstConnectionStream);
+        // 第二次 connect（重连）只要能触发 connectToDevice 调用即可，状态流可以为空。
+        fakeBle.queuedConnectionStreams
+            .add(const Stream<ConnectionStateUpdate>.empty());
 
-      manager.dispose();
+        // 不使用 async.run：确保 connect/Timer 都在 fakeAsync 的 zone 内创建（否则 elapse 不生效）。
+        unawaited(manager.connect('device-1'));
+        // connect 内部有多个 await，先推进到 connectToDevice.listen 建立完成，避免事件丢失。
+        pumpUntil(() => fakeBle.connectInvocationCount >= 1,
+            reason: '首次 connect 未调用 connectToDevice');
+        pumpUntil(() => manager.connectedDeviceId == 'device-1',
+            reason: '未进入 connected 状态');
+        pumpUntil(() => !manager.isDeviceConnected,
+            reason: '未进入 disconnected 状态');
+
+        expect(fakeBle.connectInvocationCount, 1);
+        async.elapse(const Duration(seconds: 6));
+        pumpUntil(() => fakeBle.connectInvocationCount >= 2,
+            reason: '重连未触发第二次 connectToDevice');
+        expect(fakeBle.connectInvocationCount, 2);
+
+        manager.dispose();
+      });
     });
 
     test('connect logs intermediate connection state changes', () async {
@@ -842,6 +889,7 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       expect(manager.isDeviceConnected, isFalse);
+      expect(manager.connectedDeviceId, '');
       expect(disconnectedCalled, isTrue);
       expect(stateEvents, contains(DeviceConnectionState.disconnected));
 
@@ -956,7 +1004,7 @@ void main() {
         ble: fakeBle,
         discoverResult: true,
       );
-      manager.connectedDeviceId = 'device-1';
+      manager.setConnectedDeviceIdForTest('device-1');
 
       final ready = await manager.registerNotifyChannel((data) {
         received.add(data);
@@ -981,7 +1029,7 @@ void main() {
         ble: fakeBle,
         discoverResult: false,
       );
-      manager.connectedDeviceId = 'device-1';
+      manager.setConnectedDeviceIdForTest('device-1');
 
       final ready = await manager.registerNotifyChannel((_) {});
 
@@ -1008,7 +1056,7 @@ void main() {
         discoverResult: true,
         onLog: logs.add,
       );
-      manager.connectedDeviceId = 'device-1';
+      manager.setConnectedDeviceIdForTest('device-1');
       fakeBle.subscribeThrowCharacteristicIds
           .add(manager.notifyCharacteristicUuid.toString());
 
@@ -1027,7 +1075,7 @@ void main() {
         discoverResult: true,
         onLog: logs.add,
       );
-      manager.connectedDeviceId = 'device-1';
+      manager.setConnectedDeviceIdForTest('device-1');
 
       final ready = await manager.registerNotifyChannel((_) {});
       expect(ready, isTrue);
@@ -1046,7 +1094,7 @@ void main() {
         ble: fakeBle,
         discoverResult: true,
       );
-      manager.connectedDeviceId = 'device-1';
+      manager.setConnectedDeviceIdForTest('device-1');
 
       final ready = await manager.registerRwcpChannel((data) {
         received.add(data);
@@ -1071,7 +1119,7 @@ void main() {
         ble: fakeBle,
         discoverResult: false,
       );
-      manager.connectedDeviceId = 'device-1';
+      manager.setConnectedDeviceIdForTest('device-1');
 
       final ready = await manager.registerRwcpChannel((_) {});
 
@@ -1098,7 +1146,7 @@ void main() {
         discoverResult: true,
         onLog: logs.add,
       );
-      manager.connectedDeviceId = 'device-1';
+      manager.setConnectedDeviceIdForTest('device-1');
       fakeBle.subscribeThrowCharacteristicIds
           .add(manager.writeNoResponseCharacteristicUuid.toString());
 
@@ -1117,7 +1165,7 @@ void main() {
         discoverResult: true,
         onLog: logs.add,
       );
-      manager.connectedDeviceId = 'device-1';
+      manager.setConnectedDeviceIdForTest('device-1');
 
       final ready = await manager.registerRwcpChannel((_) {});
       expect(ready, isTrue);
@@ -1136,7 +1184,7 @@ void main() {
         ble: fakeBle,
         discoverResult: true,
       );
-      manager.connectedDeviceId = 'device-1';
+      manager.setConnectedDeviceIdForTest('device-1');
 
       final ready = await manager.registerRwcpChannel(received.add);
       expect(ready, isTrue);
@@ -1153,7 +1201,7 @@ void main() {
     test('write and mtu methods call BleClient with expected arguments',
         () async {
       final manager = BleConnectionManager(ble: fakeBle);
-      manager.connectedDeviceId = 'device-1';
+      manager.setConnectedDeviceIdForTest('device-1');
 
       await manager.writeWithResponse(<int>[0x01]);
       await manager.writeWithoutResponse(<int>[0x02]);
@@ -1276,13 +1324,15 @@ void main() {
       await ble.dispose();
     });
 
-    test('disconnect marks device as disconnected', () {
+    test('disconnect clears connection state snapshot', () {
       final manager = BleConnectionManager(ble: fakeBle);
-      manager.isDeviceConnected = true;
+      manager.setIsDeviceConnectedForTest(true);
+      manager.setConnectedDeviceIdForTest('device-1');
 
       manager.disconnect();
 
       expect(manager.isDeviceConnected, isFalse);
+      expect(manager.connectedDeviceId, '');
       manager.dispose();
     });
   });

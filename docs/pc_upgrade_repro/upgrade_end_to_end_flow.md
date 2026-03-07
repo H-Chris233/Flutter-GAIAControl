@@ -200,30 +200,32 @@ chunk_len = min(requestedRemaining, chunk_len_max)
 
 ### 8.4 RWCP 会话建链（RST -> SYN）（首次发送 RWCP DATA 前必须）
 
-> 关键点：RWCP 的 DATA 不是“直接发就行”，需要先把 RWCP session 建到 `established`。
-> 本项目 Flutter 侧由 `RWCPClient` 自动完成（首次 `sendData()` 会先发 RST 再发 SYN），但电脑端复现需要显式实现。
+> 关键点：通过 `00001103` 写入的 RWCP `DATA` 不是“直接发就行”，需要先把 RWCP session 建到 `established`。
+> 本仓库 Flutter 侧由 `RWCPClient` 自动完成；电脑端复现需要显式实现。
 
 RWCP 段结构：`<header 1B> + <payload...>`
 
 - `header` 低 6 bit：`seq`（0~63）
-- `header` 高 2 bit：`op`（`0=data`，`1=syn`，`2=rst`，`3=gap`）
+- `header` 高 2 bit：`op`（client: `0=data`、`1=syn`、`2=rst`；server: `0=dataAck`、`1=synAck`、`2=rstAck`、`3=gap`）
 - `header = (op << 6) | seq`
 
-最小建链时序（读写都在 `00001103`）：
+最小建链时序（读写都在 `00001103`，Write Without Response + subscribe）：
 
 1. **Client -> Server：RST（空 payload）**
    - 示例：`seq=0` -> `header=0x80`
    - 发送 bytes：`80`
-2. **Server -> Client：RST_ACK**
-   - 示例：`80`
+2. **Server -> Client：RST_ACK（空 payload）**
+   - 期望收到：`80`
 3. **Client -> Server：SYN（空 payload）**
-   - 一般做法：新会话从 `seq=0` 开始 SYN，即 `header=0x40`
+   - 示例：`seq=0` -> `header=0x40`
    - 发送 bytes：`40`
-4. **Server -> Client：SYN_ACK**
-   - 示例：`40`
+4. **Server -> Client：SYN_ACK（空 payload）**
+   - 期望收到：`40`
 5. **进入 established 后才允许发 DATA**
-   - DATA 的 `op=0`，因此 `header` 就是 `seq` 本身（`00`~`3F`）。
-   - 注意：在本仓库实现里，`RST(seq=0)` 被 ACK 后会重置序号再发 `SYN(seq=0)`，因此**首个 DATA 通常从 `seq=1` 开始**（`header=01`）。
+   - `DATA` 的 `op=0`，因此 `header` 就是 `seq` 本身（`00`~`3F`）。
+   - 经验与本仓库日志一致：**首次 DATA 通常从 `seq=1` 开始**（`header=01`）。
+
+一句话速记：`发80回80，发40回40，开始发01...`
 
 ### 8.5 组装并发送 UPGRADE_DATA（注意 is_last）
 
@@ -268,16 +270,76 @@ RWCP = <header 1B> + GAIA
 00 1D 0C 02  16 00 00
 ```
 
-设备回 `IS_VALIDATION_DONE_CFM (0x17)`：
+### 9.1 期望回执（理想路径）
+
+设备会通过 **GAIA v3 `UPGRADE_DATA_INDICATION_NTF (cmd=0x0C80)`** 下发 VMU 回执：
+
+- 外层 GAIA：`00 1D 0C 80 <VMU...>`
+- 内层 VMU：`17 <len u16_be> <data...>`
+
+也就是说，理想情况下你会在 `00001102` 的通知里看到形如：
+
+```
+00 1D 0C 80  17 00 02  00 64
+```
+
+含义：
+
+- `00 1D`：Vendor
+- `0C 80`：Upgrade Data Indication (Notification)
+- `17`：`IS_VALIDATION_DONE_CFM`
+- `00 02`：VMU data 长度=2
+- `00 64`：`waiting_time_ms=0x0064=100ms`
+
+### 9.2 回执解析方法（字节级）
+
+设备回 `IS_VALIDATION_DONE_CFM (0x17)` 的 VMU 解析规则如下：
 
 - 若带 `waiting_time_ms`（u16_be）：等待再发下一次 0x16
 - 否则立刻再发 0x16
 
 直到设备发 `TRANSFER_COMPLETE_IND (0x0B)`。
 
+> 注意：`0x17` **不是** “校验成功/失败” 的状态码；它只是给 Host 一个“继续轮询”的节奏控制（等待时间可选）。
+
 ## 10. TRANSFER_COMPLETE ->（可选 silent commit 探测）-> TRANSFER_COMPLETE_RES
 
-设备发 `0x0B TRANSFER_COMPLETE_IND`（Data 为空）。
+### 10.1 期望回执（理想路径）
+
+当设备完成接收与校验后，会下发：
+
+- `0x0B TRANSFER_COMPLETE_IND`（VMU data 为空）
+
+在 `00001102` 通知里常见形态为：
+
+```
+00 1D 0C 80  0B 00 00
+```
+
+含义：
+
+- `0B`：`TRANSFER_COMPLETE_IND`
+- `00 00`：VMU data 长度=0
+
+### 10.2 （协议 v4+）Silent Commit 探测回执
+
+若 `protocolVersion >= 4`，并且你发送了：
+
+```
+00 1D 0C 02  20 00 00
+```
+
+则设备会回：
+
+```
+00 1D 0C 80  21 00 01  <00|01>
+```
+
+- `0x21`：`SILENT_COMMIT_SUPPORTED_CFM`
+- VMU data 长度=1
+- `data[0]`：
+  - `00`：不支持 Silent Commit
+  - `01`：支持 Silent Commit
 
 若 `protocolVersion >= 4`：
 
@@ -286,7 +348,7 @@ RWCP = <header 1B> + GAIA
 
 然后发 `TRANSFER_COMPLETE_RES`：
 
-- 本项目选择 Interactive：action=0x00
+- action=0x00
 - VMU bytes 固定：`0C 00 01 00`
 
 写入：
@@ -295,7 +357,36 @@ RWCP = <header 1B> + GAIA
 00 1D 0C 02  0C 00 01 00
 ```
 
-此后设备通常会重启/断链（真正的恢复逻辑见 Flutter 代码；本节不展开）。
+### 10.3 回执解析方法（字节级）
+
+1. `TRANSFER_COMPLETE_IND (0x0B)`：
+   - 只要收到 `0x0B`，就认为“接收+校验完成”进入下一步（需要 Host 明确回复 `0x0C`）。
+   - 该包 **没有** status/data 字段（len=0），因此不要尝试从中读取“成功码”。
+2. `SILENT_COMMIT_SUPPORTED_CFM (0x21)`：
+   - 读取 `data[0]`（一字节 0/1）判断是否支持 silent commit。
+3. Host 回复 `TRANSFER_COMPLETE_RES (0x0C)`：
+   - `data[0]=0x00` 表示继续（Interactive commit）。
+   - `data[0]=0x02` 表示 silent commit（仅当设备确认支持且协议版本允许时使用）。
+
+### 10.4 选择 Silent Commit 后：第 10 步之后怎么走
+
+当你决定走 Silent Commit（且已确认设备 `SILENT_COMMIT_SUPPORTED_CFM (0x21)` 的 `data[0]==0x01`）：
+
+1. Host 回复 `TRANSFER_COMPLETE_RES (0x0C)` 时使用 `action=0x02`：
+
+   ```
+   00 1D 0C 02  0C 00 01 02
+   ```
+
+2. 之后不再发送 `PROCEED_TO_COMMIT (0x0E)` / `COMMIT_CFM (0x10)` 这类“交互式提交”命令，改为继续监听设备下发的完成指示：
+
+   - 理想路径：设备下发 `SILENT_COMMIT_CFM (0x22)`（VMU data 为空）：
+
+     ```
+     00 1D 0C 80  22 00 00
+     ```
+
+   - 兼容路径：部分设备仍会继续下发 `COMPLETE_IND (0x12)` 或 `COMPLETE_IND_WITH_STATUS (0x25)`。
 
 ## 11. POST_REBOOT：resumePoint=inProgress 时发 PROCEED_TO_COMMIT
 

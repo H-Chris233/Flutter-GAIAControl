@@ -6,21 +6,28 @@ import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'controller/ota_server.dart';
+import 'test_ota_view.dart';
 import 'utils/crash_reporter.dart';
+import 'utils/log.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await CrashReporter.init();
     CrashReporter.maybeInstance?.installGlobalHandlers();
-  } catch (_) {}
+  } catch (e, s) {
+    // 关键初始化失败不能静默吞掉：至少在 debug 下输出，便于排障。
+    Log.e("main", "CrashReporter init/install failed: $e\n$s");
+  }
   runZonedGuarded(
     () {
       runApp(const MyApp());
     },
     (error, stack) {
-      CrashReporter.maybeInstance
-          ?.recordError(error, stack, context: "runZonedGuarded");
+      final reporter = CrashReporter.maybeInstance;
+      if (reporter != null) {
+        unawaited(reporter.recordError(error, stack, context: "runZonedGuarded"));
+      }
     },
   );
 }
@@ -51,6 +58,8 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   Worker? _messageWorker;
+  Worker? _connectionWorker;
+  bool _navigatedToOta = false;
 
   @override
   void initState() {
@@ -91,11 +100,26 @@ class _MyHomePageState extends State<MyHomePage> {
       }
       ota.userMessage.value = "检测到上次异常退出，崩溃日志已保存: $last";
     }());
+
+    _connectionWorker = ever<bool>(
+      ota.isDeviceConnected,
+      (connected) {
+        if (!mounted) return;
+        if (!connected) {
+          _navigatedToOta = false;
+          return;
+        }
+        if (_navigatedToOta) return;
+        _navigatedToOta = true;
+        Get.to(() => const TestOtaView());
+      },
+    );
   }
 
   @override
   void dispose() {
     _messageWorker?.dispose();
+    _connectionWorker?.dispose();
     CrashReporter.maybeInstance?.dispose();
     super.dispose();
   }
@@ -183,7 +207,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       isConnecting && connectingId == device.id;
                   final appConnectedThis =
                       OtaServer.to.isDeviceConnected.value &&
-                          OtaServer.to.connectDeviceId == device.id;
+                          OtaServer.to.currentConnectedDeviceId == device.id;
                   final phoneConnectedThis = appConnectedThis ||
                       OtaServer.to.isSystemConnectedScanDevice(device);
                   return InkWell(

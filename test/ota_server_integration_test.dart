@@ -276,8 +276,10 @@ void main() {
     test(
         'registerRWCP marks service not ready when rwcp channel is unavailable',
         () async {
-      fakeBleManager.isDeviceConnected = true;
+      fakeBleManager.setIsDeviceConnectedForTest(true);
       fakeBleManager.registerRwcpChannelResult = false;
+      // 连接状态以 OtaServer 为单一真相：测试需要显式设置。
+      server.isDeviceConnected.value = true;
 
       await server.registerRWCP();
       await Future<void>.delayed(Duration.zero);
@@ -290,10 +292,12 @@ void main() {
 
     test('registerRWCP sends upgrade connect when upgrading and channel ready',
         () async {
-      fakeBleManager.isDeviceConnected = true;
+      fakeBleManager.setIsDeviceConnectedForTest(true);
       fakeBleManager.registerRwcpChannelResult = true;
       server.isUpgrading.value = true;
       server.transFerComplete = false;
+      // 连接状态以 OtaServer 为单一真相：测试需要显式设置。
+      server.isDeviceConnected.value = true;
 
       await server.registerRWCP();
       await Future<void>.delayed(Duration.zero);
