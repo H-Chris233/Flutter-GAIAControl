@@ -198,7 +198,34 @@ GAIA header 固定：`00 1D 0C 02`
 chunk_len = min(requestedRemaining, chunk_len_max)
 ```
 
-### 8.4 组装并发送 UPGRADE_DATA（注意 is_last）
+### 8.4 RWCP 会话建链（RST -> SYN）（首次发送 RWCP DATA 前必须）
+
+> 关键点：RWCP 的 DATA 不是“直接发就行”，需要先把 RWCP session 建到 `established`。
+> 本项目 Flutter 侧由 `RWCPClient` 自动完成（首次 `sendData()` 会先发 RST 再发 SYN），但电脑端复现需要显式实现。
+
+RWCP 段结构：`<header 1B> + <payload...>`
+
+- `header` 低 6 bit：`seq`（0~63）
+- `header` 高 2 bit：`op`（`0=data`，`1=syn`，`2=rst`，`3=gap`）
+- `header = (op << 6) | seq`
+
+最小建链时序（读写都在 `00001103`）：
+
+1. **Client -> Server：RST（空 payload）**
+   - 示例：`seq=0` -> `header=0x80`
+   - 发送 bytes：`80`
+2. **Server -> Client：RST_ACK**
+   - 示例：`80`
+3. **Client -> Server：SYN（空 payload）**
+   - 一般做法：新会话从 `seq=0` 开始 SYN，即 `header=0x40`
+   - 发送 bytes：`40`
+4. **Server -> Client：SYN_ACK**
+   - 示例：`40`
+5. **进入 established 后才允许发 DATA**
+   - DATA 的 `op=0`，因此 `header` 就是 `seq` 本身（`00`~`3F`）。
+   - 注意：在本仓库实现里，`RST(seq=0)` 被 ACK 后会重置序号再发 `SYN(seq=0)`，因此**首个 DATA 通常从 `seq=1` 开始**（`header=01`）。
+
+### 8.5 组装并发送 UPGRADE_DATA（注意 is_last）
 
 是否是最后一包（is_last=0x01）的判断：
 
@@ -319,4 +346,3 @@ RWCP = <header 1B> + GAIA
 ```
 
 拿到新的版本文本做对比即可。
-
