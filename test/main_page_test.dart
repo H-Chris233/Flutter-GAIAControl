@@ -103,6 +103,15 @@ class _SpyHomeOtaServer extends OtaServer {
   }
 }
 
+
+Future<void> _pressSnackBarAction(WidgetTester tester, String label) async {
+  final action = tester.widget<SnackBarAction>(
+    find.widgetWithText(SnackBarAction, label),
+  );
+  action.onPressed();
+  await tester.pump();
+}
+
 void main() {
   setUp(() {
     TestWidgetsFlutterBinding.ensureInitialized();
@@ -126,6 +135,7 @@ void main() {
           pendingCrashPathReader: () async => null,
           openSettingsAction: () async {
             openSettingsCallCount += 1;
+            return true;
           },
         ),
       ),
@@ -138,8 +148,7 @@ void main() {
     expect(find.text('需要去设置'), findsOneWidget);
     expect(find.text('去设置'), findsOneWidget);
 
-    await tester.tap(find.text('去设置'));
-    await tester.pump();
+    await _pressSnackBarAction(tester, '去设置');
 
     expect(openSettingsCallCount, 1);
     expect(server.consumeUserMessageCallCount, 1);
@@ -168,8 +177,7 @@ void main() {
 
     expect(find.text('复制路径'), findsOneWidget);
 
-    await tester.tap(find.text('复制路径'));
-    await tester.pump();
+    await _pressSnackBarAction(tester, '复制路径');
 
     expect(copiedPath, '/tmp/crash.txt');
     expect(server.consumeUserMessageCallCount, 1);

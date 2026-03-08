@@ -252,7 +252,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('OTA 服务未初始化'), findsOneWidget);
+    expect(find.text('OTA服务未初始化'), findsOneWidget);
   });
 
   testWidgets('页面初始化会启动当前版本轮询', (tester) async {

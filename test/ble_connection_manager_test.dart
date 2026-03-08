@@ -729,6 +729,7 @@ void main() {
     test('connect schedules reconnect after disconnected', () {
       fakeAsync((async) {
         final manager = BleConnectionManager(ble: fakeBle);
+        final firstController = StreamController<ConnectionStateUpdate>.broadcast();
 
         void pumpUntil(
           bool Function() condition, {
@@ -740,11 +741,6 @@ void main() {
               return;
             }
             async.flushMicrotasks();
-            // `Stream.fromIterable`/`StreamController` 默认是异步投递事件（event queue / 0-delay timer）。
-            // 在 `fake_async` 下仅 `elapse(Duration.zero)` 可能无法稳定驱动这些事件被派发，
-            // 导致测试在不同调度实现/版本下变得脆弱（偶现超时）。
-            //
-            // 推进一个很小的非零时间片可以稳定触发这些异步事件，同时不会意外触发 5s 的重连定时器。
             async.elapse(const Duration(milliseconds: 1));
           }
           fail(
@@ -752,35 +748,27 @@ void main() {
               'connectedDeviceId=${manager.connectedDeviceId}, isDeviceConnected=${manager.isDeviceConnected}');
         }
 
-        // 模拟“首次连接的状态流”：connected -> disconnected -> done。
-        //
-        // 真实 BLE SDK 通常会在断开后结束连接状态流；这样可以保证重连时 cancel 旧订阅不会卡住。
-        final firstConnectionStream = Stream<ConnectionStateUpdate>.fromIterable(
-          const <ConnectionStateUpdate>[
-            ConnectionStateUpdate(
-              deviceId: 'device-1',
-              connectionState: DeviceConnectionState.connected,
-              failure: null,
-            ),
-            ConnectionStateUpdate(
-              deviceId: 'device-1',
-              connectionState: DeviceConnectionState.disconnected,
-              failure: null,
-            ),
-          ],
-        );
-        fakeBle.queuedConnectionStreams.add(firstConnectionStream);
-        // 第二次 connect（重连）只要能触发 connectToDevice 调用即可，状态流可以为空。
+        fakeBle.queuedConnectionStreams.add(firstController.stream);
         fakeBle.queuedConnectionStreams
             .add(const Stream<ConnectionStateUpdate>.empty());
 
-        // 不使用 async.run：确保 connect/Timer 都在 fakeAsync 的 zone 内创建（否则 elapse 不生效）。
         unawaited(manager.connect('device-1'));
-        // connect 内部有多个 await，先推进到 connectToDevice.listen 建立完成，避免事件丢失。
         pumpUntil(() => fakeBle.connectInvocationCount >= 1,
             reason: '首次 connect 未调用 connectToDevice');
+
+        firstController.add(const ConnectionStateUpdate(
+          deviceId: 'device-1',
+          connectionState: DeviceConnectionState.connected,
+          failure: null,
+        ));
         pumpUntil(() => manager.connectedDeviceId == 'device-1',
             reason: '未进入 connected 状态');
+
+        firstController.add(const ConnectionStateUpdate(
+          deviceId: 'device-1',
+          connectionState: DeviceConnectionState.disconnected,
+          failure: null,
+        ));
         pumpUntil(() => !manager.isDeviceConnected,
             reason: '未进入 disconnected 状态');
 
@@ -790,6 +778,7 @@ void main() {
             reason: '重连未触发第二次 connectToDevice');
         expect(fakeBle.connectInvocationCount, 2);
 
+        unawaited(firstController.close());
         manager.dispose();
       });
     });
