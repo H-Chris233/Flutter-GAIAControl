@@ -1616,7 +1616,7 @@ void main() {
 
     test('onRequestConfirmation unknown type writes ignore log', () async {
       server.onRequestConfirmation(0x7F);
-      await Future<void>.delayed(const Duration(milliseconds: 30));
+      await Future<void>.delayed(const Duration(milliseconds: 200));
       expect(server.logText.value, contains('askForConfirmation 未知类型'));
     });
 
@@ -1669,8 +1669,9 @@ void main() {
       expect(bleManager.writeWithResponsePayloads.length, before);
     });
 
-    test('onLog appends message via log buffer', () {
+    test('onLog appends message via log buffer', () async {
       server.onLog('manual-log');
+      await Future<void>.delayed(const Duration(milliseconds: 200));
       expect(server.logText.value, contains('manual-log'));
     });
   });
