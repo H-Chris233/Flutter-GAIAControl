@@ -17,10 +17,19 @@ class TestOtaView extends StatefulWidget {
 
 class _TestOtaState extends State<TestOtaView> {
   Worker? _upgradeSuccessWorker;
+  late final OtaServer? _otaServer = _resolveOtaServer();
 
-  OtaServer? get _otaServer {
+  OtaServer? _resolveOtaServer() {
     final provided = widget.otaServer;
     if (provided != null) {
+      if (Get.isRegistered<OtaServer>()) {
+        final registered = Get.find<OtaServer>();
+        if (!identical(registered, provided)) {
+          Get.replace<OtaServer>(provided);
+        }
+      } else {
+        Get.put<OtaServer>(provided);
+      }
       return provided;
     }
     if (Get.isRegistered<OtaServer>()) {
