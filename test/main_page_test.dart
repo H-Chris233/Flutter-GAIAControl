@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import 'package:gaia/controller/ble_connection_manager.dart';
@@ -103,7 +104,6 @@ class _SpyHomeOtaServer extends OtaServer {
   }
 }
 
-
 Future<void> _pressSnackBarAction(WidgetTester tester, String label) async {
   final action = tester.widget<SnackBarAction>(
     find.widgetWithText(SnackBarAction, label),
@@ -135,7 +135,6 @@ void main() {
           pendingCrashPathReader: () async => null,
           openSettingsAction: () async {
             openSettingsCallCount += 1;
-            return true;
           },
         ),
       ),
