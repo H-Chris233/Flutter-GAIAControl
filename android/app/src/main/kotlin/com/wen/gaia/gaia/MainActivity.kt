@@ -4,15 +4,24 @@ import android.Manifest
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.os.Build
+import android.util.Log
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.util.Locale
 
+internal object BluetoothConnectionReflection {
+    fun isConnected(target: Any): Boolean {
+        val method = target.javaClass.getMethod("isConnected")
+        return (method.invoke(target) as? Boolean) == true
+    }
+}
+
 class MainActivity : FlutterActivity() {
     private val channelName = "gaia/system_bluetooth"
     private val methodGetConnectedDevices = "getConnectedDevices"
+    private val tag = "MainActivity"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -27,6 +36,7 @@ class MainActivity : FlutterActivity() {
 
     private fun getConnectedDevices(): List<Map<String, String>> {
         if (!hasBluetoothConnectPermission()) {
+            Log.w(tag, "BLUETOOTH_CONNECT permission missing when reading connected devices")
             return emptyList()
         }
         val bluetoothManager = getSystemService(BLUETOOTH_SERVICE) as? BluetoothManager
@@ -43,7 +53,8 @@ class MainActivity : FlutterActivity() {
             )
         }
 
-        // 经典蓝牙（A2DP/HFP）通过反射读取 BluetoothDevice.isConnected
+        // 经典蓝牙（A2DP/HFP）通过反射读取 BluetoothDevice.isConnected。
+        // 反射失败时仅降级为“未知/未连接”，但必须保留日志，避免静默误判无法排查。
         val bondedDevices = adapter.bondedDevices ?: emptySet()
         for (device in bondedDevices) {
             if (isDeviceConnected(device)) {
@@ -90,9 +101,10 @@ class MainActivity : FlutterActivity() {
 
     private fun isDeviceConnected(device: BluetoothDevice): Boolean {
         return try {
-            val method = device.javaClass.getMethod("isConnected")
-            (method.invoke(device) as? Boolean) == true
-        } catch (_: Throwable) {
+            BluetoothConnectionReflection.isConnected(device)
+        } catch (error: Throwable) {
+            val address = device.address?.trim().orEmpty()
+            Log.w(tag, "BluetoothDevice.isConnected reflection failed for $address", error)
             false
         }
     }

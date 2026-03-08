@@ -319,10 +319,10 @@ class BleConnectionManager {
     }
     try {
       await _scanSubscription?.cancel();
-      await _connectionSubscription?.cancel();
     } catch (e) {
-      _log("清理旧连接时出错: $e");
+      _log("清理旧扫描时出错: $e");
     }
+    _cancelConnectionSubscriptionBestEffort();
     try {
       _scanSubscription = ble.scanForDevices(
           withServices: const <Uuid>[],
@@ -367,9 +367,7 @@ class BleConnectionManager {
     // 连接状态流的 cancel 在部分 BLE 实现/平台上可能不会及时完成（甚至永不完成），
     // 如果这里阻塞等待，会导致“自动重连”在 Timer 触发后卡死，第二次 connectToDevice 永远不发生。
     // 因此对 connectionSubscription 采取“尽力取消但不等待”的策略，避免重连被阻塞。
-    final oldConnectionSubscription = _connectionSubscription;
-    _connectionSubscription = null;
-    unawaited(oldConnectionSubscription?.cancel() ?? Future<void>.value());
+    _cancelConnectionSubscriptionBestEffort();
     await _notifySubscription?.cancel();
     await _rwcpSubscription?.cancel();
     _scanSubscription = null;
@@ -402,11 +400,12 @@ class BleConnectionManager {
         }
         onConnectionStateChanged?.call(state, deviceId);
         onDisconnected?.call();
-        if (_autoReconnectEnabled && deviceId.isNotEmpty) {
-          _scheduleReconnect(generation, deviceId, onConnected, onDisconnected);
-        } else {
-          _log("自动重连已关闭，等待手动重连");
-        }
+        _scheduleReconnectIfNeeded(
+          generation,
+          deviceId,
+          onConnected,
+          onDisconnected,
+        );
       } else {
         _isDeviceConnected = false;
         if (failure != null) {
@@ -425,7 +424,43 @@ class BleConnectionManager {
       onConnectionStateChanged?.call(DeviceConnectionState.disconnected, deviceId);
       onError?.call(error);
       onDisconnected?.call();
+      _scheduleReconnectIfNeeded(
+        generation,
+        deviceId,
+        onConnected,
+        onDisconnected,
+      );
     });
+  }
+
+  void _cancelConnectionSubscriptionBestEffort() {
+    final oldConnectionSubscription = _connectionSubscription;
+    _connectionSubscription = null;
+    final cancelFuture = oldConnectionSubscription?.cancel();
+    if (cancelFuture == null) {
+      return;
+    }
+    unawaited(cancelFuture.catchError((Object error) {
+      _log("清理旧连接时出错: $error");
+    }));
+  }
+
+  void _scheduleReconnectIfNeeded(
+    int expectedGeneration,
+    String deviceId,
+    VoidCallback? onConnected,
+    VoidCallback? onDisconnected,
+  ) {
+    if (_autoReconnectEnabled && deviceId.isNotEmpty) {
+      _scheduleReconnect(
+        expectedGeneration,
+        deviceId,
+        onConnected,
+        onDisconnected,
+      );
+      return;
+    }
+    _log("自动重连已关闭，等待手动重连");
   }
 
   /// 调度重连

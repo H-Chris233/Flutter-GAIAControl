@@ -10,6 +10,10 @@ import 'test_ota_view.dart';
 import 'utils/crash_reporter.dart';
 import 'utils/log.dart';
 
+typedef PendingCrashPathReader = Future<String?> Function();
+typedef SettingsOpener = Future<void> Function();
+typedef ClipboardWriter = Future<void> Function(String text);
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
@@ -26,7 +30,9 @@ Future<void> main() async {
     (error, stack) {
       final reporter = CrashReporter.maybeInstance;
       if (reporter != null) {
-        unawaited(reporter.recordError(error, stack, context: "runZonedGuarded"));
+        unawaited(
+          reporter.recordError(error, stack, context: "runZonedGuarded"),
+        );
       }
     },
   );
@@ -48,9 +54,22 @@ class MyApp extends StatelessWidget {
 }
 
 class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
+  const MyHomePage({
+    super.key,
+    required this.title,
+    this.otaServer,
+    this.pendingCrashPathReader,
+    this.openSettingsAction,
+    this.copyToClipboard,
+    this.onNavigateToOta,
+  });
 
   final String title;
+  final OtaServer? otaServer;
+  final PendingCrashPathReader? pendingCrashPathReader;
+  final SettingsOpener? openSettingsAction;
+  final ClipboardWriter? copyToClipboard;
+  final VoidCallback? onNavigateToOta;
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
@@ -60,49 +79,51 @@ class _MyHomePageState extends State<MyHomePage> {
   Worker? _messageWorker;
   Worker? _connectionWorker;
   bool _navigatedToOta = false;
+  late final OtaServer _ota;
 
   @override
   void initState() {
     super.initState();
-    final ota = Get.put<OtaServer>(OtaServer());
-    _messageWorker = ever<String?>(ota.userMessage, (message) {
+    _ota = _resolveOtaServer();
+    _messageWorker = ever<String?>(_ota.userMessage, (message) {
       if (message == null || message.isEmpty || !mounted) {
         return;
       }
       final isCrashReport = message.contains("崩溃日志已保存:");
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(
-          content: Text(message),
-          action: SnackBarAction(
-            label: isCrashReport ? '复制路径' : '去设置',
-            onPressed: () {
-              if (!isCrashReport) {
-                openAppSettings();
-                return;
-              }
-              final path = message.split("崩溃日志已保存:").last.trim();
-              if (path.isEmpty) {
-                return;
-              }
-              Clipboard.setData(ClipboardData(text: path));
-            },
+        ..showSnackBar(
+          SnackBar(
+            content: Text(message),
+            action: SnackBarAction(
+              label: isCrashReport ? '复制路径' : '去设置',
+              onPressed: () {
+                if (!isCrashReport) {
+                  unawaited(_openSettings());
+                  return;
+                }
+                final path = message.split("崩溃日志已保存:").last.trim();
+                if (path.isEmpty) {
+                  return;
+                }
+                unawaited(_writeClipboard(path));
+              },
+            ),
           ),
-        ));
-      ota.consumeUserMessage();
+        );
+      _ota.consumeUserMessage();
     });
 
     unawaited(() async {
-      final last =
-          await CrashReporter.maybeInstance?.consumePendingReportPath();
+      final last = await _readPendingCrashPath();
       if (!mounted || last == null) {
         return;
       }
-      ota.userMessage.value = "检测到上次异常退出，崩溃日志已保存: $last";
+      _ota.userMessage.value = "检测到上次异常退出，崩溃日志已保存: $last";
     }());
 
     _connectionWorker = ever<bool>(
-      ota.isDeviceConnected,
+      _ota.isDeviceConnected,
       (connected) {
         if (!mounted) return;
         if (!connected) {
@@ -111,9 +132,63 @@ class _MyHomePageState extends State<MyHomePage> {
         }
         if (_navigatedToOta) return;
         _navigatedToOta = true;
-        Get.to(() => const TestOtaView());
+        _navigateToOtaPage();
       },
     );
+  }
+
+  OtaServer _resolveOtaServer() {
+    final injected = widget.otaServer;
+    if (injected != null) {
+      if (Get.isRegistered<OtaServer>()) {
+        final registered = Get.find<OtaServer>();
+        if (!identical(registered, injected)) {
+          Get.replace<OtaServer>(injected);
+        }
+      } else {
+        Get.put<OtaServer>(injected);
+      }
+      return injected;
+    }
+    if (Get.isRegistered<OtaServer>()) {
+      return Get.find<OtaServer>();
+    }
+    return Get.put<OtaServer>(OtaServer());
+  }
+
+  Future<String?> _readPendingCrashPath() async {
+    final reader = widget.pendingCrashPathReader;
+    if (reader != null) {
+      return reader();
+    }
+    return CrashReporter.maybeInstance?.consumePendingReportPath();
+  }
+
+  Future<void> _openSettings() async {
+    final action = widget.openSettingsAction;
+    if (action != null) {
+      await action();
+      return;
+    }
+    await openAppSettings();
+  }
+
+  Future<void> _writeClipboard(String text) async {
+    final writer = widget.copyToClipboard;
+    if (writer != null) {
+      await writer(text);
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: text));
+  }
+
+  void _navigateToOtaPage() {
+    final callback = widget.onNavigateToOta;
+    if (callback != null) {
+      callback();
+      return;
+    }
+    Get.to(() => TestOtaView(otaServer: _ota));
   }
 
   @override
@@ -133,7 +208,7 @@ class _MyHomePageState extends State<MyHomePage> {
       body: Column(
         children: [
           Obx(() {
-            final scanning = OtaServer.to.isScanning.value;
+            final scanning = _ota.isScanning.value;
             return Padding(
               padding: const EdgeInsets.all(12),
               child: Row(
@@ -141,10 +216,10 @@ class _MyHomePageState extends State<MyHomePage> {
                   ElevatedButton(
                     onPressed: scanning
                         ? () {
-                            OtaServer.to.stopScan();
+                            _ota.stopScan();
                           }
                         : () {
-                            OtaServer.to.startScan();
+                            _ota.startScan();
                           },
                     child: Text(scanning ? '停止扫描' : '扫描蓝牙'),
                   ),
@@ -158,7 +233,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   if (scanning) const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      OtaServer.to.deviceListHint.value,
+                      _ota.deviceListHint.value,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -169,10 +244,10 @@ class _MyHomePageState extends State<MyHomePage> {
           }),
           Expanded(
             child: Obx(() {
-              final state = OtaServer.to.deviceListUiState.value;
-              final devices = OtaServer.to.devices;
-              final isConnecting = OtaServer.to.isConnecting.value;
-              final connectingId = OtaServer.to.connectingDeviceId.value;
+              final state = _ota.deviceListUiState.value;
+              final devices = _ota.devices;
+              final isConnecting = _ota.isConnecting.value;
+              final connectingId = _ota.connectingDeviceId.value;
 
               if ((state == DeviceListUiState.scanning && devices.isEmpty) ||
                   (isConnecting && devices.isEmpty)) {
@@ -186,11 +261,11 @@ class _MyHomePageState extends State<MyHomePage> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(OtaServer.to.deviceListHint.value),
+                      Text(_ota.deviceListHint.value),
                       const SizedBox(height: 8),
                       OutlinedButton(
                         onPressed: () {
-                          OtaServer.to.startScan();
+                          _ota.startScan();
                         },
                         child: const Text('重试扫描'),
                       ),
@@ -206,15 +281,15 @@ class _MyHomePageState extends State<MyHomePage> {
                   final connectingThis =
                       isConnecting && connectingId == device.id;
                   final appConnectedThis =
-                      OtaServer.to.isDeviceConnected.value &&
-                          OtaServer.to.currentConnectedDeviceId == device.id;
-                  final phoneConnectedThis = appConnectedThis ||
-                      OtaServer.to.isSystemConnectedScanDevice(device);
+                      _ota.isDeviceConnected.value &&
+                          _ota.currentConnectedDeviceId == device.id;
+                  final phoneConnectedThis =
+                      appConnectedThis || _ota.isSystemConnectedScanDevice(device);
                   return InkWell(
                     onTap: isConnecting
                         ? null
                         : () {
-                            OtaServer.to.connectDevice(device.id);
+                            _ota.connectDevice(device.id);
                           },
                     child: Container(
                       margin:
@@ -227,9 +302,10 @@ class _MyHomePageState extends State<MyHomePage> {
                         borderRadius:
                             const BorderRadius.all(Radius.circular(6)),
                         border: Border.all(
-                            color: phoneConnectedThis
-                                ? const Color(0xff81C784)
-                                : const Color(0xffE4E7EE)),
+                          color: phoneConnectedThis
+                              ? const Color(0xff81C784)
+                              : const Color(0xffE4E7EE),
+                        ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -242,21 +318,25 @@ class _MyHomePageState extends State<MyHomePage> {
                                       ? device.name
                                       : '未命名设备',
                                   style: const TextStyle(
-                                      color: Color(0xff373F50),
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold),
+                                    color: Color(0xff373F50),
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                               if (phoneConnectedThis)
                                 Container(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 2),
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: appConnectedThis
                                         ? const Color(0xff2E7D32)
                                         : const Color(0xffF57C00),
                                     borderRadius: const BorderRadius.all(
-                                        Radius.circular(10)),
+                                      Radius.circular(10),
+                                    ),
                                   ),
                                   child: Text(
                                     appConnectedThis ? '本机已连接' : '手机已连接',
@@ -281,7 +361,9 @@ class _MyHomePageState extends State<MyHomePage> {
                           Text(
                             device.id,
                             style: const TextStyle(
-                                color: Color(0xff373F50), fontSize: 12),
+                              color: Color(0xff373F50),
+                              fontSize: 12,
+                            ),
                           ),
                           if (connectingThis)
                             const Padding(

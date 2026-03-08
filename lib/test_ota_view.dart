@@ -1,13 +1,15 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import 'package:gaia/controller/ota_server.dart';
 
 class TestOtaView extends StatefulWidget {
-  const TestOtaView({super.key});
+  const TestOtaView({super.key, this.otaServer});
+
+  final OtaServer? otaServer;
 
   @override
   State<TestOtaView> createState() => _TestOtaState();
@@ -16,14 +18,27 @@ class TestOtaView extends StatefulWidget {
 class _TestOtaState extends State<TestOtaView> {
   Worker? _upgradeSuccessWorker;
 
+  OtaServer? get _otaServer {
+    final provided = widget.otaServer;
+    if (provided != null) {
+      return provided;
+    }
+    if (Get.isRegistered<OtaServer>()) {
+      return Get.find<OtaServer>();
+    }
+    return null;
+  }
+
   @override
   void initState() {
     super.initState();
-    if (Get.isRegistered<OtaServer>()) {
-      OtaServer.to.startCurrentVersionPolling();
+    final ota = _otaServer;
+    if (ota == null) {
+      return;
     }
+    ota.startCurrentVersionPolling();
     _upgradeSuccessWorker = ever<int>(
-      OtaServer.to.upgradeSuccessCounter,
+      ota.upgradeSuccessCounter,
       (_) async {
         if (!mounted) return;
         await showDialog<void>(
@@ -32,7 +47,7 @@ class _TestOtaState extends State<TestOtaView> {
             return AlertDialog(
               title: const Text('升级成功'),
               content: Obx(() {
-                final after = OtaServer.to.versionAfterUpgrade.value;
+                final after = ota.versionAfterUpgrade.value;
                 final display = (after == "UNKNOWN") ? "查询中..." : after;
                 return Text('固件升级已完成。\n升级后版本：$display');
               }),
@@ -51,6 +66,17 @@ class _TestOtaState extends State<TestOtaView> {
 
   @override
   Widget build(BuildContext context) {
+    final ota = _otaServer;
+    if (ota == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('GAIA Control'),
+        ),
+        body: const Center(
+          child: Text('OTA服务未初始化'),
+        ),
+      );
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text("GAIA Control"),
@@ -58,11 +84,11 @@ class _TestOtaState extends State<TestOtaView> {
       body: Column(
         children: [
           Obx(() {
-            final connected = OtaServer.to.isDeviceConnected.value;
-            final rwcpEnabled = OtaServer.to.mIsRWCPEnabled.value;
-            final mode = OtaServer.to.vendorMode.value.toUpperCase();
-            final errors = OtaServer.to.errorCount.value;
-            final currentVersion = OtaServer.to.currentVersion.value;
+            final connected = ota.isDeviceConnected.value;
+            final rwcpEnabled = ota.mIsRWCPEnabled.value;
+            final mode = ota.vendorMode.value.toUpperCase();
+            final errors = ota.errorCount.value;
+            final currentVersion = ota.currentVersion.value;
             return Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -82,7 +108,7 @@ class _TestOtaState extends State<TestOtaView> {
             );
           }),
           Obx(() {
-            final currentPath = OtaServer.to.firmwarePath.value;
+            final currentPath = ota.firmwarePath.value;
             final fileName = _extractFileName(currentPath);
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -107,19 +133,19 @@ class _TestOtaState extends State<TestOtaView> {
             );
           }),
           Obx(() {
-            final per = OtaServer.to.updatePer.value;
+            final per = ota.updatePer.value;
             return Row(
               children: [
                 Expanded(
-                    child:
-                        Slider(value: per, onChanged: null, max: 100, min: 0)),
-                SizedBox(width: 60, child: Text('${per.toStringAsFixed(2)}%'))
+                  child: Slider(value: per, onChanged: null, max: 100, min: 0),
+                ),
+                SizedBox(width: 60, child: Text('${per.toStringAsFixed(2)}%')),
               ],
             );
           }),
           Obx(() {
-            final time = OtaServer.to.timeCount.value;
-            final upgrading = OtaServer.to.isUpgrading.value;
+            final time = ota.timeCount.value;
+            final upgrading = ota.isUpgrading.value;
             return MaterialButton(
               color: Colors.blue,
               onPressed: upgrading
@@ -128,16 +154,16 @@ class _TestOtaState extends State<TestOtaView> {
                       if (!await _ensureFirmwareReady()) {
                         return;
                       }
-                      OtaServer.to.startUpdateWithVersionCheck();
+                      ota.startUpdateWithVersionCheck();
                     },
               child: Text(upgrading ? '升级中... $time' : '开始升级 $time'),
             );
           }),
           Obx(() {
-            final before = OtaServer.to.versionBeforeUpgrade.value;
-            final after = OtaServer.to.versionAfterUpgrade.value;
-            final rwcpStatus = OtaServer.to.rwcpStatusText.value;
-            final recoveryStatus = OtaServer.to.recoveryStatusText.value;
+            final before = ota.versionBeforeUpgrade.value;
+            final after = ota.versionAfterUpgrade.value;
+            final rwcpStatus = ota.rwcpStatusText.value;
+            final recoveryStatus = ota.recoveryStatusText.value;
             final compare = (before == "UNKNOWN" || after == "UNKNOWN")
                 ? "信息不足"
                 : (before == after ? "未变化（可能未升级成功）" : "已变化（升级成功）");
@@ -146,34 +172,34 @@ class _TestOtaState extends State<TestOtaView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text("RWCP状态: $rwcpStatus"),
-                  Text("恢复状态: $recoveryStatus"),
                   Text("升级前版本: $before",
                       maxLines: 1, overflow: TextOverflow.ellipsis),
                   Text("升级后版本: $after",
                       maxLines: 1, overflow: TextOverflow.ellipsis),
                   Text("版本对比: $compare"),
+                  Text("RWCP状态: $rwcpStatus"),
+                  Text("恢复状态: $recoveryStatus"),
                 ],
               ),
             );
           }),
           Obx(() {
-            final upgrading = OtaServer.to.isUpgrading.value;
+            final upgrading = ota.isUpgrading.value;
             return MaterialButton(
               color: Colors.blue,
               onPressed: upgrading
                   ? () {
-                      OtaServer.to.stopUpgrade();
+                      ota.stopUpgrade();
                     }
                   : null,
               child: const Text('取消升级'),
             );
           }),
           Obx(() {
-            final connected = OtaServer.to.isDeviceConnected.value;
-            final upgrading = OtaServer.to.isUpgrading.value;
-            final rwcpStatus = OtaServer.to.rwcpStatusText.value;
-            final recoveryStatus = OtaServer.to.recoveryStatusText.value;
+            final connected = ota.isDeviceConnected.value;
+            final upgrading = ota.isUpgrading.value;
+            final rwcpStatus = ota.rwcpStatusText.value;
+            final recoveryStatus = ota.recoveryStatusText.value;
             final canRecover = connected ||
                 upgrading ||
                 rwcpStatus.contains("错误") ||
@@ -182,26 +208,30 @@ class _TestOtaState extends State<TestOtaView> {
               color: Colors.orange,
               onPressed: canRecover
                   ? () {
-                      OtaServer.to.quickRecoverNow();
+                      ota.quickRecoverNow();
                     }
                   : null,
               child: const Text('快速恢复'),
             );
           }),
           MaterialButton(
-              color: Colors.blue,
-              onPressed: () {
-                OtaServer.to.logText.value = "";
-              },
-              child: const Text('清空LOG')),
-          Expanded(child: Obx(() {
-            final log = OtaServer.to.logText.value;
-            return SingleChildScrollView(
+            color: Colors.blue,
+            onPressed: () {
+              ota.logText.value = "";
+            },
+            child: const Text('清空LOG'),
+          ),
+          Expanded(
+            child: Obx(() {
+              final log = ota.logText.value;
+              return SingleChildScrollView(
                 child: Text(
-              log,
-              style: const TextStyle(fontSize: 12),
-            ));
-          }))
+                  log,
+                  style: const TextStyle(fontSize: 12),
+                ),
+              );
+            }),
+          ),
         ],
       ),
     );
@@ -210,16 +240,18 @@ class _TestOtaState extends State<TestOtaView> {
   @override
   void dispose() {
     _upgradeSuccessWorker?.dispose();
-    if (Get.isRegistered<OtaServer>()) {
-      OtaServer.to.stopCurrentVersionPolling();
-      OtaServer.to.disconnect();
+    final ota = _otaServer;
+    if (ota != null) {
+      ota.stopCurrentVersionPolling();
+      ota.disconnect();
     }
     super.dispose();
   }
 
   Future<void> _chooseFirmwareFile() async {
-    if (!mounted) return;
-    final initialDirectory = OtaServer.to.lastFirmwareDirectory.value.trim();
+    final ota = _otaServer;
+    if (ota == null || !mounted) return;
+    final initialDirectory = ota.lastFirmwareDirectory.value.trim();
     FilePickerResult? result;
     try {
       result = await FilePicker.platform.pickFiles(
@@ -230,7 +262,7 @@ class _TestOtaState extends State<TestOtaView> {
         initialDirectory: initialDirectory.isEmpty ? null : initialDirectory,
       );
     } catch (e) {
-      OtaServer.to.addLog("选择固件失败: $e");
+      ota.addLog("选择固件失败: $e");
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text("选择固件失败: $e")));
@@ -250,14 +282,18 @@ class _TestOtaState extends State<TestOtaView> {
   }
 
   Future<bool> _ensureFirmwareReady() async {
-    String usePath = OtaServer.to.firmwarePath.value.trim();
+    final ota = _otaServer;
+    if (ota == null) {
+      return false;
+    }
+    final usePath = ota.firmwarePath.value.trim();
     if (usePath.isEmpty) {
-      OtaServer.to.addLog("固件路径未设置");
+      ota.addLog("固件路径未设置");
       return false;
     }
     final error = await _validateFirmwareFile(usePath);
     if (error != null) {
-      OtaServer.to.addLog(error);
+      ota.addLog(error);
       if (!mounted) return false;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(error)));
@@ -268,16 +304,20 @@ class _TestOtaState extends State<TestOtaView> {
   }
 
   Future<void> _applyFirmwarePath(String rawPath) async {
+    final ota = _otaServer;
+    if (ota == null) {
+      return;
+    }
     final usePath = rawPath.trim();
     final error = await _validateFirmwareFile(usePath);
     if (error != null) {
-      OtaServer.to.addLog(error);
+      ota.addLog(error);
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(error)));
       return;
     }
-    OtaServer.to.setFirmwarePath(usePath);
+    ota.setFirmwarePath(usePath);
   }
 
   String _extractFileName(String rawPath) {

@@ -89,12 +89,24 @@ class _SpyOtaServer extends OtaServer {
 
   final _ViewBleConnectionManager manager;
 
+  int startCurrentVersionPollingCallCount = 0;
+  int stopCurrentVersionPollingCallCount = 0;
   int startUpdateWithVersionCheckCallCount = 0;
   int stopUpgradeCallCount = 0;
   int quickRecoverNowCallCount = 0;
   int disconnectCallCount = 0;
   final List<String> loggedMessages = <String>[];
   final List<String> appliedFirmwarePaths = <String>[];
+
+  @override
+  void startCurrentVersionPolling() {
+    startCurrentVersionPollingCallCount += 1;
+  }
+
+  @override
+  void stopCurrentVersionPolling() {
+    stopCurrentVersionPollingCallCount += 1;
+  }
 
   @override
   void startUpdateWithVersionCheck() {
@@ -170,10 +182,9 @@ FilePickerResult _singlePickResult({
 }
 
 Future<void> _pumpOtaView(WidgetTester tester, _SpyOtaServer server) async {
-  Get.put<OtaServer>(server);
   await tester.pumpWidget(
-    const GetMaterialApp(
-      home: TestOtaView(),
+    GetMaterialApp(
+      home: TestOtaView(otaServer: server),
     ),
   );
   await tester.pump();
@@ -231,6 +242,25 @@ void main() {
     if (originalFilePicker != null) {
       FilePicker.platform = originalFilePicker!;
     }
+  });
+
+  testWidgets('未注册 OtaServer 时显示兜底提示而不崩溃', (tester) async {
+    await tester.pumpWidget(
+      const GetMaterialApp(
+        home: TestOtaView(),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('OTA 服务未初始化'), findsOneWidget);
+  });
+
+  testWidgets('页面初始化会启动当前版本轮询', (tester) async {
+    final server = _SpyOtaServer(manager: _ViewBleConnectionManager());
+
+    await _pumpOtaView(tester, server);
+
+    expect(server.startCurrentVersionPollingCallCount, 1);
   });
 
   testWidgets('页面基础信息可渲染', (tester) async {
@@ -565,6 +595,7 @@ void main() {
     await tester.pump();
     await tester.pump();
 
+    expect(server.stopCurrentVersionPollingCallCount, 1);
     expect(server.disconnectCallCount, 1);
     expect(manager.disconnectCallCount, 1);
   });

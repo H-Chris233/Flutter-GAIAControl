@@ -683,7 +683,7 @@ void main() {
       manager.dispose();
     });
 
-    test('startScan logs when cleaning previous subscription fails', () async {
+    test('startScan logs when cleaning previous scan subscription fails', () async {
       final logs = <String>[];
       final manager = BleConnectionManager(
         ble: fakeBle,
@@ -699,8 +699,30 @@ void main() {
       await manager.startScan();
       await manager.startScan();
 
-      expect(logs.any((log) => log.contains('清理旧连接时出错')), isTrue);
+      expect(logs.any((log) => log.contains('清理旧扫描时出错')), isTrue);
       await failOnCancelController.close();
+      manager.dispose();
+    });
+
+    test('startScan does not wait for hanging connection cancel', () async {
+      final manager = BleConnectionManager(
+        ble: fakeBle,
+        isAndroidPlatform: () => false,
+        bluetoothPermissionStatus: () async => PermissionStatus.granted,
+      );
+      final cancelCompleter = Completer<void>();
+      final hangingController = StreamController<ConnectionStateUpdate>.broadcast(
+        onCancel: () => cancelCompleter.future,
+      );
+      fakeBle.queuedConnectionStreams.add(hangingController.stream);
+
+      await manager.connect('device-1');
+      final result = await manager.startScan().timeout(const Duration(seconds: 1));
+
+      expect(result, BleScanStartResult.started);
+
+      cancelCompleter.complete();
+      await hangingController.close();
       manager.dispose();
     });
 
@@ -924,26 +946,40 @@ void main() {
       manager.dispose();
     });
 
-    test('onError from current generation triggers callbacks', () async {
-      var disconnectedCalled = 0;
-      var onErrorCalled = 0;
-      final manager = BleConnectionManager(ble: fakeBle);
-      fakeBle.queuedConnectionStreams
-          .add(Stream<ConnectionStateUpdate>.fromFuture(
-        Future<ConnectionStateUpdate>.error(StateError('current error')),
-      ));
+    test('onError from current generation triggers callbacks and reconnect', () {
+      fakeAsync((async) {
+        var disconnectedCalled = 0;
+        var onErrorCalled = 0;
+        final manager = BleConnectionManager(ble: fakeBle);
+        fakeBle.queuedConnectionStreams
+            .add(Stream<ConnectionStateUpdate>.fromFuture(
+          Future<ConnectionStateUpdate>.error(StateError('current error')),
+        ));
+        fakeBle.queuedConnectionStreams
+            .add(const Stream<ConnectionStateUpdate>.empty());
 
-      await manager.connect(
-        'device-1',
-        onDisconnected: () => disconnectedCalled += 1,
-        onError: (_) => onErrorCalled += 1,
-      );
-      await Future<void>.delayed(const Duration(milliseconds: 10));
+        unawaited(manager.connect(
+          'device-1',
+          onDisconnected: () => disconnectedCalled += 1,
+          onError: (_) => onErrorCalled += 1,
+        ));
+        async.flushMicrotasks();
+        async.elapse(const Duration(milliseconds: 20));
+        async.flushMicrotasks();
 
-      expect(disconnectedCalled, 1);
-      expect(onErrorCalled, 1);
-      expect(manager.isDeviceConnected, isFalse);
-      manager.dispose();
+        expect(disconnectedCalled, 1);
+        expect(onErrorCalled, 1);
+        expect(manager.isDeviceConnected, isFalse);
+        expect(fakeBle.connectInvocationCount, 1);
+
+        async.elapse(const Duration(seconds: 5));
+        async.flushMicrotasks();
+        async.elapse(const Duration(milliseconds: 20));
+        async.flushMicrotasks();
+
+        expect(fakeBle.connectInvocationCount, 2);
+        manager.dispose();
+      });
     });
 
     test('stale disconnected event from old generation is ignored', () async {
