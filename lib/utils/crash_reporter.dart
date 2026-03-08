@@ -2,8 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
-import 'dart:ui' show PlatformDispatcher;
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:path_provider/path_provider.dart';
@@ -76,10 +74,10 @@ class CrashReporter {
 
     // 注意：使用 PlatformDispatcher.instance，避免依赖 WidgetsBinding 的初始化时机；
     // WidgetsBinding.instance.platformDispatcher 在实现上也会委托到该实例。
-    final handler = (Object error, StackTrace stack) {
+    bool handler(Object error, StackTrace stack) {
       unawaited(recordError(error, stack, context: "PlatformDispatcher"));
       return false;
-    };
+    }
     PlatformDispatcher.instance.onError = handler;
     // 防御性同步：部分测试/嵌入环境可能通过 WidgetsBinding 读取该回调。
     try {

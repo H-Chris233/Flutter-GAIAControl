@@ -99,7 +99,7 @@ class _SpyOtaServer extends OtaServer {
   final List<String> appliedFirmwarePaths = <String>[];
 
   @override
-  void startCurrentVersionPolling() {
+  void startCurrentVersionPolling({Duration interval = const Duration(seconds: 1)}) {
     startCurrentVersionPollingCallCount += 1;
   }
 

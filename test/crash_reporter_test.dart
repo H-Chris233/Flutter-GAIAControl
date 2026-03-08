@@ -12,12 +12,10 @@ class _FakePathProviderPlatform extends PathProviderPlatform
   _FakePathProviderPlatform({
     required this.documentsPath,
     this.externalStoragePath,
-    this.throwOnExternalStorage = false,
   });
 
   final String? documentsPath;
   final String? externalStoragePath;
-  final bool throwOnExternalStorage;
 
   @override
   Future<String?> getApplicationDocumentsPath() async {
@@ -26,9 +24,6 @@ class _FakePathProviderPlatform extends PathProviderPlatform
 
   @override
   Future<String?> getExternalStoragePath() async {
-    if (throwOnExternalStorage) {
-      throw StateError('external storage unavailable');
-    }
     return externalStoragePath;
   }
 }
