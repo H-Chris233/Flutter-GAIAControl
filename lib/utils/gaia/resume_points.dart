@@ -18,4 +18,15 @@ class ResumePoints {
 
   /// This resume point means the new image has been committed but the device is yet to send the upgradeCompleteInd.
   static const int postCommit = 0x05;
+
+  static List<int> values() {
+    return <int>[
+      dataTransfer,
+      validation,
+      transferComplete,
+      inProgress,
+      commit,
+      postCommit,
+    ];
+  }
 }

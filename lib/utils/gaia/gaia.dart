@@ -780,4 +780,24 @@ class GAIA {
 
   /// Bluetooth Classic.
   static int brEdr = 1;
+
+  static List<int> runtimeProbeValues() {
+    return <int>[
+      commandMask,
+      acknowledgmentMask,
+      vendorNone,
+      commandSetDataEndpointMode,
+      commandGetApplicationVersion,
+      commandDfuCommit,
+      commandVmUpgradeControl,
+      commandsNotificationMask,
+      commandRegisterNotification,
+      commandCancelNotification,
+      notStatus,
+      notNotification,
+      vmuPacket,
+      ble,
+      brEdr,
+    ];
+  }
 }

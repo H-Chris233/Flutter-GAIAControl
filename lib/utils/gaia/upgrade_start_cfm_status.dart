@@ -6,4 +6,11 @@ class UpgradeStartCFMStatus {
   /// Value for an `Enum#upgradeStartCfm upgradeStartCfm` message when the device is not ready to
   /// start the upgrade process.
   static const int errorAppNotReady = 0x09;
+
+  static List<int> values() {
+    return <int>[
+      success,
+      errorAppNotReady,
+    ];
+  }
 }

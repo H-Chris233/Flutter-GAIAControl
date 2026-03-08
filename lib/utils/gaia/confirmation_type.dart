@@ -30,4 +30,14 @@ class ConfirmationType {
   /// `com.qualcomm.qti.libraries.vmupgrade.codes.ReturnCodes.Enum#ERROR_BATTERY_LOW ERROR_BATTERY_LOW`,the
   /// listener has to ask if the upgrade should continue or not.</p>
   static const int batteryLowOnDevice = 5;
+
+  static List<int> values() {
+    return <int>[
+      transferComplete,
+      commit,
+      inProgress,
+      warningFileIsDifferent,
+      batteryLowOnDevice,
+    ];
+  }
 }

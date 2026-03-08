@@ -24,3 +24,7 @@ abstract class RWCPListener {
   ///              The number of segments which had been acknowledged.
   void onTransferProgress(int acknowledged);
 }
+
+bool isRwcpListenerInstance(Object? value) {
+  return value is RWCPListener;
+}

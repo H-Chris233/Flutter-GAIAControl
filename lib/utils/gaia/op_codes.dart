@@ -213,4 +213,26 @@ class OpCodes {
 
   /// The length for the data of the `Enum#upgradeDataBytesReq upgradeDataBytesReq` message.
   static const dataLength = fileOffsetLength + nbBytesLength;
+
+  static List<int> values() {
+    return <int>[
+      upgradeStartReq,
+      upgradeStartCfm,
+      upgradeDataBytesReq,
+      upgradeData,
+      upgradeAbortReq,
+      upgradeAbortCfm,
+      upgradeTransferCompleteRes,
+      upgradeInProgressRes,
+      upgradeCommitCfm,
+      upgradeSyncReq,
+      upgradeSyncCfm,
+      upgradeStartDataReq,
+      upgradeIsValidationDoneReq,
+      upgradeIsValidationDoneCfm,
+      upgradeErrorWarnRes,
+      upgradeCompleteIndWithStatus,
+      dataLength,
+    ];
+  }
 }

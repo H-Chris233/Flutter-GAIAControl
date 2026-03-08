@@ -1575,5 +1575,103 @@ void main() {
         );
       });
     });
+
+    test('normalizeBluetoothId covers empty/compact/fallback branches', () {
+      expect(server.normalizeBluetoothId('   '), '');
+      expect(server.normalizeBluetoothId(' aa:bb-cc dd.ee ff '), 'AABBCCDDEEFF');
+      expect(server.normalizeBluetoothId('gaia-device-id'), 'GAIA-DEVICE-ID');
+    });
+
+    test('refreshSystemConnectedDevices clears cache on non-android', () async {
+      if (Platform.isAndroid) {
+        return;
+      }
+      server.systemConnectedDeviceIds.assignAll(<String>['AABBCCDDEEFF']);
+      await server.refreshSystemConnectedDevices();
+      expect(server.systemConnectedDeviceIds, isEmpty);
+    });
+
+    test('current version polling can start/stop safely in test mode', () {
+      expect(Get.testMode, isTrue);
+      server.startCurrentVersionPolling(interval: const Duration(milliseconds: 10));
+      server.stopCurrentVersionPolling();
+      expect(server.currentVersion.value, 'UNKNOWN');
+    });
+
+    test('onRequestConfirmation commit sends VMU commit confirmation', () async {
+      server.onRequestConfirmation(ConfirmationType.commit);
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+
+      final hasCommitConfirmation =
+          bleManager.writeWithResponsePayloads.any((bytes) {
+        final gaia = GaiaPacketBLE.fromByte(bytes);
+        if (gaia == null || gaia.getCommand() != cmdBuilder.upgradeControlCommand()) {
+          return false;
+        }
+        final vmu = VMUPacket.getPackageFromByte(gaia.mPayload ?? <int>[]);
+        return vmu?.mOpCode == OpCodes.upgradeCommitCfm;
+      });
+      expect(hasCommitConfirmation, isTrue);
+    });
+
+    test('onRequestConfirmation unknown type writes ignore log', () async {
+      server.onRequestConfirmation(0x7F);
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      expect(server.logText.value, contains('askForConfirmation 未知类型'));
+    });
+
+    test('sendUpgradeDisconnect and disconnectUpgrade send disconnect command',
+        () async {
+      server.sendUpgradeDisconnect();
+      server.disconnectUpgrade();
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+
+      final disconnectCount =
+          bleManager.writeWithResponsePayloads.where((bytes) {
+        final packet = GaiaPacketBLE.fromByte(bytes);
+        return packet?.getCommand() == cmdBuilder.upgradeDisconnectCommand();
+      }).length;
+      expect(disconnectCount, greaterThanOrEqualTo(2));
+    });
+
+    test('sendDfuGetResult timeout finishes upgrade when still upgrading', () {
+      fakeAsync((async) {
+        server.isUpgrading.value = true;
+        server.sendDfuGetResult();
+        async.elapse(
+            Duration(seconds: OtaServer.kDfuResultQueryTimeoutSeconds + 1));
+        async.flushMicrotasks();
+      });
+
+      expect(server.isUpgrading.value, isFalse);
+      expect(server.logText.value, contains('DFU_GET_RESULT超时'));
+    });
+
+    test('sendDfuGetResult timeout no-op when not upgrading', () {
+      fakeAsync((async) {
+        server.isUpgrading.value = false;
+        server.sendDfuGetResult();
+        async.elapse(
+            Duration(seconds: OtaServer.kDfuResultQueryTimeoutSeconds + 1));
+        async.flushMicrotasks();
+      });
+
+      expect(server.logText.value, isNot(contains('DFU_GET_RESULT超时')));
+    });
+
+    test('writeMsg is ignored after onClose', () async {
+      server.onClose();
+      final before = bleManager.writeWithResponsePayloads.length;
+
+      server.writeMsg(<int>[0xFF, 0xEE, 0xDD]);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(bleManager.writeWithResponsePayloads.length, before);
+    });
+
+    test('onLog appends message via log buffer', () {
+      server.onLog('manual-log');
+      expect(server.logText.value, contains('manual-log'));
+    });
   });
 }
