@@ -1036,9 +1036,12 @@ class OtaServer extends GetxService
     isUpgrading.value = false;
     _dfuWriteInFlight = false;
     _dfuPendingChunkSize = 0;
-    if (sendDisconnect &&
-        isDeviceConnected.value &&
-        currentConnectedDeviceId.isNotEmpty) {
+    // 连接态以 BleConnectionManager 为主；但在少数状态切换窗口（尤其测试桩）下，
+    // 可能出现“已连接标志为 true，connectedDeviceId 尚未同步”的短暂不一致。
+    // 这里允许退化到 connectDeviceId，避免漏发 UpgradeDisconnect。
+    final hasKnownDeviceId =
+        currentConnectedDeviceId.isNotEmpty || connectDeviceId.isNotEmpty;
+    if (sendDisconnect && isDeviceConnected.value && hasKnownDeviceId) {
       await Future.delayed(const Duration(milliseconds: 500));
       sendUpgradeDisconnect();
     }

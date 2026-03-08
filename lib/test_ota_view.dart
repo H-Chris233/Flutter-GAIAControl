@@ -251,7 +251,6 @@ class _TestOtaState extends State<TestOtaView> {
     _upgradeSuccessWorker?.dispose();
     final ota = _otaServer;
     if (ota != null) {
-      ota.stopCurrentVersionPolling();
       ota.disconnect();
     }
     super.dispose();
